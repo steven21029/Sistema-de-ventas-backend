@@ -98,6 +98,7 @@ class ProductoSerializer(serializers.ModelSerializer):
             "empresa_nombre",
             "familia_nombre",
             "categoria_nombre",
+            "existencia",
             "agotado",
             "fecha_creacion",
             "fecha_actualizacion",

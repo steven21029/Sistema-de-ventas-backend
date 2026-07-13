@@ -98,7 +98,7 @@ class ProductoAdmin(admin.ModelAdmin):
     list_filter = ("empresa", "familia", "categoria", "activo")
     search_fields = ("nombre", "codigo_barra", "empresa__nombre")
     autocomplete_fields = ("empresa", "familia", "categoria")
-    readonly_fields = ("fecha_creacion", "fecha_actualizacion")
+    readonly_fields = ("existencia", "fecha_creacion", "fecha_actualizacion")
     ordering = ("empresa__nombre", "nombre")
 
     fieldsets = (
@@ -124,7 +124,7 @@ class ProductoAdmin(admin.ModelAdmin):
             },
         ),
         (
-            "Venta e inventario inicial",
+            "Venta e inventario actual",
             {
                 "fields": (
                     "precio",
