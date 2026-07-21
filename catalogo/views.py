@@ -1,4 +1,5 @@
 from rest_framework import viewsets
+from rest_framework.permissions import SAFE_METHODS
 
 from .models import Categoria, Familia, Producto
 from .permissions import IsCatalogoManagerOrReadOnly
@@ -8,15 +9,33 @@ from .serializers import CategoriaSerializer, FamiliaSerializer, ProductoSeriali
 class EmpresaQuerysetMixin:
     def filtrar_por_empresa(self, queryset):
         user = self.request.user
+        empresa_slug = self.request.query_params.get("empresa_slug", "").strip()
 
-        if user.is_superuser:
+        if self.request.method in SAFE_METHODS and empresa_slug:
+            queryset = queryset.filter(empresa__slug__iexact=empresa_slug, empresa__activa=True)
+            return self.filtrar_catalogo_publico(queryset)
+
+        if user.is_authenticated and user.is_superuser:
             return queryset
 
-        perfil = getattr(user, "perfil", None)
+        perfil = getattr(user, "perfil", None) if user.is_authenticated else None
         if perfil and perfil.empresa_id:
             return queryset.filter(empresa=perfil.empresa)
 
         return queryset.none()
+
+    def filtrar_catalogo_publico(self, queryset):
+        if queryset.model == Producto:
+            return queryset.filter(
+                activo=True,
+                familia__activa=True,
+                categoria__activa=True,
+            )
+
+        if queryset.model in [Familia, Categoria]:
+            return queryset.filter(activa=True)
+
+        return queryset
 
     def asignar_empresa_si_corresponde(self, serializer):
         user = self.request.user

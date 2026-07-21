@@ -7,11 +7,11 @@ class IsCatalogoManagerOrReadOnly(BasePermission):
     message = "No tienes permiso para administrar el catalogo."
 
     def has_permission(self, request, view):
-        if not request.user or not request.user.is_authenticated:
-            return False
-
         if request.method in SAFE_METHODS:
             return True
+
+        if not request.user or not request.user.is_authenticated:
+            return False
 
         if request.user.is_superuser:
             return True

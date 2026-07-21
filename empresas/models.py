@@ -46,6 +46,10 @@ class Empresa(models.Model):
     direccion = models.TextField(blank=True)
     sitio_web = models.URLField(blank=True)
 
+    tiene_envios = models.BooleanField(
+        default=False,
+        help_text="Si esta activo, la empresa podra ofrecer envio local y envio nacional.",
+    )
     activa = models.BooleanField(default=True)
     creada_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -64,6 +68,13 @@ class Empresa(models.Model):
 
     def __str__(self):
         return self.nombre
+
+    @property
+    def opciones_entrega_disponibles(self):
+        if self.tiene_envios:
+            return ["envio_local", "envio_nacional"]
+
+        return ["retiro_en_local"]
 
     def save(self, *args, **kwargs):
         if not self.slug:

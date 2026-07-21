@@ -1,9 +1,85 @@
-from rest_framework import decorators, response, viewsets
-from rest_framework.permissions import IsAuthenticated
+from rest_framework import decorators, response, status, views, viewsets
+from rest_framework.permissions import AllowAny, IsAuthenticated
 
 from .models import PerfilUsuario
 from .permissions import IsSuperUserOrReadOwnProfile
-from .serializers import PerfilUsuarioSerializer
+from .serializers import (
+    ConfirmarRecuperacionContrasenaSerializer,
+    LoginJWTSerializer,
+    PerfilUsuarioSerializer,
+    ReenviarVerificacionCorreoSerializer,
+    RegistroCompradorSerializer,
+    SolicitarRecuperacionContrasenaSerializer,
+    VerificarCorreoSerializer,
+)
+
+
+class LoginJWTView(views.APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = LoginJWTSerializer(
+            data=request.data,
+            context={"request": request},
+        )
+        serializer.is_valid(raise_exception=True)
+        return response.Response(serializer.validated_data, status=status.HTTP_200_OK)
+
+
+class RegistroCompradorView(views.APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = RegistroCompradorSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return response.Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class VerificarCorreoView(views.APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = VerificarCorreoSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return response.Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class ReenviarVerificacionCorreoView(views.APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = ReenviarVerificacionCorreoSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return response.Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class SolicitarRecuperacionContrasenaView(views.APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = SolicitarRecuperacionContrasenaSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return response.Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class ConfirmarRecuperacionContrasenaView(views.APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = ConfirmarRecuperacionContrasenaSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return response.Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class PerfilUsuarioViewSet(viewsets.ModelViewSet):

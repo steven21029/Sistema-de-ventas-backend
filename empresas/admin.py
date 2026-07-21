@@ -10,10 +10,11 @@ class EmpresaAdmin(admin.ModelAdmin):
         "slug",
         "correo",
         "telefono",
+        "tiene_envios",
         "activa",
         "fecha_creacion",
     )
-    list_filter = ("activa", "fecha_creacion")
+    list_filter = ("tiene_envios", "activa", "fecha_creacion")
     search_fields = ("nombre", "slug", "correo", "telefono")
     prepopulated_fields = {"slug": ("nombre",)}
     readonly_fields = ("creada_por", "fecha_creacion", "fecha_actualizacion")
@@ -49,6 +50,14 @@ class EmpresaAdmin(admin.ModelAdmin):
                     "correo",
                     "direccion",
                     "sitio_web",
+                )
+            },
+        ),
+        (
+            "Entrega",
+            {
+                "fields": (
+                    "tiene_envios",
                 )
             },
         ),
