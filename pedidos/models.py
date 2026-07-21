@@ -141,6 +141,12 @@ class Pedido(models.Model):
         choices=TipoEntrega.choices,
         default=TipoEntrega.RETIRO_EN_LOCAL,
     )
+    nombre_recibe = models.CharField(max_length=180, blank=True)
+    telefono_recibe = models.CharField(max_length=30, blank=True)
+    direccion_entrega = models.TextField(blank=True)
+    referencia_entrega = models.TextField(blank=True)
+    departamento_entrega = models.CharField(max_length=120, blank=True)
+    municipio_entrega = models.CharField(max_length=120, blank=True)
     estado_pago = models.CharField(
         max_length=20,
         choices=EstadoPago.choices,
@@ -168,6 +174,7 @@ class Pedido(models.Model):
     def clean(self):
         super().clean()
         self._validar_tipo_entrega()
+        self._validar_direccion_entrega()
         self._obtener_monto_envio()
         self._validar_descuento()
 
@@ -186,6 +193,7 @@ class Pedido(models.Model):
         )
 
         self._validar_tipo_entrega()
+        self._validar_direccion_entrega()
         self.envio = self._obtener_monto_envio()
         self._calcular_totales()
 
@@ -226,6 +234,25 @@ class Pedido(models.Model):
                     )
                 }
             )
+
+    def _validar_direccion_entrega(self):
+        if self.tipo_entrega == self.TipoEntrega.RETIRO_EN_LOCAL:
+            return
+
+        campos_requeridos = {
+            "nombre_recibe": self.nombre_recibe,
+            "telefono_recibe": self.telefono_recibe,
+            "direccion_entrega": self.direccion_entrega,
+            "departamento_entrega": self.departamento_entrega,
+            "municipio_entrega": self.municipio_entrega,
+        }
+        errores = {
+            campo: "Este campo es obligatorio para envios."
+            for campo, valor in campos_requeridos.items()
+            if not str(valor).strip()
+        }
+        if errores:
+            raise ValidationError(errores)
 
     def _validar_descuento(self):
         if self.descuento_total > self.subtotal:
@@ -321,6 +348,7 @@ class Pedido(models.Model):
         carrito,
         tipo_entrega,
         observaciones="",
+        datos_entrega=None,
     ):
         with transaction.atomic():
             carrito = (
@@ -380,6 +408,7 @@ class Pedido(models.Model):
                 subtotal=subtotal,
                 descuento_total=Decimal("0.00"),
                 observaciones=observaciones,
+                **(datos_entrega or {}),
             )
             pedido.full_clean()
             pedido.save()

@@ -84,6 +84,54 @@ class CarritoSerializer(serializers.ModelSerializer):
         ]
 
 
+class ItemCarritoClienteSerializer(serializers.ModelSerializer):
+    producto_nombre = serializers.CharField(source="producto.nombre", read_only=True)
+    codigo_barra = serializers.CharField(source="producto.codigo_barra", read_only=True)
+    imagen_principal = serializers.ImageField(
+        source="producto.imagen_principal",
+        read_only=True,
+    )
+    subtotal = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+
+    class Meta:
+        model = ItemCarrito
+        fields = [
+            "id",
+            "producto_nombre",
+            "codigo_barra",
+            "imagen_principal",
+            "cantidad",
+            "precio_unitario",
+            "subtotal",
+            "fecha_creacion",
+            "fecha_actualizacion",
+        ]
+        read_only_fields = fields
+
+
+class CarritoClienteSerializer(serializers.ModelSerializer):
+    items = ItemCarritoClienteSerializer(many=True, read_only=True)
+    empresa_nombre = serializers.CharField(source="empresa.nombre", read_only=True)
+    empresa_slug = serializers.CharField(source="empresa.slug", read_only=True)
+    total_items = serializers.IntegerField(read_only=True)
+    subtotal = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+
+    class Meta:
+        model = Carrito
+        fields = [
+            "id",
+            "empresa_nombre",
+            "empresa_slug",
+            "activo",
+            "total_items",
+            "subtotal",
+            "items",
+            "fecha_creacion",
+            "fecha_actualizacion",
+        ]
+        read_only_fields = fields
+
+
 class DetallePedidoSerializer(serializers.ModelSerializer):
     producto_nombre_actual = serializers.CharField(source="producto.nombre", read_only=True)
 
@@ -136,6 +184,12 @@ class PedidoSerializer(serializers.ModelSerializer):
             "carrito_origen",
             "numero",
             "tipo_entrega",
+            "nombre_recibe",
+            "telefono_recibe",
+            "direccion_entrega",
+            "referencia_entrega",
+            "departamento_entrega",
+            "municipio_entrega",
             "estado_pago",
             "subtotal",
             "descuento_total",
@@ -226,6 +280,27 @@ class PedidoSerializer(serializers.ModelSerializer):
                     }
                 )
 
+        if tipo_entrega != Pedido.TipoEntrega.RETIRO_EN_LOCAL:
+            campos_entrega = {
+                "nombre_recibe": attrs.get("nombre_recibe")
+                or getattr(self.instance, "nombre_recibe", ""),
+                "telefono_recibe": attrs.get("telefono_recibe")
+                or getattr(self.instance, "telefono_recibe", ""),
+                "direccion_entrega": attrs.get("direccion_entrega")
+                or getattr(self.instance, "direccion_entrega", ""),
+                "departamento_entrega": attrs.get("departamento_entrega")
+                or getattr(self.instance, "departamento_entrega", ""),
+                "municipio_entrega": attrs.get("municipio_entrega")
+                or getattr(self.instance, "municipio_entrega", ""),
+            }
+            errores = {
+                campo: "Este campo es obligatorio para envios."
+                for campo, valor in campos_entrega.items()
+                if not str(valor).strip()
+            }
+            if errores:
+                raise serializers.ValidationError(errores)
+
         return attrs
 
 
@@ -236,6 +311,17 @@ class GenerarPedidoDesdeCarritoSerializer(serializers.Serializer):
         allow_blank=True,
         default="",
     )
+    nombre_recibe = serializers.CharField(required=False, allow_blank=True, default="")
+    telefono_recibe = serializers.CharField(required=False, allow_blank=True, default="")
+    direccion_entrega = serializers.CharField(required=False, allow_blank=True, default="")
+    referencia_entrega = serializers.CharField(required=False, allow_blank=True, default="")
+    departamento_entrega = serializers.CharField(required=False, allow_blank=True, default="")
+    municipio_entrega = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class AgregarProductoCarritoSerializer(serializers.Serializer):
+    codigo_barra = serializers.CharField(max_length=80)
+    cantidad = serializers.IntegerField(min_value=1, default=1)
 
 
 class TarifaEntregaSerializer(serializers.ModelSerializer):
@@ -411,7 +497,18 @@ class PrefacturaSerializer(serializers.ModelSerializer):
         }
 
     def get_direccion_entrega(self, obj):
-        return None
+        pedido = obj.pedido
+        if pedido.tipo_entrega == Pedido.TipoEntrega.RETIRO_EN_LOCAL:
+            return None
+
+        return {
+            "nombre_recibe": pedido.nombre_recibe,
+            "telefono_recibe": pedido.telefono_recibe,
+            "direccion": pedido.direccion_entrega,
+            "referencia": pedido.referencia_entrega,
+            "departamento": pedido.departamento_entrega,
+            "municipio": pedido.municipio_entrega,
+        }
 
     def get_metodo_pago(self, obj):
         return "pendiente_integracion_pago"

@@ -51,6 +51,7 @@ usuarios/
 catalogo/
 inventario/
 pedidos/
+favoritos/
 ```
 
 Carpetas auxiliares:
@@ -133,6 +134,8 @@ Regla:
 
 - Si `tiene_envios = True`, la empresa ofrece `envio_local` y `envio_nacional`.
 - Si `tiene_envios = False`, la empresa solo ofrece `retiro_en_local`.
+- Para `envio_local` y `envio_nacional`, el pedido requiere direccion simple.
+- Para `retiro_en_local`, la direccion no es obligatoria.
 
 ### Impuesto
 
@@ -353,7 +356,33 @@ Migraciones:
 
 - `inventario.0001_initial`
 
-## 10. App pedidos
+## 10. App favoritos
+
+Modelo principal:
+
+```text
+Favorito
+```
+
+Campos:
+
+- empresa
+- usuario
+- producto
+- fecha_creacion
+
+Reglas:
+
+- Un favorito pertenece a una empresa, un usuario y un producto.
+- Un usuario no puede duplicar el mismo producto como favorito en la misma empresa.
+- El producto debe pertenecer a la misma empresa del favorito.
+- La API permite agregar favoritos por `codigo_barra`, sin exponer el `id` interno del producto.
+
+Migraciones:
+
+- `favoritos.0001_initial`
+
+## 11. App pedidos
 
 Modelos:
 
@@ -406,6 +435,12 @@ Campos relevantes:
 - carrito_origen
 - numero automatico
 - tipo_entrega
+- nombre_recibe
+- telefono_recibe
+- direccion_entrega
+- referencia_entrega
+- departamento_entrega
+- municipio_entrega
 - estado_pago
 - subtotal
 - descuento_total
@@ -432,6 +467,8 @@ Reglas:
 
 - Si la empresa tiene envios, solo acepta envio local o nacional.
 - Si la empresa no tiene envios, solo acepta retiro en local.
+- En envio local o nacional, la direccion simple es obligatoria.
+- En retiro en local, la direccion no es obligatoria.
 - El envio se toma automaticamente de la tarifa activa si aplica.
 - Retiro en local usa envio `0.00`.
 - El impuesto se calcula sobre `subtotal - descuento_total`.
@@ -453,6 +490,19 @@ Entrada esperada:
 {
   "tipo_entrega": "retiro_en_local",
   "observaciones": ""
+}
+```
+
+Para `envio_local` o `envio_nacional`, tambien acepta:
+
+```json
+{
+  "nombre_recibe": "Cliente",
+  "telefono_recibe": "99999999",
+  "direccion_entrega": "Direccion de entrega",
+  "referencia_entrega": "Referencia",
+  "departamento_entrega": "Departamento",
+  "municipio_entrega": "Municipio"
 }
 ```
 
@@ -530,7 +580,8 @@ Reglas:
 - No representa factura fiscal original.
 - Se puede consultar desde `GET /api/pedidos/pedidos/{id}/prefactura/`.
 - Por ahora se entrega como datos JSON, no como PDF.
-- Direccion de entrega y metodo de pago quedan como campos informativos pendientes hasta implementar entrega/pagos.
+- La direccion de entrega se muestra cuando el pedido es envio local o nacional.
+- El metodo de pago queda como campo informativo pendiente hasta implementar pagos.
 
 Leyenda:
 
@@ -546,12 +597,14 @@ Migraciones:
 - `pedidos.0004_pedido_estado_pago`
 - `pedidos.0005_pedido_inventario_descontado`
 - `pedidos.0006_prefactura`
+- `pedidos.0007_pedido_departamento_entrega_pedido_direccion_entrega_and_more`
 
-## 11. Endpoints API actuales
+## 12. Endpoints API actuales
 
 Rutas principales incluidas bajo `/api/`:
 
 - `empresas/`
+- `empresas/publica/`
 - `usuarios/registro-comprador/`
 - `usuarios/login/`
 - `usuarios/token/refresh/`
@@ -562,7 +615,10 @@ Rutas principales incluidas bajo `/api/`:
 - `catalogo/categorias/`
 - `catalogo/productos/`
 - `inventario/movimientos/`
+- `favoritos/`
 - `pedidos/carritos/`
+- `pedidos/carritos/mi-carrito/`
+- `pedidos/carritos/{id}/agregar-producto/`
 - `pedidos/items-carrito/`
 - `pedidos/pedidos/`
 - `pedidos/pedidos/{id}/prefactura/`
@@ -575,8 +631,9 @@ Catalogo publico:
 - Ejemplo: `GET /api/catalogo/productos/?empresa_slug=Analiza`.
 - La lectura publica solo devuelve empresas activas y elementos activos.
 - Para crear, editar o eliminar catalogo sigue siendo obligatorio iniciar sesion y tener permisos.
+- Productos aceptan filtros `buscar`, `familia`, `categoria`, `agotado` y `orden`.
 
-## 12. Base de datos
+## 13. Base de datos
 
 Actual:
 
@@ -593,7 +650,7 @@ Nota:
 
 El superusuario y los datos creados en SQLite local no existen automaticamente en Supabase. Cuando se cambie a Supabase se deberan crear/aplicar alli.
 
-## 13. Autenticacion
+## 14. Autenticacion
 
 Decision aprobada e implementada en backend:
 
@@ -637,7 +694,7 @@ Correo:
 - El perfil guarda `numero_identidad` hondureno de 13 digitos.
 - La misma identidad no puede repetirse dentro de la misma empresa.
 
-## 14. Pruebas realizadas
+## 15. Pruebas realizadas
 
 Se han ejecutado validaciones frecuentes con:
 
@@ -668,15 +725,24 @@ Pruebas hechas con rollback:
 - Bloqueo de identidad duplicada por empresa.
 - Solicitud y confirmacion de recuperacion de contrasena.
 - Generacion y consulta de prefactura para pedido pagado.
+- Empresa publica por slug.
+- Filtros de catalogo publico.
+- Creacion/consulta de `mi-carrito`.
+- Agregar producto al carrito por codigo de barra sin exponer `id` interno de producto.
+- Favoritos por codigo de barra.
+- Validacion de direccion obligatoria para envios local/nacional.
 
-## 15. Pendientes recomendados en orden
+## 16. Pendientes recomendados en orden
 
 1. Conectar Supabase como base PostgreSQL real.
 2. Probar login JWT y registro desde el frontend o con cliente API.
 3. Definir integracion PayPal cuando se autorice proveedor, credenciales y modo sandbox.
 4. Crear frontend React.
+5. Definir promociones/descuentos.
+6. Definir PDF de prefactura.
+7. Definir almacenamiento de imagenes en produccion.
 
-## 16. Reglas de trabajo pendientes de respetar
+## 17. Reglas de trabajo pendientes de respetar
 
 - No instalar dependencias sin autorizacion.
 - No crear o modificar archivos sin autorizacion.
@@ -686,6 +752,6 @@ Pruebas hechas con rollback:
 - No crear credenciales ni escribir secretos reales en codigo.
 - Cada cambio importante debe explicarse antes de ejecutarse.
 
-## 17. Ultimo estado
+## 18. Ultimo estado
 
-El backend local tiene empresas, usuarios/perfiles, catalogo publico por empresa, inventario, pedidos, prefactura, login JWT, registro de compradores, verificacion de correo y recuperacion de contrasena funcionando como base inicial. Falta conexion con Supabase, claves reales de Brevo e integracion de pago antes de usuarios reales en produccion.
+El backend local tiene empresas, empresa publica por slug, usuarios/perfiles, catalogo publico con filtros, inventario, favoritos, carrito por codigo de barra, pedidos con direccion simple para envios, prefactura, login JWT, registro de compradores, verificacion de correo y recuperacion de contrasena funcionando como base inicial. Falta conexion con Supabase, claves reales de Brevo, integracion de pago, promociones, PDF de prefactura y almacenamiento de imagenes en produccion antes de usuarios reales en produccion.

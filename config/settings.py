@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'catalogo.apps.CatalogoConfig',
     'inventario.apps.InventarioConfig',
     'pedidos.apps.PedidosConfig',
+    'favoritos.apps.FavoritosConfig',
 ]
 
 MIDDLEWARE = [

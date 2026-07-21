@@ -30,6 +30,30 @@ class EmpresaSerializer(serializers.ModelSerializer):
             "fecha_creacion",
             "fecha_actualizacion",
         ]
+
+
+class EmpresaPublicaSerializer(serializers.ModelSerializer):
+    opciones_entrega_disponibles = serializers.ListField(read_only=True)
+
+    class Meta:
+        model = Empresa
+        fields = [
+            "nombre",
+            "slug",
+            "logo",
+            "color_principal",
+            "color_secundario",
+            "color_acento",
+            "color_texto",
+            "color_fondo",
+            "telefono",
+            "correo",
+            "direccion",
+            "sitio_web",
+            "tiene_envios",
+            "opciones_entrega_disponibles",
+        ]
+        read_only_fields = fields
         read_only_fields = [
             "id",
             "slug",
