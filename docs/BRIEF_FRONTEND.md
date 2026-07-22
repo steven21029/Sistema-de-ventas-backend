@@ -1,6 +1,6 @@
 # Brief para iniciar el frontend - Sistema web de ventas en linea
 
-Fecha de preparacion: 2026-07-21
+Fecha de preparacion: 2026-07-22
 
 Este documento resume lo necesario para abrir una nueva conversacion y comenzar el frontend React. El backend queda pausado por ahora en este proyecto.
 
@@ -105,6 +105,38 @@ Si el backend corre localmente con Django:
 
 ```text
 http://127.0.0.1:8000/api/
+```
+
+Para multiempresa por subdominio, la API principal para detectar la empresa sera:
+
+```text
+GET /api/empresas/actual/?host=analiza.localhost:3000
+```
+
+En el frontend se puede enviar:
+
+```js
+window.location.host
+```
+
+Ejemplo:
+
+```text
+http://127.0.0.1:8000/api/empresas/actual/?host=analiza.localhost:3000
+```
+
+Mientras no haya dominios reales, tambien se puede probar con:
+
+```text
+analiza.localhost
+analiza.test
+```
+
+El respaldo por slug sigue funcionando:
+
+```text
+GET /api/empresas/actual/?slug=Analiza
+GET /api/empresas/publica/?slug=Analiza
 ```
 
 Para endpoints protegidos usar:
@@ -356,10 +388,66 @@ Reglas:
 - Crear, editar o eliminar catalogo requiere login y permisos.
 - El `id` interno del producto no se muestra al cliente.
 - El codigo de barra es unico por empresa.
+- Todo producto inicia con existencia `0` al crearse.
+- La existencia se cambia desde inventario, no desde catalogo.
+- Los productos pueden traer `existencia`, `existencia_minima`, `agotado`, `inventario_bajo` y `estado_inventario`.
+
+Estados de inventario:
+
+```text
+agotado = existencia 0
+bajo = existencia mayor que 0 y menor o igual a existencia_minima
+ok = existencia suficiente
+```
+
+### Paginas dinamicas de catalogo
+
+Inicio:
+
+```text
+GET /api/catalogo/combos-destacados/?empresa_slug=Analiza
+GET /api/catalogo/productos-mas-vendidos/?empresa_slug=Analiza
+```
+
+Examenes:
+
+```text
+GET /api/catalogo/examenes/?empresa_slug=Analiza&buscar=texto
+```
+
+Perfiles:
+
+```text
+GET /api/catalogo/perfiles/?empresa_slug=Analiza&buscar=texto
+```
+
+Servicios:
+
+```text
+GET /api/catalogo/servicios/?empresa_slug=Analiza&buscar=texto
+```
+
+Reglas:
+
+- Todos requieren `empresa_slug`.
+- Todos devuelven solo registros activos de empresas activas.
+- No exponen IDs internos.
+- Productos y paquetes devuelven `imagen_final`.
+- Si hay `imagen_url`, `imagen_final` usa esa URL externa.
+- Si no hay `imagen_url`, `imagen_final` usa la imagen local del backend.
+- `servicios` usa familias activas como tipos grandes de servicio.
+- `combos-destacados` devuelve paquetes tipo combo con `destacado=true`.
+- `perfiles` devuelve paquetes tipo perfil con productos internos.
 
 ## 9. Empresa publica implementada
 
-Endpoint:
+Endpoint recomendado para la empresa actual:
+
+```text
+GET /api/empresas/actual/?host=analiza.localhost:3000
+```
+
+Respaldo por slug:
 
 ```text
 GET /api/empresas/publica/?slug=Analiza
@@ -369,6 +457,9 @@ Uso:
 
 - cargar nombre de empresa;
 - logo;
+- slug;
+- subdominio;
+- dominio personalizado;
 - colores;
 - telefono;
 - correo;
@@ -377,7 +468,162 @@ Uso:
 - `tiene_envios`;
 - `opciones_entrega_disponibles`.
 
-## 10. Carrito y pedidos implementados
+Regla multiempresa:
+
+- En produccion el frontend deberia resolver la empresa con `window.location.host`.
+- En desarrollo se puede mandar `host=analiza.localhost:3000`.
+- Si no hay host confiable, usar `slug=Analiza` como respaldo temporal.
+- Cuando la empresa se resuelva, usar su `slug` para APIs que todavia pidan `empresa_slug`.
+
+Sucursales:
+
+```text
+GET /api/empresas/sucursales/?empresa_slug=Analiza&buscar=texto
+```
+
+Campos:
+
+```text
+nombre
+direccion
+telefono
+horario
+google_maps_url
+latitud
+longitud
+orden
+```
+
+El frontend debe usar `google_maps_url` como enlace hacia Google Maps.
+
+## 10. Menu principal por empresa implementado
+
+El menu principal ya no debe estar fijo en el frontend.
+
+El backend devuelve el menu dentro de:
+
+```text
+GET /api/empresas/actual/?host=analiza.localhost:3000
+```
+
+Tambien existe endpoint solo para menu:
+
+```text
+GET /api/empresas/menu/?empresa_slug=Analiza
+GET /api/empresas/menu/?host=analiza.localhost:3000
+```
+
+Ejemplo de respuesta:
+
+```json
+[
+  {
+    "clave": "inicio",
+    "texto": "Inicio",
+    "ruta": "/",
+    "orden": 1,
+    "activo": true,
+    "abre_en_nueva_pestana": false
+  },
+  {
+    "clave": "examenes",
+    "texto": "Examenes",
+    "ruta": "/examenes",
+    "orden": 2,
+    "activo": true,
+    "abre_en_nueva_pestana": false
+  }
+]
+```
+
+Reglas para frontend:
+
+- Renderizar el menu usando `empresa.menu` o `/api/empresas/menu/`.
+- Usar `texto` como nombre visible.
+- Usar `ruta` para navegar.
+- Ordenar por `orden` si el frontend necesita ordenar, aunque el backend ya lo devuelve ordenado.
+- Si un item no viene en la respuesta, no debe mostrarse.
+- No dejar nombres fijos como "Examenes" o "Servicios" en el componente.
+- Si `abre_en_nueva_pestana = true`, abrir con target externo.
+
+El menu predeterminado actual es:
+
+```text
+Inicio
+Examenes
+Perfiles
+Servicios
+Promociones
+Sucursales
+Contacto
+```
+
+Cada empresa puede cambiar esos textos desde el backend/admin.
+
+## 11. Banner promocional implementado
+
+Endpoint publico:
+
+```text
+GET /api/promociones/banners/?empresa_slug=Analiza
+```
+
+Uso:
+
+- banner central;
+- carrusel futuro;
+- promociones visuales por empresa.
+
+Campos importantes para frontend:
+
+```text
+titulo
+subtitulo
+texto_boton
+url_boton
+imagen_final
+texto_alternativo
+orden
+fecha_inicio
+fecha_fin
+```
+
+Reglas:
+
+- Cada banner pertenece a una empresa.
+- La API publica devuelve solo banners activos y vigentes.
+- Si no hay banners activos, la respuesta debe ser `[]` y el frontend debe ocultar el espacio del banner.
+- Aunque exista token de administrador guardado en el navegador, la llamada normal no devuelve banners inactivos.
+- Para panel administrativo, usar `incluir_inactivos=true` si se necesita ver banners desactivados.
+- La API publica no expone `id` interno ni `empresa` interna.
+- El frontend debe usar `imagen_final`.
+- Si existe `imagen_url`, `imagen_final` devuelve esa URL externa.
+- Si no existe `imagen_url`, `imagen_final` devuelve la URL local de `imagen`.
+- Esto deja listo el cambio futuro a almacenamiento externo sin romper el frontend.
+
+Ejemplo de respuesta:
+
+```json
+[
+  {
+    "titulo": "Promocion especial",
+    "subtitulo": "Disponible por tiempo limitado",
+    "texto_boton": "Ver productos",
+    "url_boton": "https://example.com/promocion",
+    "imagen_final": "https://cdn.example.com/banner.jpg",
+    "texto_alternativo": "Banner de promocion",
+    "orden": 1
+  }
+]
+```
+
+Endpoint administrativo para ver tambien banners desactivados:
+
+```text
+GET /api/promociones/banners/?empresa_slug=Analiza&incluir_inactivos=true
+```
+
+## 12. Carrito y pedidos implementados
 
 El carrito del backend requiere usuario autenticado.
 
@@ -469,7 +715,7 @@ Prefactura:
 GET /api/pedidos/pedidos/{id}/prefactura/
 ```
 
-## 11. Favoritos implementados
+## 13. Favoritos implementados
 
 Favoritos requieren usuario autenticado.
 
@@ -506,7 +752,110 @@ Reglas:
 - El producto debe estar activo.
 - El producto se identifica por codigo de barra.
 
-## 12. Entrega
+## 14. Inventario interno implementado
+
+Estas rutas son para pantallas internas de administrador/gerente, no para la tienda publica.
+
+Permisos:
+
+- Administrador maestro puede ver todas las empresas o filtrar por `empresa_slug`.
+- Administrador de empresa y gerente solo ven su empresa.
+- Comprador no puede entrar a inventario.
+
+Headers:
+
+```http
+Authorization: Bearer ACCESS_TOKEN
+```
+
+Listar todos los productos del inventario:
+
+```text
+GET /api/inventario/productos/
+```
+
+Filtros opcionales:
+
+```text
+GET /api/inventario/productos/?buscar=hemograma
+GET /api/inventario/productos/?activo=true
+GET /api/inventario/productos/?empresa_slug=Analiza
+```
+
+Resumen:
+
+```text
+GET /api/inventario/resumen/
+```
+
+Respuesta esperada:
+
+```json
+{
+  "total_productos": 10,
+  "productos_activos": 10,
+  "productos_agotados": 2,
+  "productos_bajo_stock": 3,
+  "existencia_total": 120,
+  "valor_inventario": "3500.00"
+}
+```
+
+Productos agotados:
+
+```text
+GET /api/inventario/productos-agotados/
+```
+
+Productos con inventario bajo:
+
+```text
+GET /api/inventario/productos-bajo-stock/
+```
+
+Ajustar existencia por codigo de barra:
+
+```text
+POST /api/inventario/ajustar-existencia/
+```
+
+Payload:
+
+```json
+{
+  "codigo_barra": "ABC123",
+  "existencia_nueva": 10,
+  "motivo": "Conteo fisico",
+  "referencia": "AJ-001"
+}
+```
+
+Para administrador maestro, si el codigo de barra existe en varias empresas, enviar tambien:
+
+```json
+{
+  "empresa_slug": "Analiza",
+  "codigo_barra": "ABC123",
+  "existencia_nueva": 10
+}
+```
+
+Historial de movimientos:
+
+```text
+GET /api/inventario/movimientos/
+POST /api/inventario/movimientos/
+```
+
+Reglas:
+
+- Un ajuste fija la existencia final contada.
+- El ajuste puede ser `0`.
+- Entrada y salida deben ser mayores que `0`.
+- Cada ajuste crea historial en movimientos.
+- El frontend debe identificar producto por `codigo_barra`, no por `id` interno.
+
+## 15. Entrega
 
 Regla por empresa:
 
@@ -544,7 +893,7 @@ Nota:
 - Administrador maestro y administrador de empresa pueden cambiar tarifas.
 - Compradores no administran tarifas.
 
-## 13. Totales de pedido
+## 16. Totales de pedido
 
 Formula aprobada:
 
@@ -569,7 +918,7 @@ Cuando un pedido pasa a `pagado`:
 - se genera prefactura;
 - no se descuenta inventario dos veces.
 
-## 14. Prefactura
+## 17. Prefactura
 
 La prefactura existe como JSON, no como PDF todavia.
 
@@ -597,11 +946,51 @@ Leyenda obligatoria:
 Este documento corresponde a una prefactura y no representa una factura fiscal original.
 ```
 
-## 15. APIs que faltan antes de cerrar el frontend completo
+### Formulario de contacto
+
+Endpoint publico:
+
+```text
+POST /api/contacto/mensajes/
+```
+
+Payload:
+
+```json
+{
+  "empresa_slug": "Analiza",
+  "nombre": "Cliente",
+  "telefono": "99999999",
+  "correo": "cliente@example.com",
+  "asunto": "Consulta",
+  "mensaje": "Quiero informacion."
+}
+```
+
+Reglas:
+
+- `empresa_slug`, `nombre` y `mensaje` son obligatorios.
+- Debe enviarse `telefono` o `correo`.
+- La respuesta publica es:
+
+```json
+{
+  "ok": true,
+  "mensaje": "Mensaje recibido correctamente."
+}
+```
+
+Endpoint administrativo:
+
+```text
+GET /api/contacto/mensajes/?empresa_slug=Analiza
+```
+
+## 18. APIs que faltan antes de cerrar el frontend completo
 
 Estas APIs no bloquean empezar el frontend visual, pero si deben resolverse antes de terminar compra real.
 
-### 15.1 Pagos
+### 18.1 Pagos
 
 PayPal esta aprobado como primera pasarela futura, pero no esta implementado.
 
@@ -613,49 +1002,55 @@ Falta:
 - guardar referencia de transaccion;
 - cambiar pedido a `pagado` despues de confirmacion real.
 
-### 15.2 Promociones y descuentos
+### 18.2 Descuentos de productos
 
-No hay modelos ni APIs de promociones todavia.
+El banner promocional ya existe.
+
+No hay modelos ni APIs de descuentos de productos todavia.
 
 El pedido tiene `descuento_total`, pero no existe todavia logica de promociones.
 
-### 15.3 PDF de prefactura
+### 18.3 PDF de prefactura
 
 La prefactura existe como JSON.
 
 Falta generar PDF o plantilla visual imprimible.
 
-### 15.4 Imagenes en produccion
+### 18.4 Imagenes en produccion
 
 El backend usa `media/` local para imagenes.
 
 Para produccion falta definir almacenamiento en linea vinculado al proyecto.
 
-### 15.5 Direcciones guardadas del cliente
+### 18.5 Direcciones guardadas del cliente
 
 El pedido ya permite direccion simple para envio local y nacional.
 
 Falta solo si se quiere guardar una libreta de direcciones reutilizables por cliente.
 
-## 16. Recomendacion para empezar frontend
+## 19. Recomendacion para empezar frontend
 
 Se puede iniciar el frontend con este orden:
 
 1. Crear layout base de tienda.
-2. Cargar branding desde `GET /api/empresas/publica/?slug=Analiza`.
-3. Consumir catalogo publico con `empresa_slug=Analiza`.
-4. Crear carrito visual local en React.
-5. Crear modal/pagina de login y registro.
-6. Crear flujo de verificar correo.
-7. Crear flujo de recuperar contrasena.
-8. Sincronizar carrito autenticado con `mi-carrito`.
-9. Agregar productos por codigo de barra.
-10. Implementar favoritos.
-11. Capturar direccion simple para envio local/nacional.
-12. Mostrar pedidos y prefactura JSON.
-13. Dejar pagos como pendiente hasta PayPal.
+2. Cargar empresa, branding y menu desde `GET /api/empresas/actual/?host=...`.
+3. Usar `empresa.slug` para consumir catalogo publico.
+4. Consumir banners promocionales por empresa.
+5. Renderizar menu principal desde `empresa.menu`.
+6. Consumir endpoints de paginas dinamicas segun la ruta actual.
+7. Crear carrito visual local en React.
+8. Crear modal/pagina de login y registro.
+9. Crear flujo de verificar correo.
+10. Crear flujo de recuperar contrasena.
+11. Sincronizar carrito autenticado con `mi-carrito`.
+12. Agregar productos por codigo de barra.
+13. Implementar favoritos.
+14. Capturar direccion simple para envio local/nacional.
+15. Implementar formulario de contacto.
+16. Mostrar pedidos y prefactura JSON.
+17. Dejar pagos como pendiente hasta PayPal.
 
-## 17. Reglas importantes para la otra conversacion
+## 20. Reglas importantes para la otra conversacion
 
 - No convertir la pagina en landing page.
 - El catalogo y ventas son lo primero.
@@ -663,18 +1058,24 @@ Se puede iniciar el frontend con este orden:
 - El carrito debe estar oculto por defecto y abrirse al hacer clic.
 - No agregar citas medicas.
 - No duplicar acceso a "Mi cuenta".
+- No dejar nombres fijos en el menu principal; usar el menu que devuelve el backend.
 - No mostrar id interno del producto al cliente.
-- Usar `empresa_slug = Analiza`.
+- Para inventario interno, usar `codigo_barra` para ajustar existencias.
+- Usar `empresa_slug = Analiza` como respaldo local, pero preferir resolver empresa con `/api/empresas/actual/`.
 - Mantener diseno sobrio y formal.
 - No integrar PayPal ni Brevo real sin autorizacion.
 - No conectar Supabase sin autorizacion.
 
-## 18. Estado final del backend para frontend
+## 21. Estado final del backend para frontend
 
 Listo para empezar frontend:
 
 - Catalogo publico por empresa.
-- Empresa publica por slug.
+- Empresa publica por slug y empresa actual por host/subdominio.
+- Menu principal configurable por empresa.
+- Paginas dinamicas de inicio, examenes, perfiles, servicios y sucursales.
+- Formulario publico de contacto.
+- Banner promocional por empresa.
 - Filtros de catalogo.
 - Login JWT.
 - Registro comprador.
@@ -684,13 +1085,14 @@ Listo para empezar frontend:
 - Mi carrito.
 - Agregar producto al carrito por codigo de barra.
 - Favoritos.
+- Inventario interno con productos, resumen, bajo stock, agotados y ajuste de existencia.
 - Direccion simple para envio local/nacional.
 - Prefactura JSON para pedidos pagados.
 
 Pendiente para compra completa:
 
 - PayPal;
-- promociones;
+- descuentos de productos;
 - PDF de prefactura;
 - almacenamiento de imagenes en produccion;
 - libreta de direcciones guardadas, solo si se decide hacerla.

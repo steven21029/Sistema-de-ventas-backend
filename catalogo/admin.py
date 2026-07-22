@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Categoria, Familia, Producto
+from .models import Categoria, Familia, PaqueteCatalogo, PaqueteProducto, Producto
 
 
 @admin.register(Familia)
@@ -18,6 +18,8 @@ class FamiliaAdmin(admin.ModelAdmin):
                     "empresa",
                     "nombre",
                     "descripcion",
+                    "imagen",
+                    "imagen_url",
                     "activa",
                 )
             },
@@ -93,6 +95,8 @@ class ProductoAdmin(admin.ModelAdmin):
         "categoria",
         "precio",
         "existencia",
+        "existencia_minima",
+        "orden_destacado",
         "activo",
     )
     list_filter = ("empresa", "familia", "categoria", "activo")
@@ -120,6 +124,7 @@ class ProductoAdmin(admin.ModelAdmin):
                     "nombre",
                     "descripcion",
                     "imagen_principal",
+                    "imagen_url",
                 )
             },
         ),
@@ -129,6 +134,8 @@ class ProductoAdmin(admin.ModelAdmin):
                 "fields": (
                     "precio",
                     "existencia",
+                    "existencia_minima",
+                    "orden_destacado",
                     "activo",
                 )
             },
@@ -143,3 +150,98 @@ class ProductoAdmin(admin.ModelAdmin):
             },
         ),
     )
+
+
+class PaqueteProductoInline(admin.TabularInline):
+    model = PaqueteProducto
+    extra = 0
+    autocomplete_fields = ("producto",)
+    fields = ("producto", "orden")
+
+
+@admin.register(PaqueteCatalogo)
+class PaqueteCatalogoAdmin(admin.ModelAdmin):
+    list_display = (
+        "nombre",
+        "codigo",
+        "tipo",
+        "empresa",
+        "precio_normal",
+        "precio_paquete",
+        "porcentaje_descuento",
+        "destacado",
+        "activo",
+        "orden",
+    )
+    list_filter = ("empresa", "tipo", "destacado", "activo")
+    search_fields = ("nombre", "codigo", "descripcion", "empresa__nombre")
+    autocomplete_fields = ("empresa",)
+    readonly_fields = ("fecha_creacion", "fecha_actualizacion")
+    ordering = ("empresa__nombre", "tipo", "orden", "nombre")
+    inlines = [PaqueteProductoInline]
+
+    fieldsets = (
+        (
+            "Empresa y tipo",
+            {
+                "fields": (
+                    "empresa",
+                    "tipo",
+                    "codigo",
+                )
+            },
+        ),
+        (
+            "Contenido",
+            {
+                "fields": (
+                    "nombre",
+                    "descripcion",
+                    "imagen",
+                    "imagen_url",
+                )
+            },
+        ),
+        (
+            "Precio",
+            {
+                "fields": (
+                    "precio_normal",
+                    "precio_paquete",
+                    "porcentaje_descuento",
+                )
+            },
+        ),
+        (
+            "Publicacion",
+            {
+                "fields": (
+                    "destacado",
+                    "activo",
+                    "orden",
+                )
+            },
+        ),
+        (
+            "Fechas",
+            {
+                "fields": (
+                    "fecha_creacion",
+                    "fecha_actualizacion",
+                )
+            },
+        ),
+    )
+
+
+@admin.register(PaqueteProducto)
+class PaqueteProductoAdmin(admin.ModelAdmin):
+    list_display = ("paquete", "producto", "orden")
+    list_filter = ("paquete__empresa", "paquete__tipo")
+    search_fields = (
+        "paquete__nombre",
+        "paquete__codigo",
+        "producto__nombre",
+        "producto__codigo_barra",
+    )
+    autocomplete_fields = ("paquete", "producto")

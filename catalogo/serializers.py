@@ -1,10 +1,31 @@
+from django.utils.text import slugify
 from rest_framework import serializers
 
-from .models import Categoria, Familia, Producto
+from .models import Categoria, Familia, PaqueteCatalogo, Producto
+
+
+class ImagenFinalMixin:
+    imagen_final = serializers.SerializerMethodField()
+
+    def get_imagen_final(self, obj):
+        imagen_url = getattr(obj, "imagen_url", "")
+        if imagen_url:
+            return imagen_url
+
+        imagen = getattr(obj, "imagen_principal", None) or getattr(obj, "imagen", None)
+        if not imagen:
+            return None
+
+        request = self.context.get("request")
+        if request:
+            return request.build_absolute_uri(imagen.url)
+
+        return imagen.url
 
 
 class FamiliaSerializer(serializers.ModelSerializer):
     empresa_nombre = serializers.CharField(source="empresa.nombre", read_only=True)
+    imagen_final = serializers.SerializerMethodField()
 
     class Meta:
         model = Familia
@@ -14,6 +35,9 @@ class FamiliaSerializer(serializers.ModelSerializer):
             "empresa_nombre",
             "nombre",
             "descripcion",
+            "imagen",
+            "imagen_url",
+            "imagen_final",
             "activa",
             "orden",
             "fecha_creacion",
@@ -22,10 +46,24 @@ class FamiliaSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id",
             "empresa_nombre",
+            "imagen_final",
             "orden",
             "fecha_creacion",
             "fecha_actualizacion",
         ]
+
+    def get_imagen_final(self, obj):
+        if obj.imagen_url:
+            return obj.imagen_url
+
+        if not obj.imagen:
+            return None
+
+        request = self.context.get("request")
+        if request:
+            return request.build_absolute_uri(obj.imagen.url)
+
+        return obj.imagen.url
 
 
 class CategoriaSerializer(serializers.ModelSerializer):
@@ -73,6 +111,9 @@ class ProductoSerializer(serializers.ModelSerializer):
     familia_nombre = serializers.CharField(source="familia.nombre", read_only=True)
     categoria_nombre = serializers.CharField(source="categoria.nombre", read_only=True)
     agotado = serializers.BooleanField(read_only=True)
+    inventario_bajo = serializers.BooleanField(read_only=True)
+    estado_inventario = serializers.CharField(read_only=True)
+    imagen_final = serializers.SerializerMethodField()
 
     class Meta:
         model = Producto
@@ -87,9 +128,15 @@ class ProductoSerializer(serializers.ModelSerializer):
             "nombre",
             "descripcion",
             "imagen_principal",
+            "imagen_url",
+            "imagen_final",
             "precio",
             "existencia",
+            "existencia_minima",
+            "orden_destacado",
             "agotado",
+            "inventario_bajo",
+            "estado_inventario",
             "activo",
             "fecha_creacion",
             "fecha_actualizacion",
@@ -98,8 +145,11 @@ class ProductoSerializer(serializers.ModelSerializer):
             "empresa_nombre",
             "familia_nombre",
             "categoria_nombre",
+            "imagen_final",
             "existencia",
             "agotado",
+            "inventario_bajo",
+            "estado_inventario",
             "fecha_creacion",
             "fecha_actualizacion",
         ]
@@ -125,3 +175,141 @@ class ProductoSerializer(serializers.ModelSerializer):
             )
 
         return attrs
+
+    def get_imagen_final(self, obj):
+        if obj.imagen_url:
+            return obj.imagen_url
+
+        if not obj.imagen_principal:
+            return None
+
+        request = self.context.get("request")
+        if request:
+            return request.build_absolute_uri(obj.imagen_principal.url)
+
+        return obj.imagen_principal.url
+
+
+class ProductoPaginaPublicaSerializer(ImagenFinalMixin, serializers.ModelSerializer):
+    familia_nombre = serializers.CharField(source="familia.nombre", read_only=True)
+    categoria_nombre = serializers.CharField(source="categoria.nombre", read_only=True)
+    agotado = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = Producto
+        fields = [
+            "codigo_barra",
+            "nombre",
+            "descripcion",
+            "precio",
+            "imagen_final",
+            "categoria_nombre",
+            "familia_nombre",
+            "agotado",
+            "existencia",
+        ]
+        read_only_fields = fields
+
+
+class ProductoPaquetePublicoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Producto
+        fields = [
+            "codigo_barra",
+            "nombre",
+            "precio",
+        ]
+        read_only_fields = fields
+
+
+class ComboDestacadoPublicoSerializer(ImagenFinalMixin, serializers.ModelSerializer):
+    precio_combo = serializers.DecimalField(
+        source="precio_paquete",
+        max_digits=12,
+        decimal_places=2,
+        read_only=True,
+    )
+    productos = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PaqueteCatalogo
+        fields = [
+            "codigo",
+            "nombre",
+            "descripcion",
+            "precio_normal",
+            "precio_combo",
+            "porcentaje_descuento",
+            "imagen_final",
+            "productos",
+            "orden",
+        ]
+        read_only_fields = fields
+
+    def get_productos(self, obj):
+        items = obj.items_productos.select_related("producto").filter(
+            producto__activo=True
+        )
+        return [
+            {
+                "codigo_barra": item.producto.codigo_barra,
+                "nombre": item.producto.nombre,
+            }
+            for item in items
+        ]
+
+
+class PerfilPublicoSerializer(ImagenFinalMixin, serializers.ModelSerializer):
+    precio_perfil = serializers.DecimalField(
+        source="precio_paquete",
+        max_digits=12,
+        decimal_places=2,
+        read_only=True,
+    )
+    productos = serializers.SerializerMethodField()
+    agotado = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = PaqueteCatalogo
+        fields = [
+            "codigo",
+            "nombre",
+            "descripcion",
+            "precio_normal",
+            "precio_perfil",
+            "porcentaje_descuento",
+            "imagen_final",
+            "productos",
+            "agotado",
+            "orden",
+        ]
+        read_only_fields = fields
+
+    def get_productos(self, obj):
+        productos = [
+            item.producto
+            for item in obj.items_productos.select_related("producto").filter(
+                producto__activo=True
+            )
+        ]
+        return ProductoPaquetePublicoSerializer(productos, many=True).data
+
+
+class ServicioPublicoSerializer(ImagenFinalMixin, serializers.ModelSerializer):
+    clave = serializers.SerializerMethodField()
+    cantidad_productos = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Familia
+        fields = [
+            "clave",
+            "nombre",
+            "descripcion",
+            "imagen_final",
+            "orden",
+            "cantidad_productos",
+        ]
+        read_only_fields = fields
+
+    def get_clave(self, obj):
+        return slugify(obj.nombre)

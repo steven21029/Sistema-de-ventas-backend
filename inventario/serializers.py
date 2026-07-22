@@ -1,6 +1,44 @@
 from rest_framework import serializers
 
+from catalogo.models import Producto
 from .models import MovimientoInventario
+
+
+class ProductoInventarioSerializer(serializers.ModelSerializer):
+    empresa_nombre = serializers.CharField(source="empresa.nombre", read_only=True)
+    empresa_slug = serializers.CharField(source="empresa.slug", read_only=True)
+    familia_nombre = serializers.CharField(source="familia.nombre", read_only=True)
+    categoria_nombre = serializers.CharField(source="categoria.nombre", read_only=True)
+    agotado = serializers.BooleanField(read_only=True)
+    inventario_bajo = serializers.BooleanField(read_only=True)
+    estado_inventario = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = Producto
+        fields = [
+            "empresa_nombre",
+            "empresa_slug",
+            "familia_nombre",
+            "categoria_nombre",
+            "codigo_barra",
+            "nombre",
+            "precio",
+            "existencia",
+            "existencia_minima",
+            "agotado",
+            "inventario_bajo",
+            "estado_inventario",
+            "activo",
+            "fecha_actualizacion",
+        ]
+
+
+class AjustarExistenciaSerializer(serializers.Serializer):
+    empresa_slug = serializers.CharField(required=False, allow_blank=True)
+    codigo_barra = serializers.CharField()
+    existencia_nueva = serializers.IntegerField(min_value=0)
+    motivo = serializers.CharField(required=False, allow_blank=True)
+    referencia = serializers.CharField(required=False, allow_blank=True, max_length=120)
 
 
 class MovimientoInventarioSerializer(serializers.ModelSerializer):
@@ -55,6 +93,14 @@ class MovimientoInventarioSerializer(serializers.ModelSerializer):
         if empresa and producto and empresa != producto.empresa:
             raise serializers.ValidationError(
                 {"producto": "El producto debe pertenecer a la misma empresa del movimiento."}
+            )
+
+        if attrs.get("tipo") in [
+            MovimientoInventario.Tipo.ENTRADA,
+            MovimientoInventario.Tipo.SALIDA,
+        ] and attrs.get("cantidad", 0) < 1:
+            raise serializers.ValidationError(
+                {"cantidad": "Las entradas y salidas deben ser mayores que cero."}
             )
 
         if attrs.get("tipo") == MovimientoInventario.Tipo.SALIDA and producto:

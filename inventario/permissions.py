@@ -14,9 +14,17 @@ class IsInventarioManager(BasePermission):
             return True
 
         perfil = getattr(request.user, "perfil", None)
+        if not perfil or not perfil.activo:
+            return False
+
+        if perfil.es_administrador_maestro:
+            return True
+
         return bool(
-            perfil
-            and perfil.activo
-            and perfil.empresa_id
-            and perfil.rol in [PerfilUsuario.Rol.ADMINISTRADOR_MAESTRO, PerfilUsuario.Rol.GERENTE]
+            perfil.empresa_id
+            and perfil.rol
+            in [
+                PerfilUsuario.Rol.ADMINISTRADOR_EMPRESA,
+                PerfilUsuario.Rol.GERENTE,
+            ]
         )

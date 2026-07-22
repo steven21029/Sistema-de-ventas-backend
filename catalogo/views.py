@@ -1,11 +1,22 @@
-from django.db.models import Q
+from django.db.models import Count, IntegerField, Q, Sum, Value
+from django.db.models.functions import Coalesce
 
-from rest_framework import viewsets
+from rest_framework import generics, viewsets
+from rest_framework.exceptions import ValidationError
+from rest_framework.permissions import AllowAny
 from rest_framework.permissions import SAFE_METHODS
 
-from .models import Categoria, Familia, Producto
+from .models import Categoria, Familia, PaqueteCatalogo, Producto
 from .permissions import IsCatalogoManagerOrReadOnly
-from .serializers import CategoriaSerializer, FamiliaSerializer, ProductoSerializer
+from .serializers import (
+    CategoriaSerializer,
+    ComboDestacadoPublicoSerializer,
+    FamiliaSerializer,
+    PerfilPublicoSerializer,
+    ProductoPaginaPublicaSerializer,
+    ProductoSerializer,
+    ServicioPublicoSerializer,
+)
 
 
 class EmpresaQuerysetMixin:
@@ -175,3 +186,145 @@ class ProductoViewSet(EmpresaQuerysetMixin, viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         self.asignar_empresa_si_corresponde(serializer)
+
+
+class CatalogoPublicoEmpresaMixin:
+    permission_classes = [AllowAny]
+
+    def get_empresa_slug(self):
+        empresa_slug = self.request.query_params.get("empresa_slug", "").strip()
+        if not empresa_slug:
+            raise ValidationError({"empresa_slug": "Debes enviar el slug de la empresa."})
+
+        return empresa_slug
+
+    def aplicar_busqueda(self, queryset):
+        buscar = self.request.query_params.get("buscar", "").strip()
+        if not buscar:
+            return queryset
+
+        return self.filtrar_busqueda(queryset, buscar)
+
+    def filtrar_busqueda(self, queryset, buscar):
+        return queryset
+
+
+class ProductoPaginaPublicaMixin(CatalogoPublicoEmpresaMixin):
+    serializer_class = ProductoPaginaPublicaSerializer
+
+    def get_queryset(self):
+        queryset = Producto.objects.select_related(
+            "empresa",
+            "familia",
+            "categoria",
+        ).filter(
+            empresa__slug__iexact=self.get_empresa_slug(),
+            empresa__activa=True,
+            activo=True,
+            familia__activa=True,
+            categoria__activa=True,
+        )
+        queryset = self.aplicar_busqueda(queryset)
+        return self.ordenar_productos(queryset)
+
+    def filtrar_busqueda(self, queryset, buscar):
+        return queryset.filter(
+            Q(nombre__icontains=buscar)
+            | Q(codigo_barra__icontains=buscar)
+            | Q(descripcion__icontains=buscar)
+            | Q(familia__nombre__icontains=buscar)
+            | Q(categoria__nombre__icontains=buscar)
+        )
+
+    def ordenar_productos(self, queryset):
+        return queryset.order_by("nombre")
+
+
+class ExamenesListView(ProductoPaginaPublicaMixin, generics.ListAPIView):
+    pass
+
+
+class ProductosMasVendidosListView(ProductoPaginaPublicaMixin, generics.ListAPIView):
+    def ordenar_productos(self, queryset):
+        queryset = queryset.annotate(
+            total_vendido=Coalesce(
+                Sum(
+                    "detalles_pedido__cantidad",
+                    filter=Q(
+                        detalles_pedido__pedido__estado_pago="pagado",
+                    ),
+                ),
+                Value(0),
+                output_field=IntegerField(),
+            )
+        )
+        return queryset.order_by("-total_vendido", "orden_destacado", "nombre")
+
+
+class CombosDestacadosListView(CatalogoPublicoEmpresaMixin, generics.ListAPIView):
+    serializer_class = ComboDestacadoPublicoSerializer
+
+    def get_queryset(self):
+        queryset = PaqueteCatalogo.objects.prefetch_related("productos").filter(
+            empresa__slug__iexact=self.get_empresa_slug(),
+            empresa__activa=True,
+            tipo=PaqueteCatalogo.Tipo.COMBO,
+            destacado=True,
+            activo=True,
+        )
+        queryset = self.aplicar_busqueda(queryset)
+        return queryset.order_by("orden", "nombre")
+
+    def filtrar_busqueda(self, queryset, buscar):
+        return queryset.filter(
+            Q(nombre__icontains=buscar)
+            | Q(codigo__icontains=buscar)
+            | Q(descripcion__icontains=buscar)
+            | Q(productos__nombre__icontains=buscar)
+        ).distinct()
+
+
+class PerfilesListView(CatalogoPublicoEmpresaMixin, generics.ListAPIView):
+    serializer_class = PerfilPublicoSerializer
+
+    def get_queryset(self):
+        queryset = PaqueteCatalogo.objects.prefetch_related("productos").filter(
+            empresa__slug__iexact=self.get_empresa_slug(),
+            empresa__activa=True,
+            tipo=PaqueteCatalogo.Tipo.PERFIL,
+            activo=True,
+        )
+        queryset = self.aplicar_busqueda(queryset)
+        return queryset.order_by("orden", "nombre")
+
+    def filtrar_busqueda(self, queryset, buscar):
+        return queryset.filter(
+            Q(nombre__icontains=buscar)
+            | Q(codigo__icontains=buscar)
+            | Q(descripcion__icontains=buscar)
+            | Q(productos__nombre__icontains=buscar)
+        ).distinct()
+
+
+class ServiciosListView(CatalogoPublicoEmpresaMixin, generics.ListAPIView):
+    serializer_class = ServicioPublicoSerializer
+
+    def get_queryset(self):
+        queryset = Familia.objects.filter(
+            empresa__slug__iexact=self.get_empresa_slug(),
+            empresa__activa=True,
+            activa=True,
+        ).annotate(
+            cantidad_productos=Count(
+                "productos",
+                filter=Q(productos__activo=True),
+                distinct=True,
+            )
+        )
+        queryset = self.aplicar_busqueda(queryset)
+        return queryset.order_by("orden", "nombre")
+
+    def filtrar_busqueda(self, queryset, buscar):
+        return queryset.filter(
+            Q(nombre__icontains=buscar) | Q(descripcion__icontains=buscar)
+        )

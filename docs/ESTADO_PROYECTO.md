@@ -1,6 +1,6 @@
 # Estado del proyecto - Sistema web de ventas en linea
 
-Fecha de actualizacion: 2026-07-21
+Fecha de actualizacion: 2026-07-22
 
 Este documento resume el estado actual del backend y las decisiones aprobadas. Debe actualizarse cada vez que el proyecto avance. Si una regla cambia, se debe reemplazar la regla anterior por la nueva para evitar contradicciones.
 
@@ -52,6 +52,7 @@ catalogo/
 inventario/
 pedidos/
 favoritos/
+promociones/
 ```
 
 Carpetas auxiliares:
@@ -95,6 +96,14 @@ Version 1:
 - Una sola base de datos.
 - Cada registro importante se relaciona con una empresa.
 - Las consultas deben filtrar por empresa cuando el usuario no sea administrador maestro.
+- La empresa puede resolverse por dominio, subdominio o slug de respaldo.
+- La tienda publica debera cargar la empresa segun el host actual cuando existan dominios/subdominios.
+
+Pruebas locales sin comprar dominio:
+
+- `analiza.localhost`
+- `analiza.test`
+- `GET /api/empresas/actual/?host=analiza.localhost:3000`
 
 Version futura:
 
@@ -112,6 +121,12 @@ Slug definido:
 
 ```text
 Analiza
+```
+
+Subdominio local definido:
+
+```text
+analiza
 ```
 
 Colores base:
@@ -168,10 +183,18 @@ Modelo principal:
 Empresa
 ```
 
+Modelo de menu por empresa:
+
+```text
+ItemMenuEmpresa
+```
+
 Campos relevantes:
 
 - `nombre`
 - `slug`
+- `subdominio`
+- `dominio_personalizado`
 - `logo`
 - `color_principal`
 - `color_secundario`
@@ -187,17 +210,96 @@ Campos relevantes:
 - `creada_por`
 - fechas de creacion y actualizacion
 
+Campos de `ItemMenuEmpresa`:
+
+- empresa
+- clave
+- texto
+- ruta
+- orden
+- activo
+- abre_en_nueva_pestana
+- fechas de creacion y actualizacion
+
+Modelo de sucursales:
+
+```text
+SucursalEmpresa
+```
+
+Campos de `SucursalEmpresa`:
+
+- empresa
+- nombre
+- direccion
+- telefono
+- horario
+- google_maps_url
+- latitud
+- longitud
+- orden
+- activa
+- fechas de creacion y actualizacion
+
 Reglas:
 
 - El `slug` se genera automaticamente si no se escribe.
+- `subdominio` sirve para abrir empresas como `analiza.localhost` o `analiza.tuapp.com`.
+- `dominio_personalizado` sirve para dominios reales futuros como `tienda.analizahn.com`.
+- `dominio_personalizado` se guarda sin `http`, sin `https` y sin puerto.
+- Para resolver una empresa por host, el backend prueba primero `dominio_personalizado` exacto y despues `subdominio`.
+- Si no hay dominio disponible, se mantiene el `slug` como respaldo.
 - `opciones_entrega_disponibles` devuelve:
   - `envio_local`, `envio_nacional` si la empresa tiene envios.
   - `retiro_en_local` si no tiene envios.
+- Cada empresa tiene su propio menu principal.
+- Al crear una empresa se genera un menu predeterminado.
+- El menu predeterminado contiene Inicio, Examenes, Perfiles, Servicios, Promociones, Sucursales y Contacto.
+- Los nombres visibles del menu salen de `ItemMenuEmpresa.texto`.
+- El frontend debe navegar usando `ItemMenuEmpresa.ruta`.
+- Si un item del menu esta inactivo, no se devuelve en el menu publico.
+- El orden del menu sale de `ItemMenuEmpresa.orden`.
+
+Endpoint de resolucion por host:
+
+```text
+GET /api/empresas/actual/?host=analiza.localhost:3000
+```
+
+Tambien acepta header:
+
+```http
+X-Frontend-Host: analiza.localhost:3000
+```
+
+Respaldo por slug:
+
+```text
+GET /api/empresas/actual/?slug=Analiza
+```
+
+Endpoint solo para menu:
+
+```text
+GET /api/empresas/menu/?empresa_slug=Analiza
+GET /api/empresas/menu/?host=analiza.localhost:3000
+```
+
+Endpoint publico de sucursales:
+
+```text
+GET /api/empresas/sucursales/?empresa_slug=Analiza&buscar=texto
+```
 
 Migraciones:
 
 - `empresas.0001_initial`
 - `empresas.0002_empresa_tiene_envios`
+- `empresas.0003_empresa_dominio_personalizado_empresa_subdominio`
+- `empresas.0004_poblar_subdominios_existentes`
+- `empresas.0005_itemmenuempresa`
+- `empresas.0006_poblar_menu_empresas_existentes`
+- `empresas.0007_sucursalempresa`
 
 ## 7. App usuarios
 
@@ -259,6 +361,8 @@ Modelos:
 Familia
 Categoria
 Producto
+PaqueteCatalogo
+PaqueteProducto
 ```
 
 Reglas aprobadas:
@@ -270,13 +374,17 @@ Reglas aprobadas:
 - El codigo de barra es unico por empresa.
 - El mismo codigo de barra puede existir en empresas diferentes.
 - El `id` interno existe solo para base de datos y no debe mostrarse al cliente.
-- Cada producto usa una sola imagen principal por ahora.
+- Productos, familias y paquetes pueden usar imagen local o `imagen_url`.
+- Las respuestas publicas deben usar `imagen_final`.
+- `imagen_url` queda preparada para almacenamiento externo futuro.
 
 Familia:
 
 - empresa
 - nombre
 - descripcion
+- imagen
+- imagen_url
 - activa
 - orden
 - fechas
@@ -300,10 +408,69 @@ Producto:
 - nombre
 - descripcion
 - imagen_principal
+- imagen_url
 - precio
 - existencia
+- existencia_minima
+- orden_destacado
 - activo
 - fechas
+
+PaqueteCatalogo:
+
+- empresa
+- tipo: `combo` o `perfil`
+- codigo
+- nombre
+- descripcion
+- precio_normal
+- precio_paquete
+- porcentaje_descuento
+- imagen
+- imagen_url
+- destacado
+- activo
+- orden
+- productos
+- fechas
+
+Reglas de paquetes:
+
+- Un combo no es una promocion temporal; es un paquete vendible con precio propio.
+- Un perfil es un paquete de varios productos/examenes.
+- Combo y perfil usan la misma estructura interna para evitar duplicar logica.
+- `precio_paquete` se devuelve como `precio_combo` en combos.
+- `precio_paquete` se devuelve como `precio_perfil` en perfiles.
+- Los paquetes activos se filtran por empresa.
+- Combos destacados usan `destacado=True`.
+
+Endpoints publicos dinamicos de catalogo:
+
+```text
+GET /api/catalogo/combos-destacados/?empresa_slug=Analiza
+GET /api/catalogo/productos-mas-vendidos/?empresa_slug=Analiza
+GET /api/catalogo/examenes/?empresa_slug=Analiza&buscar=texto
+GET /api/catalogo/perfiles/?empresa_slug=Analiza&buscar=texto
+GET /api/catalogo/servicios/?empresa_slug=Analiza&buscar=texto
+```
+
+Servicios:
+
+- Se implementan usando `Familia`.
+- Familia representa el tipo grande de servicio.
+- Categoria representa el grupo interno.
+- Producto representa lo vendible.
+
+Reglas de existencia:
+
+- Todo producto inicia siempre con existencia `0` al crearse.
+- La existencia no se cambia desde producto.
+- La existencia se cambia desde inventario mediante movimientos.
+- `existencia_minima` sirve para alertar inventario bajo.
+- Estado interno de inventario:
+  - `agotado` cuando existencia es `0`;
+  - `bajo` cuando existencia es mayor que `0` y menor o igual a `existencia_minima`;
+  - `ok` cuando hay existencia suficiente.
 
 Orden:
 
@@ -314,6 +481,8 @@ Orden:
 Migraciones:
 
 - `catalogo.0001_initial`
+- `catalogo.0002_producto_existencia_minima`
+- `catalogo.0003_familia_imagen_familia_imagen_url_and_more`
 
 ## 9. App inventario
 
@@ -348,13 +517,53 @@ Reglas:
 - Una entrada suma existencia.
 - Una salida resta existencia.
 - Un ajuste fija la existencia final contada.
+- Un ajuste puede fijar la existencia en `0`.
+- Las entradas y salidas deben ser mayores que `0`.
 - No se permite existencia negativa.
 - Cada movimiento actualiza automaticamente `Producto.existencia`.
 - Los cambios de existencia deben hacerse por movimientos para conservar historial.
+- Administrador maestro, administrador de empresa y gerente pueden administrar inventario.
+- Compradores no pueden administrar inventario.
+- Administrador maestro puede consultar todas las empresas o filtrar por `empresa_slug`.
+- Administrador de empresa y gerente solo ven los productos de su empresa.
+
+Endpoints internos de inventario:
+
+```text
+GET /api/inventario/productos/
+GET /api/inventario/resumen/
+GET /api/inventario/productos-bajo-stock/
+GET /api/inventario/productos-agotados/
+POST /api/inventario/ajustar-existencia/
+GET /api/inventario/movimientos/
+POST /api/inventario/movimientos/
+```
+
+Payload para ajustar existencia por codigo de barra:
+
+```json
+{
+  "codigo_barra": "ABC123",
+  "existencia_nueva": 10,
+  "motivo": "Conteo fisico",
+  "referencia": "AJ-001"
+}
+```
+
+Si un administrador maestro trabaja con codigos de barra que existen en varias empresas, debe enviar:
+
+```json
+{
+  "empresa_slug": "Analiza",
+  "codigo_barra": "ABC123",
+  "existencia_nueva": 10
+}
+```
 
 Migraciones:
 
 - `inventario.0001_initial`
+- `inventario.0002_alter_movimientoinventario_cantidad`
 
 ## 10. App favoritos
 
@@ -382,7 +591,113 @@ Migraciones:
 
 - `favoritos.0001_initial`
 
-## 11. App pedidos
+## 11. App promociones
+
+Modelo principal:
+
+```text
+BannerPromocional
+```
+
+Campos:
+
+- empresa
+- titulo
+- subtitulo
+- texto_boton
+- url_boton
+- imagen
+- imagen_url
+- texto_alternativo
+- orden
+- activo
+- fecha_inicio
+- fecha_fin
+- fechas de creacion y actualizacion
+
+Reglas:
+
+- Cada banner pertenece a una empresa.
+- Una empresa puede tener varios banners para carrusel o rotacion futura.
+- La API normal devuelve solo banners activos, vigentes y de empresas activas.
+- Aunque el frontend mande token de administrador, la llamada normal no devuelve banners inactivos.
+- Los administradores solo ven inactivos si envian `incluir_inactivos=true`.
+- La respuesta publica no expone `id` interno ni `empresa` interna.
+- `imagen_url` tiene prioridad sobre `imagen` local.
+- El frontend debe usar `imagen_final`.
+- `imagen` local sirve para desarrollo.
+- `imagen_url` queda preparada para almacenamiento externo en produccion.
+- Se puede programar inicio y fin de publicacion.
+- El orden se asigna automaticamente si no se indica.
+
+Endpoint publico:
+
+```text
+GET /api/promociones/banners/?empresa_slug=Analiza
+```
+
+Endpoint administrativo para incluir inactivos:
+
+```text
+GET /api/promociones/banners/?empresa_slug=Analiza&incluir_inactivos=true
+```
+
+Migraciones:
+
+- `promociones.0001_initial`
+
+## 12. App contacto
+
+Modelo principal:
+
+```text
+MensajeContacto
+```
+
+Campos:
+
+- empresa
+- nombre
+- telefono
+- correo
+- asunto
+- mensaje
+- estado
+- fechas de creacion y actualizacion
+
+Estados:
+
+- `nuevo`
+- `pendiente`
+- `respondido`
+- `cerrado`
+
+Reglas:
+
+- El endpoint publico permite crear mensajes desde el formulario de contacto.
+- `empresa_slug`, `nombre` y `mensaje` son obligatorios.
+- Debe enviarse telefono o correo.
+- El estado inicial es `nuevo`.
+- La respuesta publica no expone IDs internos.
+- Administradores pueden listar mensajes por empresa.
+
+Endpoint publico:
+
+```text
+POST /api/contacto/mensajes/
+```
+
+Endpoint administrativo:
+
+```text
+GET /api/contacto/mensajes/?empresa_slug=Analiza
+```
+
+Migraciones:
+
+- `contacto.0001_initial`
+
+## 13. App pedidos
 
 Modelos:
 
@@ -599,12 +914,15 @@ Migraciones:
 - `pedidos.0006_prefactura`
 - `pedidos.0007_pedido_departamento_entrega_pedido_direccion_entrega_and_more`
 
-## 12. Endpoints API actuales
+## 14. Endpoints API actuales
 
 Rutas principales incluidas bajo `/api/`:
 
 - `empresas/`
+- `empresas/actual/`
+- `empresas/menu/`
 - `empresas/publica/`
+- `empresas/sucursales/`
 - `usuarios/registro-comprador/`
 - `usuarios/login/`
 - `usuarios/token/refresh/`
@@ -614,8 +932,20 @@ Rutas principales incluidas bajo `/api/`:
 - `catalogo/familias/`
 - `catalogo/categorias/`
 - `catalogo/productos/`
+- `catalogo/combos-destacados/`
+- `catalogo/productos-mas-vendidos/`
+- `catalogo/examenes/`
+- `catalogo/perfiles/`
+- `catalogo/servicios/`
+- `contacto/mensajes/`
 - `inventario/movimientos/`
+- `inventario/productos/`
+- `inventario/resumen/`
+- `inventario/productos-bajo-stock/`
+- `inventario/productos-agotados/`
+- `inventario/ajustar-existencia/`
 - `favoritos/`
+- `promociones/banners/`
 - `pedidos/carritos/`
 - `pedidos/carritos/mi-carrito/`
 - `pedidos/carritos/{id}/agregar-producto/`
@@ -633,7 +963,7 @@ Catalogo publico:
 - Para crear, editar o eliminar catalogo sigue siendo obligatorio iniciar sesion y tener permisos.
 - Productos aceptan filtros `buscar`, `familia`, `categoria`, `agotado` y `orden`.
 
-## 13. Base de datos
+## 15. Base de datos
 
 Actual:
 
@@ -650,7 +980,7 @@ Nota:
 
 El superusuario y los datos creados en SQLite local no existen automaticamente en Supabase. Cuando se cambie a Supabase se deberan crear/aplicar alli.
 
-## 14. Autenticacion
+## 16. Autenticacion
 
 Decision aprobada e implementada en backend:
 
@@ -694,7 +1024,7 @@ Correo:
 - El perfil guarda `numero_identidad` hondureno de 13 digitos.
 - La misma identidad no puede repetirse dentro de la misma empresa.
 
-## 15. Pruebas realizadas
+## 17. Pruebas realizadas
 
 Se han ejecutado validaciones frecuentes con:
 
@@ -726,23 +1056,49 @@ Pruebas hechas con rollback:
 - Solicitud y confirmacion de recuperacion de contrasena.
 - Generacion y consulta de prefactura para pedido pagado.
 - Empresa publica por slug.
+- Empresa actual por dominio/subdominio/host.
+- Subdominio local `analiza` poblado para la empresa Analiza.
+- Menu publico por empresa dentro de `empresas/actual/`.
+- Endpoint publico `empresas/menu/`.
+- Menu predeterminado creado para empresas existentes.
+- Confirmacion de que items inactivos no salen en el menu publico.
+- Sucursales publicas por empresa con busqueda.
+- Examenes publicos por empresa con busqueda e `imagen_final`.
+- Servicios publicos usando familias activas.
+- Combos destacados publicos.
+- Perfiles publicos.
+- Productos mas vendidos publicos.
+- Mensajes de contacto publicos.
+- Listado administrativo de mensajes de contacto por empresa.
 - Filtros de catalogo publico.
 - Creacion/consulta de `mi-carrito`.
 - Agregar producto al carrito por codigo de barra sin exponer `id` interno de producto.
 - Favoritos por codigo de barra.
 - Validacion de direccion obligatoria para envios local/nacional.
+- Banner promocional publico por empresa.
+- Filtro de banners activos y vigentes.
+- Prioridad de `imagen_url` sobre imagen local mediante `imagen_final`.
+- Confirmacion de que banners inactivos no salen en la tienda aunque se consulte con token admin.
+- Confirmacion de que administradores pueden listar inactivos usando `incluir_inactivos=true`.
+- Producto creado con existencia inicial `0`.
+- Listado interno de productos para inventario.
+- Resumen interno de inventario.
+- Filtro interno de productos agotados.
+- Filtro interno de productos con inventario bajo.
+- Ajuste de existencia por codigo de barra.
+- Ajuste de existencia a `0`.
 
-## 16. Pendientes recomendados en orden
+## 18. Pendientes recomendados en orden
 
 1. Conectar Supabase como base PostgreSQL real.
 2. Probar login JWT y registro desde el frontend o con cliente API.
 3. Definir integracion PayPal cuando se autorice proveedor, credenciales y modo sandbox.
 4. Crear frontend React.
-5. Definir promociones/descuentos.
+5. Definir promociones/descuentos de productos.
 6. Definir PDF de prefactura.
 7. Definir almacenamiento de imagenes en produccion.
 
-## 17. Reglas de trabajo pendientes de respetar
+## 19. Reglas de trabajo pendientes de respetar
 
 - No instalar dependencias sin autorizacion.
 - No crear o modificar archivos sin autorizacion.
@@ -752,6 +1108,6 @@ Pruebas hechas con rollback:
 - No crear credenciales ni escribir secretos reales en codigo.
 - Cada cambio importante debe explicarse antes de ejecutarse.
 
-## 18. Ultimo estado
+## 20. Ultimo estado
 
-El backend local tiene empresas, empresa publica por slug, usuarios/perfiles, catalogo publico con filtros, inventario, favoritos, carrito por codigo de barra, pedidos con direccion simple para envios, prefactura, login JWT, registro de compradores, verificacion de correo y recuperacion de contrasena funcionando como base inicial. Falta conexion con Supabase, claves reales de Brevo, integracion de pago, promociones, PDF de prefactura y almacenamiento de imagenes en produccion antes de usuarios reales en produccion.
+El backend local tiene empresas, empresa publica por slug, usuarios/perfiles, catalogo publico con filtros, inventario con resumen/listado/alertas/ajustes, favoritos, banners promocionales, carrito por codigo de barra, pedidos con direccion simple para envios, prefactura, login JWT, registro de compradores, verificacion de correo y recuperacion de contrasena funcionando como base inicial. Falta conexion con Supabase, claves reales de Brevo, integracion de pago, descuentos/promociones de productos, PDF de prefactura y almacenamiento de imagenes en produccion antes de usuarios reales en produccion.

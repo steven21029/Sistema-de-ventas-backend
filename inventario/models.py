@@ -1,6 +1,5 @@
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator
 from django.db import models, transaction
 
 from catalogo.models import Producto
@@ -25,7 +24,6 @@ class MovimientoInventario(models.Model):
     )
     tipo = models.CharField(max_length=20, choices=Tipo.choices)
     cantidad = models.PositiveIntegerField(
-        validators=[MinValueValidator(1)],
         help_text="En ajustes, la cantidad representa la existencia final contada.",
     )
     existencia_anterior = models.PositiveIntegerField(editable=False)
@@ -60,6 +58,11 @@ class MovimientoInventario(models.Model):
         if self.pk:
             return
 
+        if self.tipo in [self.Tipo.ENTRADA, self.Tipo.SALIDA] and self.cantidad < 1:
+            raise ValidationError(
+                {"cantidad": "Las entradas y salidas deben ser mayores que cero."}
+            )
+
         if self.tipo == self.Tipo.SALIDA and self.producto_id:
             if self.cantidad > self.producto.existencia:
                 raise ValidationError(
@@ -70,6 +73,11 @@ class MovimientoInventario(models.Model):
         if self.pk:
             super().save(*args, **kwargs)
             return
+
+        if self.tipo in [self.Tipo.ENTRADA, self.Tipo.SALIDA] and self.cantidad < 1:
+            raise ValidationError(
+                {"cantidad": "Las entradas y salidas deben ser mayores que cero."}
+            )
 
         with transaction.atomic():
             producto = Producto.objects.select_for_update().get(pk=self.producto_id)

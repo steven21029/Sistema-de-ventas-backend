@@ -37,9 +37,10 @@ SECRET_KEY = config(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config("DJANGO_DEBUG", default=True, cast=bool)
 
-ALLOWED_HOSTS = config_list("ALLOWED_HOSTS", "localhost,127.0.0.1")
+ALLOWED_HOSTS = config_list("ALLOWED_HOSTS", "localhost,127.0.0.1,.localhost,.test")
 CSRF_TRUSTED_ORIGINS = config_list("CSRF_TRUSTED_ORIGINS")
 CORS_ALLOWED_ORIGINS = config_list("CORS_ALLOWED_ORIGINS")
+CORS_ALLOWED_ORIGIN_REGEXES = config_list("CORS_ALLOWED_ORIGIN_REGEXES")
 CORS_ALLOW_CREDENTIALS = True
 
 
@@ -61,6 +62,8 @@ INSTALLED_APPS = [
     'inventario.apps.InventarioConfig',
     'pedidos.apps.PedidosConfig',
     'favoritos.apps.FavoritosConfig',
+    'promociones.apps.PromocionesConfig',
+    'contacto.apps.ContactoConfig',
 ]
 
 MIDDLEWARE = [
