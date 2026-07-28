@@ -67,7 +67,7 @@ class SucursalEmpresaListView(generics.ListAPIView):
         if not empresa_slug:
             raise ValidationError({"empresa_slug": "Debes enviar el slug de la empresa."})
 
-        queryset = SucursalEmpresa.objects.filter(
+        queryset = SucursalEmpresa.objects.select_related("empresa").filter(
             empresa__slug__iexact=empresa_slug,
             empresa__activa=True,
             activa=True,

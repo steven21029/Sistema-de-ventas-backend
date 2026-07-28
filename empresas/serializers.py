@@ -20,6 +20,7 @@ class ItemMenuEmpresaSerializer(serializers.ModelSerializer):
 class EmpresaSerializer(serializers.ModelSerializer):
     creada_por = serializers.StringRelatedField(read_only=True)
     opciones_entrega_disponibles = serializers.ListField(read_only=True)
+    imagen_sucursales_final = serializers.SerializerMethodField()
 
     class Meta:
         model = Empresa
@@ -30,6 +31,9 @@ class EmpresaSerializer(serializers.ModelSerializer):
             "subdominio",
             "dominio_personalizado",
             "logo",
+            "imagen_sucursales",
+            "imagen_sucursales_url",
+            "imagen_sucursales_final",
             "color_principal",
             "color_secundario",
             "color_acento",
@@ -47,10 +51,24 @@ class EmpresaSerializer(serializers.ModelSerializer):
             "fecha_actualizacion",
         ]
 
+    def get_imagen_sucursales_final(self, obj):
+        if obj.imagen_sucursales_url:
+            return obj.imagen_sucursales_url
+
+        if not obj.imagen_sucursales:
+            return None
+
+        request = self.context.get("request")
+        if request:
+            return request.build_absolute_uri(obj.imagen_sucursales.url)
+
+        return obj.imagen_sucursales.url
+
 
 class EmpresaPublicaSerializer(serializers.ModelSerializer):
     opciones_entrega_disponibles = serializers.ListField(read_only=True)
     menu = serializers.SerializerMethodField()
+    imagen_sucursales_final = serializers.SerializerMethodField()
 
     class Meta:
         model = Empresa
@@ -60,6 +78,8 @@ class EmpresaPublicaSerializer(serializers.ModelSerializer):
             "subdominio",
             "dominio_personalizado",
             "logo",
+            "imagen_sucursales_url",
+            "imagen_sucursales_final",
             "color_principal",
             "color_secundario",
             "color_acento",
@@ -93,8 +113,23 @@ class EmpresaPublicaSerializer(serializers.ModelSerializer):
         items_activos = items_menu.filter(activo=True).order_by("orden", "texto")
         return ItemMenuEmpresaSerializer(items_activos, many=True).data
 
+    def get_imagen_sucursales_final(self, obj):
+        if obj.imagen_sucursales_url:
+            return obj.imagen_sucursales_url
+
+        if not obj.imagen_sucursales:
+            return None
+
+        request = self.context.get("request")
+        if request:
+            return request.build_absolute_uri(obj.imagen_sucursales.url)
+
+        return obj.imagen_sucursales.url
+
 
 class SucursalEmpresaPublicaSerializer(serializers.ModelSerializer):
+    imagen_final = serializers.SerializerMethodField()
+
     class Meta:
         model = SucursalEmpresa
         fields = [
@@ -103,8 +138,22 @@ class SucursalEmpresaPublicaSerializer(serializers.ModelSerializer):
             "telefono",
             "horario",
             "google_maps_url",
+            "imagen_final",
             "latitud",
             "longitud",
             "orden",
         ]
         read_only_fields = fields
+
+    def get_imagen_final(self, obj):
+        if obj.empresa.imagen_sucursales_url:
+            return obj.empresa.imagen_sucursales_url
+
+        if obj.empresa.imagen_sucursales:
+            request = self.context.get("request")
+            if request:
+                return request.build_absolute_uri(obj.empresa.imagen_sucursales.url)
+
+            return obj.empresa.imagen_sucursales.url
+
+        return None

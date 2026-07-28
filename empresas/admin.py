@@ -81,6 +81,15 @@ class EmpresaAdmin(admin.ModelAdmin):
             },
         ),
         (
+            "Sucursales",
+            {
+                "fields": (
+                    "imagen_sucursales",
+                    "imagen_sucursales_url",
+                )
+            },
+        ),
+        (
             "Contacto",
             {
                 "fields": (
@@ -138,6 +147,7 @@ class ItemMenuEmpresaAdmin(admin.ModelAdmin):
 
 @admin.register(SucursalEmpresa)
 class SucursalEmpresaAdmin(admin.ModelAdmin):
+    exclude = ("imagen", "imagen_url")
     list_display = (
         "nombre",
         "empresa",

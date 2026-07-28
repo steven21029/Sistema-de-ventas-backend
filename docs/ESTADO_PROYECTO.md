@@ -196,6 +196,9 @@ Campos relevantes:
 - `subdominio`
 - `dominio_personalizado`
 - `logo`
+- `imagen_sucursales`
+- `imagen_sucursales_url`
+- `imagen_sucursales_final` en API publica
 - `color_principal`
 - `color_secundario`
 - `color_acento`
@@ -235,6 +238,7 @@ Campos de `SucursalEmpresa`:
 - telefono
 - horario
 - google_maps_url
+- imagen_final en API publica
 - latitud
 - longitud
 - orden
@@ -291,6 +295,12 @@ Endpoint publico de sucursales:
 GET /api/empresas/sucursales/?empresa_slug=Analiza&buscar=texto
 ```
 
+La respuesta publica de sucursales devuelve `imagen_final`.
+El frontend debe usar `imagen_final` para mostrar la imagen.
+La imagen principal de sucursales se cambia una sola vez desde la empresa.
+Si la empresa tiene `imagen_sucursales_url` o `imagen_sucursales`, todas las sucursales devuelven esa imagen en `imagen_final`.
+`imagen_sucursales_url` queda preparada para almacenamiento externo futuro.
+
 Migraciones:
 
 - `empresas.0001_initial`
@@ -300,6 +310,9 @@ Migraciones:
 - `empresas.0005_itemmenuempresa`
 - `empresas.0006_poblar_menu_empresas_existentes`
 - `empresas.0007_sucursalempresa`
+- `empresas.0008_alter_sucursalempresa_latitud_and_more`
+- `empresas.0009_sucursalempresa_imagen_sucursalempresa_imagen_url`
+- `empresas.0010_empresa_imagen_sucursales_and_more`
 
 ## 7. App usuarios
 
@@ -452,14 +465,17 @@ GET /api/catalogo/productos-mas-vendidos/?empresa_slug=Analiza
 GET /api/catalogo/examenes/?empresa_slug=Analiza&buscar=texto
 GET /api/catalogo/perfiles/?empresa_slug=Analiza&buscar=texto
 GET /api/catalogo/servicios/?empresa_slug=Analiza&buscar=texto
+GET /api/catalogo/servicios/detalle/?empresa_slug=Analiza&servicio=imagenes
 ```
 
 Servicios:
 
 - Se implementan usando `Familia`.
-- Familia representa el tipo grande de servicio.
-- Categoria representa el grupo interno.
+- Familia representa la rama grande de servicio.
+- Categoria representa la opcion interna o grupo dentro de esa rama.
 - Producto representa lo vendible.
+- `/catalogo/servicios/` devuelve las ramas y un resumen de categorias.
+- `/catalogo/servicios/detalle/` devuelve una rama con sus categorias y productos agrupados.
 
 Reglas de existencia:
 
@@ -593,10 +609,12 @@ Migraciones:
 
 ## 11. App promociones
 
-Modelo principal:
+Modelos principales:
 
 ```text
 BannerPromocional
+OfertaPromocional
+OfertaProducto
 ```
 
 Campos:
@@ -619,6 +637,9 @@ Reglas:
 
 - Cada banner pertenece a una empresa.
 - Una empresa puede tener varios banners para carrusel o rotacion futura.
+- El banner es solo carrusel visual y punto de entrada.
+- El banner no representa por si mismo una oferta de la pagina Promociones.
+- El campo `url_boton` puede guardar una ruta interna como `/promociones/oferta-1` o una URL externa.
 - La API normal devuelve solo banners activos, vigentes y de empresas activas.
 - Aunque el frontend mande token de administrador, la llamada normal no devuelve banners inactivos.
 - Los administradores solo ven inactivos si envian `incluir_inactivos=true`.
@@ -630,21 +651,62 @@ Reglas:
 - Se puede programar inicio y fin de publicacion.
 - El orden se asigna automaticamente si no se indica.
 
+OfertaPromocional:
+
+- empresa
+- tipo: `producto`, `productos` o `paquete`
+- codigo
+- titulo
+- descripcion
+- precio_normal
+- precio_oferta
+- porcentaje_descuento
+- imagen
+- imagen_url
+- url_destino
+- paquete
+- productos
+- orden
+- activo
+- fecha_inicio
+- fecha_fin
+- fechas de creacion y actualizacion
+
+Reglas de ofertas:
+
+- Las ofertas se administran aparte de los banners.
+- La pagina Promociones debe consumir ofertas, no banners.
+- Una oferta puede ser de un producto, varios productos o un paquete/combo/perfil.
+- `precio_oferta` no puede ser mayor que `precio_normal`.
+- Si la oferta es tipo `paquete`, debe tener un paquete asociado.
+- Los productos asociados se guardan en `OfertaProducto`.
+- La API publica devuelve `imagen_final`.
+- Las ofertas inactivas o fuera de vigencia no salen en la API publica.
+- Administradores pueden ver inactivas usando `incluir_inactivos=true`.
+
 Endpoint publico:
 
 ```text
 GET /api/promociones/banners/?empresa_slug=Analiza
 ```
 
+Endpoint publico de ofertas:
+
+```text
+GET /api/promociones/ofertas/?empresa_slug=Analiza&buscar=texto
+```
+
 Endpoint administrativo para incluir inactivos:
 
 ```text
 GET /api/promociones/banners/?empresa_slug=Analiza&incluir_inactivos=true
+GET /api/promociones/ofertas/?empresa_slug=Analiza&incluir_inactivos=true
 ```
 
 Migraciones:
 
 - `promociones.0001_initial`
+- `promociones.0002_alter_bannerpromocional_url_boton_ofertaproducto_and_more`
 
 ## 12. App contacto
 
@@ -937,6 +999,7 @@ Rutas principales incluidas bajo `/api/`:
 - `catalogo/examenes/`
 - `catalogo/perfiles/`
 - `catalogo/servicios/`
+- `catalogo/servicios/detalle/`
 - `contacto/mensajes/`
 - `inventario/movimientos/`
 - `inventario/productos/`
@@ -946,6 +1009,7 @@ Rutas principales incluidas bajo `/api/`:
 - `inventario/ajustar-existencia/`
 - `favoritos/`
 - `promociones/banners/`
+- `promociones/ofertas/`
 - `pedidos/carritos/`
 - `pedidos/carritos/mi-carrito/`
 - `pedidos/carritos/{id}/agregar-producto/`
@@ -1080,6 +1144,9 @@ Pruebas hechas con rollback:
 - Prioridad de `imagen_url` sobre imagen local mediante `imagen_final`.
 - Confirmacion de que banners inactivos no salen en la tienda aunque se consulte con token admin.
 - Confirmacion de que administradores pueden listar inactivos usando `incluir_inactivos=true`.
+- Ofertas promocionales separadas de banners.
+- Confirmacion de que la pagina Promociones consume `promociones/ofertas/`.
+- Confirmacion de que banners pueden redirigir a rutas internas con `url_boton`.
 - Producto creado con existencia inicial `0`.
 - Listado interno de productos para inventario.
 - Resumen interno de inventario.

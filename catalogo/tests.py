@@ -61,7 +61,27 @@ class CatalogoPaginasPublicasTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data[0]["nombre"], self.familia.nombre)
         self.assertEqual(response.data[0]["imagen_final"], self.familia.imagen_url)
+        self.assertEqual(response.data[0]["cantidad_categorias"], 1)
         self.assertEqual(response.data[0]["cantidad_productos"], 1)
+        self.assertEqual(response.data[0]["categorias"][0]["nombre"], self.categoria.nombre)
+
+    def test_detalle_servicio_publico_devuelve_categorias_y_productos(self):
+        response = self.client.get(
+            reverse("catalogo-servicio-detalle"),
+            {
+                "empresa_slug": self.empresa.slug,
+                "servicio": "examenes",
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["nombre"], self.familia.nombre)
+        self.assertEqual(response.data["categorias"][0]["nombre"], self.categoria.nombre)
+        self.assertEqual(
+            response.data["categorias"][0]["productos"][0]["codigo_barra"],
+            self.producto.codigo_barra,
+        )
+        self.assertNotIn("id", response.data["categorias"][0]["productos"][0])
 
     def test_combos_destacados_publicos(self):
         combo = PaqueteCatalogo.objects.create(

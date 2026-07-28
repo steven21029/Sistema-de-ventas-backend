@@ -9,6 +9,7 @@ from .views import (
     PerfilesListView,
     ProductoViewSet,
     ProductosMasVendidosListView,
+    ServicioDetallePublicoView,
     ServiciosListView,
 )
 
@@ -31,5 +32,10 @@ urlpatterns = [
     path("catalogo/examenes/", ExamenesListView.as_view(), name="catalogo-examenes"),
     path("catalogo/perfiles/", PerfilesListView.as_view(), name="catalogo-perfiles"),
     path("catalogo/servicios/", ServiciosListView.as_view(), name="catalogo-servicios"),
+    path(
+        "catalogo/servicios/detalle/",
+        ServicioDetallePublicoView.as_view(),
+        name="catalogo-servicio-detalle",
+    ),
     path("", include(router.urls)),
 ]

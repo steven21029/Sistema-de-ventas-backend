@@ -295,9 +295,53 @@ class PerfilPublicoSerializer(ImagenFinalMixin, serializers.ModelSerializer):
         return ProductoPaquetePublicoSerializer(productos, many=True).data
 
 
+class CategoriaServicioPublicoSerializer(serializers.ModelSerializer):
+    clave = serializers.SerializerMethodField()
+    cantidad_productos = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Categoria
+        fields = [
+            "clave",
+            "nombre",
+            "descripcion",
+            "orden",
+            "cantidad_productos",
+        ]
+        read_only_fields = fields
+
+    def get_clave(self, obj):
+        return slugify(obj.nombre)
+
+
+class CategoriaServicioDetalleSerializer(CategoriaServicioPublicoSerializer):
+    productos = serializers.SerializerMethodField()
+
+    class Meta(CategoriaServicioPublicoSerializer.Meta):
+        fields = CategoriaServicioPublicoSerializer.Meta.fields + ["productos"]
+        read_only_fields = fields
+
+    def get_productos(self, obj):
+        productos = getattr(obj, "productos_activos", None)
+        if productos is None:
+            productos = obj.productos.filter(
+                activo=True,
+                familia__activa=True,
+                categoria__activa=True,
+            ).order_by("nombre")
+
+        return ProductoPaginaPublicaSerializer(
+            productos,
+            many=True,
+            context=self.context,
+        ).data
+
+
 class ServicioPublicoSerializer(ImagenFinalMixin, serializers.ModelSerializer):
     clave = serializers.SerializerMethodField()
     cantidad_productos = serializers.IntegerField(read_only=True)
+    cantidad_categorias = serializers.IntegerField(read_only=True)
+    categorias = serializers.SerializerMethodField()
 
     class Meta:
         model = Familia
@@ -307,9 +351,37 @@ class ServicioPublicoSerializer(ImagenFinalMixin, serializers.ModelSerializer):
             "descripcion",
             "imagen_final",
             "orden",
+            "cantidad_categorias",
             "cantidad_productos",
+            "categorias",
         ]
         read_only_fields = fields
 
     def get_clave(self, obj):
         return slugify(obj.nombre)
+
+    def get_categorias(self, obj):
+        categorias = getattr(obj, "categorias_activas", None)
+        if categorias is None:
+            categorias = obj.categorias.filter(activa=True).order_by("orden", "nombre")
+
+        return CategoriaServicioPublicoSerializer(
+            categorias,
+            many=True,
+            context=self.context,
+        ).data
+
+
+class ServicioDetallePublicoSerializer(ServicioPublicoSerializer):
+    categorias = serializers.SerializerMethodField()
+
+    def get_categorias(self, obj):
+        categorias = getattr(obj, "categorias_activas", None)
+        if categorias is None:
+            categorias = obj.categorias.filter(activa=True).order_by("orden", "nombre")
+
+        return CategoriaServicioDetalleSerializer(
+            categorias,
+            many=True,
+            context=self.context,
+        ).data

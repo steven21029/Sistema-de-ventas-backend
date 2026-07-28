@@ -427,6 +427,13 @@ Servicios:
 GET /api/catalogo/servicios/?empresa_slug=Analiza&buscar=texto
 ```
 
+Detalle de una rama de servicio:
+
+```text
+GET /api/catalogo/servicios/detalle/?empresa_slug=Analiza&servicio=imagenes
+GET /api/catalogo/servicios/detalle/?empresa_slug=Analiza&servicio=Examenes
+```
+
 Reglas:
 
 - Todos requieren `empresa_slug`.
@@ -435,7 +442,10 @@ Reglas:
 - Productos y paquetes devuelven `imagen_final`.
 - Si hay `imagen_url`, `imagen_final` usa esa URL externa.
 - Si no hay `imagen_url`, `imagen_final` usa la imagen local del backend.
-- `servicios` usa familias activas como tipos grandes de servicio.
+- `servicios` usa familias activas como ramas grandes de servicio.
+- En servicios: Familia = rama principal, Categoria = opcion interna, Producto = vendible.
+- `/catalogo/servicios/` devuelve las ramas y un resumen de categorias.
+- `/catalogo/servicios/detalle/` devuelve la rama con categorias y productos agrupados.
 - `combos-destacados` devuelve paquetes tipo combo con `destacado=true`.
 - `perfiles` devuelve paquetes tipo perfil con productos internos.
 
@@ -457,6 +467,7 @@ Uso:
 
 - cargar nombre de empresa;
 - logo;
+- imagen general de sucursales;
 - slug;
 - subdominio;
 - dominio personalizado;
@@ -467,6 +478,13 @@ Uso:
 - sitio web;
 - `tiene_envios`;
 - `opciones_entrega_disponibles`.
+
+Campos de imagen general de sucursales en empresa:
+
+```text
+imagen_sucursales_url
+imagen_sucursales_final
+```
 
 Regla multiempresa:
 
@@ -489,12 +507,23 @@ direccion
 telefono
 horario
 google_maps_url
+imagen_final
 latitud
 longitud
 orden
 ```
 
-El frontend debe usar `google_maps_url` como enlace hacia Google Maps.
+El frontend debe usar:
+
+- `imagen_final` para mostrar la imagen de la sucursal.
+- `google_maps_url` como enlace hacia Google Maps.
+
+Regla de imagen:
+
+- Todas las sucursales pueden usar una sola imagen general configurada en la empresa.
+- El frontend no debe escoger imagen por sucursal manualmente; debe usar `imagen_final`.
+- Si la empresa tiene imagen general de sucursales, `imagen_final` devuelve esa misma imagen para todas.
+- Si no hay ninguna imagen, `imagen_final` devuelve `null`.
 
 ## 10. Menu principal por empresa implementado
 
@@ -572,7 +601,7 @@ Uso:
 
 - banner central;
 - carrusel futuro;
-- promociones visuales por empresa.
+- entrada visual hacia una pagina interna o externa.
 
 Campos importantes para frontend:
 
@@ -591,6 +620,10 @@ fecha_fin
 Reglas:
 
 - Cada banner pertenece a una empresa.
+- El banner no es la pagina Promociones.
+- El banner no debe listarse dentro de Promociones.
+- El banner solo se muestra en carrusel y redirige usando `url_boton`.
+- `url_boton` puede ser ruta interna como `/promociones/oferta-1` o URL externa.
 - La API publica devuelve solo banners activos y vigentes.
 - Si no hay banners activos, la respuesta debe ser `[]` y el frontend debe ocultar el espacio del banner.
 - Aunque exista token de administrador guardado en el navegador, la llamada normal no devuelve banners inactivos.
@@ -623,7 +656,65 @@ Endpoint administrativo para ver tambien banners desactivados:
 GET /api/promociones/banners/?empresa_slug=Analiza&incluir_inactivos=true
 ```
 
-## 12. Carrito y pedidos implementados
+## 12. Promociones y ofertas implementadas
+
+La pagina Promociones debe consumir este endpoint:
+
+```text
+GET /api/promociones/ofertas/?empresa_slug=Analiza&buscar=texto
+```
+
+No debe consumir:
+
+```text
+GET /api/promociones/banners/
+```
+
+Tipos de oferta:
+
+```text
+producto = oferta de un producto individual
+productos = oferta de varios productos juntos
+paquete = oferta vinculada a combo o perfil
+```
+
+Ejemplo de respuesta:
+
+```json
+[
+  {
+    "tipo": "producto",
+    "codigo": "OFERTA-001",
+    "titulo": "Hemograma en oferta",
+    "descripcion": "Precio especial por tiempo limitado.",
+    "precio_normal": "150.00",
+    "precio_oferta": "120.00",
+    "porcentaje_descuento": 20,
+    "imagen_final": "https://example.com/oferta.jpg",
+    "url_destino": "/promociones/oferta-001",
+    "paquete_resumen": null,
+    "productos": [
+      {
+        "codigo_barra": "HEMO-001",
+        "nombre": "Hemograma",
+        "precio": "150.00"
+      }
+    ],
+    "orden": 1
+  }
+]
+```
+
+Reglas:
+
+- Las ofertas son independientes de los banners.
+- Solo devuelve ofertas activas y vigentes.
+- No expone IDs internos.
+- Usa `imagen_final`.
+- Si `url_destino` viene lleno, el frontend puede usarlo para abrir detalle o ruta interna.
+- Los administradores pueden ver inactivas con `incluir_inactivos=true`.
+
+## 13. Carrito y pedidos implementados
 
 El carrito del backend requiere usuario autenticado.
 
@@ -715,7 +806,7 @@ Prefactura:
 GET /api/pedidos/pedidos/{id}/prefactura/
 ```
 
-## 13. Favoritos implementados
+## 14. Favoritos implementados
 
 Favoritos requieren usuario autenticado.
 
@@ -752,7 +843,7 @@ Reglas:
 - El producto debe estar activo.
 - El producto se identifica por codigo de barra.
 
-## 14. Inventario interno implementado
+## 15. Inventario interno implementado
 
 Estas rutas son para pantallas internas de administrador/gerente, no para la tienda publica.
 
@@ -855,7 +946,7 @@ Reglas:
 - Cada ajuste crea historial en movimientos.
 - El frontend debe identificar producto por `codigo_barra`, no por `id` interno.
 
-## 15. Entrega
+## 16. Entrega
 
 Regla por empresa:
 
@@ -893,7 +984,7 @@ Nota:
 - Administrador maestro y administrador de empresa pueden cambiar tarifas.
 - Compradores no administran tarifas.
 
-## 16. Totales de pedido
+## 17. Totales de pedido
 
 Formula aprobada:
 
@@ -918,7 +1009,7 @@ Cuando un pedido pasa a `pagado`:
 - se genera prefactura;
 - no se descuenta inventario dos veces.
 
-## 17. Prefactura
+## 18. Prefactura
 
 La prefactura existe como JSON, no como PDF todavia.
 
@@ -986,11 +1077,11 @@ Endpoint administrativo:
 GET /api/contacto/mensajes/?empresa_slug=Analiza
 ```
 
-## 18. APIs que faltan antes de cerrar el frontend completo
+## 19. APIs que faltan antes de cerrar el frontend completo
 
 Estas APIs no bloquean empezar el frontend visual, pero si deben resolverse antes de terminar compra real.
 
-### 18.1 Pagos
+### 19.1 Pagos
 
 PayPal esta aprobado como primera pasarela futura, pero no esta implementado.
 
@@ -1002,33 +1093,31 @@ Falta:
 - guardar referencia de transaccion;
 - cambiar pedido a `pagado` despues de confirmacion real.
 
-### 18.2 Descuentos de productos
+### 19.2 Descuentos aplicados al checkout
 
-El banner promocional ya existe.
+Las ofertas promocionales ya existen para la pagina Promociones.
 
-No hay modelos ni APIs de descuentos de productos todavia.
+Pendiente: aplicar esas ofertas automaticamente al carrito/pedido.
 
-El pedido tiene `descuento_total`, pero no existe todavia logica de promociones.
-
-### 18.3 PDF de prefactura
+### 19.3 PDF de prefactura
 
 La prefactura existe como JSON.
 
 Falta generar PDF o plantilla visual imprimible.
 
-### 18.4 Imagenes en produccion
+### 19.4 Imagenes en produccion
 
 El backend usa `media/` local para imagenes.
 
 Para produccion falta definir almacenamiento en linea vinculado al proyecto.
 
-### 18.5 Direcciones guardadas del cliente
+### 19.5 Direcciones guardadas del cliente
 
 El pedido ya permite direccion simple para envio local y nacional.
 
 Falta solo si se quiere guardar una libreta de direcciones reutilizables por cliente.
 
-## 19. Recomendacion para empezar frontend
+## 20. Recomendacion para empezar frontend
 
 Se puede iniciar el frontend con este orden:
 
@@ -1050,7 +1139,7 @@ Se puede iniciar el frontend con este orden:
 16. Mostrar pedidos y prefactura JSON.
 17. Dejar pagos como pendiente hasta PayPal.
 
-## 20. Reglas importantes para la otra conversacion
+## 21. Reglas importantes para la otra conversacion
 
 - No convertir la pagina en landing page.
 - El catalogo y ventas son lo primero.
@@ -1059,6 +1148,7 @@ Se puede iniciar el frontend con este orden:
 - No agregar citas medicas.
 - No duplicar acceso a "Mi cuenta".
 - No dejar nombres fijos en el menu principal; usar el menu que devuelve el backend.
+- No usar banners como listado de promociones; la pagina Promociones usa `promociones/ofertas/`.
 - No mostrar id interno del producto al cliente.
 - Para inventario interno, usar `codigo_barra` para ajustar existencias.
 - Usar `empresa_slug = Analiza` como respaldo local, pero preferir resolver empresa con `/api/empresas/actual/`.
@@ -1066,7 +1156,7 @@ Se puede iniciar el frontend con este orden:
 - No integrar PayPal ni Brevo real sin autorizacion.
 - No conectar Supabase sin autorizacion.
 
-## 21. Estado final del backend para frontend
+## 22. Estado final del backend para frontend
 
 Listo para empezar frontend:
 
@@ -1076,6 +1166,7 @@ Listo para empezar frontend:
 - Paginas dinamicas de inicio, examenes, perfiles, servicios y sucursales.
 - Formulario publico de contacto.
 - Banner promocional por empresa.
+- Ofertas promocionales separadas de banners.
 - Filtros de catalogo.
 - Login JWT.
 - Registro comprador.

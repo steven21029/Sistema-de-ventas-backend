@@ -1,8 +1,9 @@
-from django.db.models import Count, IntegerField, Q, Sum, Value
+from django.db.models import Count, IntegerField, Prefetch, Q, Sum, Value
 from django.db.models.functions import Coalesce
+from django.utils.text import slugify
 
 from rest_framework import generics, viewsets
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.permissions import AllowAny
 from rest_framework.permissions import SAFE_METHODS
 
@@ -15,6 +16,7 @@ from .serializers import (
     PerfilPublicoSerializer,
     ProductoPaginaPublicaSerializer,
     ProductoSerializer,
+    ServicioDetallePublicoSerializer,
     ServicioPublicoSerializer,
 )
 
@@ -310,15 +312,34 @@ class ServiciosListView(CatalogoPublicoEmpresaMixin, generics.ListAPIView):
     serializer_class = ServicioPublicoSerializer
 
     def get_queryset(self):
+        categorias_activas = Categoria.objects.filter(activa=True).annotate(
+            cantidad_productos=Count(
+                "productos",
+                filter=Q(productos__activo=True),
+                distinct=True,
+            )
+        ).order_by("orden", "nombre")
+
         queryset = Familia.objects.filter(
             empresa__slug__iexact=self.get_empresa_slug(),
             empresa__activa=True,
             activa=True,
         ).annotate(
+            cantidad_categorias=Count(
+                "categorias",
+                filter=Q(categorias__activa=True),
+                distinct=True,
+            ),
             cantidad_productos=Count(
                 "productos",
                 filter=Q(productos__activo=True),
                 distinct=True,
+            )
+        ).prefetch_related(
+            Prefetch(
+                "categorias",
+                queryset=categorias_activas,
+                to_attr="categorias_activas",
             )
         )
         queryset = self.aplicar_busqueda(queryset)
@@ -328,3 +349,76 @@ class ServiciosListView(CatalogoPublicoEmpresaMixin, generics.ListAPIView):
         return queryset.filter(
             Q(nombre__icontains=buscar) | Q(descripcion__icontains=buscar)
         )
+
+
+class ServicioDetallePublicoView(CatalogoPublicoEmpresaMixin, generics.RetrieveAPIView):
+    serializer_class = ServicioDetallePublicoSerializer
+
+    def get_object(self):
+        empresa_slug = self.get_empresa_slug()
+        servicio = (
+            self.request.query_params.get("servicio", "").strip()
+            or self.request.query_params.get("familia", "").strip()
+            or self.request.query_params.get("clave", "").strip()
+        )
+        if not servicio:
+            raise ValidationError(
+                {
+                    "servicio": (
+                        "Debes enviar la clave o nombre del servicio, "
+                        "por ejemplo servicio=imagenes."
+                    )
+                }
+            )
+
+        productos_activos = Producto.objects.filter(
+            activo=True,
+            familia__activa=True,
+            categoria__activa=True,
+        ).order_by("nombre")
+        categorias_activas = Categoria.objects.filter(activa=True).annotate(
+            cantidad_productos=Count(
+                "productos",
+                filter=Q(productos__activo=True),
+                distinct=True,
+            )
+        ).prefetch_related(
+            Prefetch(
+                "productos",
+                queryset=productos_activos,
+                to_attr="productos_activos",
+            )
+        ).order_by("orden", "nombre")
+
+        queryset = Familia.objects.filter(
+            empresa__slug__iexact=empresa_slug,
+            empresa__activa=True,
+            activa=True,
+        ).annotate(
+            cantidad_categorias=Count(
+                "categorias",
+                filter=Q(categorias__activa=True),
+                distinct=True,
+            ),
+            cantidad_productos=Count(
+                "productos",
+                filter=Q(productos__activo=True),
+                distinct=True,
+            )
+        ).prefetch_related(
+            Prefetch(
+                "categorias",
+                queryset=categorias_activas,
+                to_attr="categorias_activas",
+            )
+        )
+
+        servicio_normalizado = slugify(servicio).lower()
+        for familia in queryset:
+            if (
+                slugify(familia.nombre).lower() == servicio_normalizado
+                or familia.nombre.strip().lower() == servicio.strip().lower()
+            ):
+                return familia
+
+        raise NotFound("Servicio no encontrado para esta empresa.")

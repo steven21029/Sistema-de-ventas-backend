@@ -59,6 +59,16 @@ class Empresa(models.Model):
         help_text="Ejemplo: tienda.analizahn.com. No incluir http ni puerto.",
     )
     logo = models.ImageField(upload_to="empresas/logos/", blank=True, null=True)
+    imagen_sucursales = models.ImageField(
+        upload_to="empresas/sucursales/",
+        blank=True,
+        null=True,
+        help_text="Imagen general que usaran todas las sucursales de esta empresa.",
+    )
+    imagen_sucursales_url = models.URLField(
+        blank=True,
+        help_text="URL externa futura para la imagen general de sucursales.",
+    )
 
     color_principal = models.CharField(
         max_length=7,
@@ -120,6 +130,16 @@ class Empresa(models.Model):
             return ["envio_local", "envio_nacional"]
 
         return ["retiro_en_local"]
+
+    @property
+    def imagen_sucursales_final(self):
+        if self.imagen_sucursales_url:
+            return self.imagen_sucursales_url
+
+        if self.imagen_sucursales:
+            return self.imagen_sucursales.url
+
+        return None
 
     def clean(self):
         super().clean()
@@ -275,15 +295,24 @@ class SucursalEmpresa(models.Model):
     telefono = models.CharField(max_length=30, blank=True)
     horario = models.CharField(max_length=180, blank=True)
     google_maps_url = models.URLField(blank=True)
+    imagen = models.ImageField(
+        upload_to="empresas/sucursales/",
+        blank=True,
+        null=True,
+    )
+    imagen_url = models.URLField(
+        blank=True,
+        help_text="URL externa futura para almacenamiento en linea.",
+    )
     latitud = models.DecimalField(
-        max_digits=10,
-        decimal_places=7,
+        max_digits=20,
+        decimal_places=15,
         null=True,
         blank=True,
     )
     longitud = models.DecimalField(
-        max_digits=10,
-        decimal_places=7,
+        max_digits=20,
+        decimal_places=15,
         null=True,
         blank=True,
     )
@@ -302,6 +331,16 @@ class SucursalEmpresa(models.Model):
 
     def __str__(self):
         return f"{self.empresa} - {self.nombre}"
+
+    @property
+    def imagen_final(self):
+        if self.empresa.imagen_sucursales_url:
+            return self.empresa.imagen_sucursales_url
+
+        if self.empresa.imagen_sucursales:
+            return self.empresa.imagen_sucursales.url
+
+        return None
 
     def save(self, *args, **kwargs):
         if not self.pk and self.orden == 0:
