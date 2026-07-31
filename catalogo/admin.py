@@ -66,6 +66,15 @@ class CategoriaAdmin(admin.ModelAdmin):
             },
         ),
         (
+            "Imagen",
+            {
+                "fields": (
+                    "imagen",
+                    "imagen_url",
+                )
+            },
+        ),
+        (
             "Orden automatico",
             {
                 "fields": (
@@ -89,6 +98,8 @@ class CategoriaAdmin(admin.ModelAdmin):
 class ProductoAdmin(admin.ModelAdmin):
     list_display = (
         "nombre",
+        "tipo_item",
+        "codigo_interno",
         "codigo_barra",
         "empresa",
         "familia",
@@ -99,10 +110,20 @@ class ProductoAdmin(admin.ModelAdmin):
         "orden_destacado",
         "activo",
     )
-    list_filter = ("empresa", "familia", "categoria", "activo")
-    search_fields = ("nombre", "codigo_barra", "empresa__nombre")
+    list_filter = ("empresa", "tipo_item", "familia", "categoria", "activo")
+    search_fields = (
+        "nombre",
+        "codigo_interno",
+        "codigo_barra",
+        "empresa__nombre",
+    )
     autocomplete_fields = ("empresa", "familia", "categoria")
-    readonly_fields = ("existencia", "fecha_creacion", "fecha_actualizacion")
+    readonly_fields = (
+        "codigo_interno",
+        "existencia",
+        "fecha_creacion",
+        "fecha_actualizacion",
+    )
     ordering = ("empresa__nombre", "nombre")
 
     fieldsets = (
@@ -113,6 +134,7 @@ class ProductoAdmin(admin.ModelAdmin):
                     "empresa",
                     "familia",
                     "categoria",
+                    "tipo_item",
                 )
             },
         ),
@@ -120,6 +142,7 @@ class ProductoAdmin(admin.ModelAdmin):
             "Producto",
             {
                 "fields": (
+                    "codigo_interno",
                     "codigo_barra",
                     "nombre",
                     "descripcion",

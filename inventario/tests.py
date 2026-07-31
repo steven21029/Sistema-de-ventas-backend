@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
@@ -14,6 +15,7 @@ class InventarioAPITests(APITestCase):
         self.empresa = Empresa.objects.create(
             nombre="Analiza Laboratorios Clinicos",
             slug="Analiza",
+            modo_inventario=Empresa.ModoInventario.MIXTO,
         )
         self.familia = Familia.objects.create(
             empresa=self.empresa,
@@ -131,3 +133,29 @@ class InventarioAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(producto.existencia, 0)
         self.assertEqual(response.data["producto"]["estado_inventario"], "agotado")
+
+    def test_servicio_no_aparece_ni_admite_movimientos(self):
+        servicio = Producto.objects.create(
+            empresa=self.empresa,
+            familia=self.familia,
+            categoria=self.categoria,
+            tipo_item=Producto.TipoItem.SERVICIO,
+            nombre="Consulta sin inventario",
+            precio="300.00",
+        )
+
+        response = self.client.get(reverse("inventario-productos"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotIn(
+            servicio.codigo_interno,
+            [producto["codigo_interno"] for producto in response.data],
+        )
+        with self.assertRaises(DjangoValidationError):
+            MovimientoInventario.objects.create(
+                empresa=self.empresa,
+                producto=servicio,
+                tipo=MovimientoInventario.Tipo.AJUSTE,
+                cantidad=10,
+                usuario=self.usuario,
+            )

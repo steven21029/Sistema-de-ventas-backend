@@ -1,11 +1,13 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
-from rest_framework_simplejwt.views import TokenRefreshView, TokenVerifyView
+from rest_framework_simplejwt.views import TokenVerifyView
 
 from .views import (
     ConfirmarRecuperacionContrasenaView,
     LoginJWTView,
+    LogoutJWTView,
     PerfilUsuarioViewSet,
+    RefreshJWTView,
     ReenviarVerificacionCorreoView,
     RegistroCompradorView,
     SolicitarRecuperacionContrasenaView,
@@ -44,8 +46,13 @@ urlpatterns = [
     path("usuarios/login/", LoginJWTView.as_view(), name="usuarios-login"),
     path(
         "usuarios/token/refresh/",
-        TokenRefreshView.as_view(),
+        RefreshJWTView.as_view(),
         name="usuarios-token-refresh",
+    ),
+    path(
+        "usuarios/token/logout/",
+        LogoutJWTView.as_view(),
+        name="usuarios-token-logout",
     ),
     path(
         "usuarios/token/verify/",

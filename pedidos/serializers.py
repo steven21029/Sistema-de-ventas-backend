@@ -1,11 +1,39 @@
+from django.db.models import Prefetch, Q
+from django.db.models.functions import Lower
+
 from rest_framework import serializers
 
-from .models import Carrito, DetallePedido, ItemCarrito, Pedido, Prefactura, TarifaEntrega
+from catalogo.models import PaqueteCatalogo, PaqueteProducto, Producto
+from empresas.models import Empresa
+
+from .models import (
+    Carrito,
+    DetallePedido,
+    DetallePedidoComponente,
+    ItemCarrito,
+    Pedido,
+    Prefactura,
+    TarifaEntrega,
+)
+
+
+TIPOS_ARTICULO_CARRITO = [
+    ("producto", "Producto o servicio"),
+    (PaqueteCatalogo.Tipo.PERFIL, "Perfil"),
+    (PaqueteCatalogo.Tipo.COMBO, "Combo"),
+]
 
 
 class ItemCarritoSerializer(serializers.ModelSerializer):
-    producto_nombre = serializers.CharField(source="producto.nombre", read_only=True)
-    codigo_barra = serializers.CharField(source="producto.codigo_barra", read_only=True)
+    articulo_nombre = serializers.SerializerMethodField()
+    codigo = serializers.SerializerMethodField()
+    codigo_interno = serializers.SerializerMethodField()
+    codigo_barra = serializers.SerializerMethodField()
+    tipo_articulo = serializers.CharField(read_only=True)
+    tipo_item = serializers.SerializerMethodField()
+    controla_inventario = serializers.BooleanField(read_only=True)
+    agotado = serializers.BooleanField(read_only=True)
+    imagen_final = serializers.SerializerMethodField()
     subtotal = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
 
     class Meta:
@@ -14,8 +42,16 @@ class ItemCarritoSerializer(serializers.ModelSerializer):
             "id",
             "carrito",
             "producto",
-            "producto_nombre",
+            "paquete",
+            "articulo_nombre",
+            "codigo",
+            "codigo_interno",
             "codigo_barra",
+            "tipo_articulo",
+            "tipo_item",
+            "controla_inventario",
+            "agotado",
+            "imagen_final",
             "cantidad",
             "precio_unitario",
             "subtotal",
@@ -24,8 +60,15 @@ class ItemCarritoSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id",
-            "producto_nombre",
+            "articulo_nombre",
+            "codigo",
+            "codigo_interno",
             "codigo_barra",
+            "tipo_articulo",
+            "tipo_item",
+            "controla_inventario",
+            "agotado",
+            "imagen_final",
             "precio_unitario",
             "subtotal",
             "fecha_creacion",
@@ -34,20 +77,109 @@ class ItemCarritoSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         carrito = attrs.get("carrito") or getattr(self.instance, "carrito", None)
-        producto = attrs.get("producto") or getattr(self.instance, "producto", None)
+        producto = attrs.get("producto")
+        if "producto" not in attrs and self.instance:
+            producto = self.instance.producto
+        paquete = attrs.get("paquete")
+        if "paquete" not in attrs and self.instance:
+            paquete = self.instance.paquete
         cantidad = attrs.get("cantidad") or getattr(self.instance, "cantidad", 1)
+
+        if bool(producto) == bool(paquete):
+            raise serializers.ValidationError(
+                "Debes seleccionar un producto, perfil o combo, pero no varios."
+            )
+
+        if carrito and not carrito.activo:
+            raise serializers.ValidationError(
+                {"carrito": "Este carrito ya no esta activo."}
+            )
+
+        if producto and not producto.activo:
+            raise serializers.ValidationError(
+                {"producto": "El producto ya no esta activo."}
+            )
 
         if carrito and producto and carrito.empresa_id != producto.empresa_id:
             raise serializers.ValidationError(
                 {"producto": "El producto debe pertenecer a la empresa del carrito."}
             )
 
-        if producto and cantidad > producto.existencia:
+        if (
+            producto
+            and producto.controla_inventario
+            and cantidad > producto.existencia
+        ):
             raise serializers.ValidationError(
                 {"cantidad": "La cantidad no puede superar la existencia disponible."}
             )
 
+        if carrito and paquete and carrito.empresa_id != paquete.empresa_id:
+            raise serializers.ValidationError(
+                {"paquete": "El perfil o combo debe pertenecer a la empresa del carrito."}
+            )
+
+        if paquete:
+            if not paquete.activo:
+                raise serializers.ValidationError(
+                    {"paquete": "El perfil o combo ya no esta activo."}
+                )
+
+            for componente in paquete.items_productos.select_related("producto"):
+                articulo = componente.producto
+                if not articulo.activo:
+                    raise serializers.ValidationError(
+                        {
+                            "paquete": (
+                                f"El componente {articulo.nombre} ya no esta activo."
+                            )
+                        }
+                    )
+                if articulo.controla_inventario and cantidad > articulo.existencia:
+                    raise serializers.ValidationError(
+                        {
+                            "cantidad": (
+                                f"El paquete {paquete.nombre} no tiene existencia "
+                                f"suficiente de {articulo.nombre}."
+                            )
+                        }
+                    )
+
         return attrs
+
+    def get_articulo_nombre(self, obj):
+        return obj.nombre_articulo
+
+    def get_codigo(self, obj):
+        return obj.codigo_articulo
+
+    def get_codigo_interno(self, obj):
+        if obj.producto_id:
+            return obj.producto.codigo_interno
+
+        return obj.paquete.codigo
+
+    def get_codigo_barra(self, obj):
+        return obj.producto.codigo_barra if obj.producto_id else None
+
+    def get_tipo_item(self, obj):
+        return obj.producto.tipo_item if obj.producto_id else obj.paquete.tipo
+
+    def get_imagen_final(self, obj):
+        return self._imagen_absoluta(obj.articulo.imagen_final)
+
+    def _imagen_absoluta(self, imagen):
+        if not imagen:
+            return None
+
+        if imagen.startswith(("http://", "https://")):
+            return imagen
+
+        request = self.context.get("request")
+        if request:
+            return request.build_absolute_uri(imagen)
+
+        return imagen
 
 
 class CarritoSerializer(serializers.ModelSerializer):
@@ -84,22 +216,19 @@ class CarritoSerializer(serializers.ModelSerializer):
         ]
 
 
-class ItemCarritoClienteSerializer(serializers.ModelSerializer):
-    producto_nombre = serializers.CharField(source="producto.nombre", read_only=True)
-    codigo_barra = serializers.CharField(source="producto.codigo_barra", read_only=True)
-    imagen_principal = serializers.ImageField(
-        source="producto.imagen_principal",
-        read_only=True,
-    )
-    subtotal = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
-
-    class Meta:
-        model = ItemCarrito
+class ItemCarritoClienteSerializer(ItemCarritoSerializer):
+    class Meta(ItemCarritoSerializer.Meta):
         fields = [
             "id",
-            "producto_nombre",
+            "articulo_nombre",
+            "codigo",
+            "codigo_interno",
             "codigo_barra",
-            "imagen_principal",
+            "tipo_articulo",
+            "tipo_item",
+            "controla_inventario",
+            "agotado",
+            "imagen_final",
             "cantidad",
             "precio_unitario",
             "subtotal",
@@ -132,8 +261,20 @@ class CarritoClienteSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class DetallePedidoComponenteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DetallePedidoComponente
+        fields = [
+            "codigo_interno",
+            "codigo_barra",
+            "nombre_producto",
+            "cantidad_por_unidad",
+        ]
+        read_only_fields = fields
+
+
 class DetallePedidoSerializer(serializers.ModelSerializer):
-    producto_nombre_actual = serializers.CharField(source="producto.nombre", read_only=True)
+    componentes = DetallePedidoComponenteSerializer(many=True, read_only=True)
 
     class Meta:
         model = DetallePedido
@@ -141,32 +282,26 @@ class DetallePedidoSerializer(serializers.ModelSerializer):
             "id",
             "pedido",
             "producto",
-            "producto_nombre_actual",
+            "paquete",
+            "tipo_articulo",
+            "codigo_articulo",
+            "nombre_articulo",
+            "codigo_interno",
             "codigo_barra",
             "nombre_producto",
             "precio_unitario",
             "cantidad",
             "subtotal",
+            "promocion_codigo",
+            "promocion_titulo",
+            "porcentaje_descuento",
+            "descuento_unitario",
+            "precio_unitario_final",
+            "descuento_total",
+            "subtotal_final",
+            "componentes",
         ]
-        read_only_fields = [
-            "id",
-            "producto_nombre_actual",
-            "codigo_barra",
-            "nombre_producto",
-            "subtotal",
-        ]
-
-    def validate(self, attrs):
-        pedido = attrs.get("pedido") or getattr(self.instance, "pedido", None)
-        producto = attrs.get("producto") or getattr(self.instance, "producto", None)
-
-        if pedido and producto and pedido.empresa_id != producto.empresa_id:
-            raise serializers.ValidationError(
-                {"producto": "El producto debe pertenecer a la empresa del pedido."}
-            )
-
-        return attrs
-
+        read_only_fields = fields
 
 class PedidoSerializer(serializers.ModelSerializer):
     detalles = DetallePedidoSerializer(many=True, read_only=True)
@@ -194,6 +329,8 @@ class PedidoSerializer(serializers.ModelSerializer):
             "subtotal",
             "descuento_total",
             "impuesto",
+            "aplica_impuesto",
+            "tasa_impuesto",
             "envio",
             "total",
             "moneda",
@@ -203,105 +340,7 @@ class PedidoSerializer(serializers.ModelSerializer):
             "fecha_creacion",
             "fecha_actualizacion",
         ]
-        read_only_fields = [
-            "id",
-            "empresa_nombre",
-            "usuario_nombre",
-            "numero",
-            "estado_pago",
-            "impuesto",
-            "envio",
-            "total",
-            "inventario_descontado",
-            "detalles",
-            "fecha_creacion",
-            "fecha_actualizacion",
-        ]
-
-    def validate(self, attrs):
-        empresa = attrs.get("empresa") or getattr(self.instance, "empresa", None)
-        carrito = attrs.get("carrito_origen") or getattr(self.instance, "carrito_origen", None)
-        tipo_entrega = attrs.get("tipo_entrega") or getattr(
-            self.instance,
-            "tipo_entrega",
-            Pedido.TipoEntrega.RETIRO_EN_LOCAL,
-        )
-        subtotal = attrs.get("subtotal") or getattr(self.instance, "subtotal", 0)
-        descuento_total = attrs.get("descuento_total") or getattr(
-            self.instance,
-            "descuento_total",
-            0,
-        )
-
-        if empresa and carrito and empresa != carrito.empresa:
-            raise serializers.ValidationError(
-                {"carrito_origen": "El carrito debe pertenecer a la empresa del pedido."}
-            )
-
-        if descuento_total > subtotal:
-            raise serializers.ValidationError(
-                {"descuento_total": "El descuento no puede ser mayor al subtotal."}
-            )
-
-        if empresa and empresa.tiene_envios:
-            opciones_validas = [
-                Pedido.TipoEntrega.ENVIO_LOCAL,
-                Pedido.TipoEntrega.ENVIO_NACIONAL,
-            ]
-            if tipo_entrega not in opciones_validas:
-                raise serializers.ValidationError(
-                    {
-                        "tipo_entrega": (
-                            "Esta empresa tiene envios; debe seleccionar envio local "
-                            "o envio nacional."
-                        )
-                    }
-                )
-            if not TarifaEntrega.objects.filter(
-                empresa=empresa,
-                tipo_entrega=tipo_entrega,
-                activa=True,
-            ).exists():
-                raise serializers.ValidationError(
-                    {
-                        "envio": (
-                            "No hay una tarifa activa configurada para este tipo de entrega."
-                        )
-                    }
-                )
-
-        if empresa and not empresa.tiene_envios:
-            if tipo_entrega != Pedido.TipoEntrega.RETIRO_EN_LOCAL:
-                raise serializers.ValidationError(
-                    {
-                        "tipo_entrega": (
-                            "Esta empresa no tiene envios; solo permite retiro en local."
-                        )
-                    }
-                )
-
-        if tipo_entrega != Pedido.TipoEntrega.RETIRO_EN_LOCAL:
-            campos_entrega = {
-                "nombre_recibe": attrs.get("nombre_recibe")
-                or getattr(self.instance, "nombre_recibe", ""),
-                "telefono_recibe": attrs.get("telefono_recibe")
-                or getattr(self.instance, "telefono_recibe", ""),
-                "direccion_entrega": attrs.get("direccion_entrega")
-                or getattr(self.instance, "direccion_entrega", ""),
-                "departamento_entrega": attrs.get("departamento_entrega")
-                or getattr(self.instance, "departamento_entrega", ""),
-                "municipio_entrega": attrs.get("municipio_entrega")
-                or getattr(self.instance, "municipio_entrega", ""),
-            }
-            errores = {
-                campo: "Este campo es obligatorio para envios."
-                for campo, valor in campos_entrega.items()
-                if not str(valor).strip()
-            }
-            if errores:
-                raise serializers.ValidationError(errores)
-
-        return attrs
+        read_only_fields = fields
 
 
 class GenerarPedidoDesdeCarritoSerializer(serializers.Serializer):
@@ -319,9 +358,275 @@ class GenerarPedidoDesdeCarritoSerializer(serializers.Serializer):
     municipio_entrega = serializers.CharField(required=False, allow_blank=True, default="")
 
 
-class AgregarProductoCarritoSerializer(serializers.Serializer):
-    codigo_barra = serializers.CharField(max_length=80)
+class AgregarArticuloCarritoSerializer(serializers.Serializer):
+    codigo = serializers.CharField(max_length=80)
+    tipo_articulo = serializers.ChoiceField(
+        choices=TIPOS_ARTICULO_CARRITO,
+        required=False,
+    )
     cantidad = serializers.IntegerField(min_value=1, default=1)
+
+    def validate_codigo(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("El codigo no puede estar vacio.")
+        return value
+
+
+class LineaCalculoCarritoEntradaSerializer(serializers.Serializer):
+    codigo = serializers.CharField(max_length=80)
+    tipo_articulo = serializers.ChoiceField(
+        choices=TIPOS_ARTICULO_CARRITO,
+        required=False,
+    )
+    cantidad = serializers.IntegerField(min_value=1, max_value=999)
+
+    def validate_codigo(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("El codigo no puede estar vacio.")
+        return value
+
+
+class CalcularCarritoEntradaSerializer(serializers.Serializer):
+    empresa_slug = serializers.CharField(max_length=80)
+    items = LineaCalculoCarritoEntradaSerializer(
+        many=True,
+        allow_empty=False,
+        max_length=100,
+    )
+
+    def validate(self, attrs):
+        empresa_slug = attrs["empresa_slug"].strip()
+        empresa = Empresa.objects.filter(
+            slug__iexact=empresa_slug,
+            activa=True,
+        ).first()
+        if not empresa:
+            raise serializers.ValidationError(
+                {"empresa_slug": "La empresa no existe o no esta activa."}
+            )
+
+        items = attrs["items"]
+        codigos_normalizados = [item["codigo"].casefold() for item in items]
+        claves_normalizadas = [
+            (
+                item.get("tipo_articulo") or "",
+                item["codigo"].casefold(),
+            )
+            for item in items
+        ]
+        if len(claves_normalizadas) != len(set(claves_normalizadas)):
+            raise serializers.ValidationError(
+                {"items": "Cada articulo debe aparecer una sola vez en el carrito."}
+            )
+
+        productos = (
+            Producto.objects.filter(
+                empresa=empresa,
+                activo=True,
+                familia__activa=True,
+                categoria__activa=True,
+            )
+            .annotate(
+                codigo_interno_normalizado=Lower("codigo_interno"),
+                codigo_barra_normalizado=Lower("codigo_barra"),
+            )
+            .filter(
+                Q(codigo_interno_normalizado__in=codigos_normalizados)
+                | Q(codigo_barra_normalizado__in=codigos_normalizados)
+            )
+        )
+        paquetes = (
+            PaqueteCatalogo.objects.filter(
+                empresa=empresa,
+                activo=True,
+            )
+            .annotate(codigo_normalizado=Lower("codigo"))
+            .filter(codigo_normalizado__in=codigos_normalizados)
+            .prefetch_related(
+                Prefetch(
+                    "items_productos",
+                    queryset=PaqueteProducto.objects.select_related(
+                        "producto",
+                        "producto__empresa",
+                    ),
+                )
+            )
+        )
+
+        coincidencias = {codigo: [] for codigo in codigos_normalizados}
+        for producto in productos:
+            codigos_producto = {producto.codigo_interno.casefold()}
+            if producto.codigo_barra:
+                codigos_producto.add(producto.codigo_barra.casefold())
+            for codigo in codigos_producto & coincidencias.keys():
+                coincidencias[codigo].append(("producto", producto))
+
+        for paquete in paquetes:
+            coincidencias[paquete.codigo.casefold()].append(("paquete", paquete))
+
+        coincidencias_filtradas = []
+        for item, codigo in zip(items, codigos_normalizados):
+            tipo_solicitado = item.get("tipo_articulo")
+            candidatos = coincidencias[codigo]
+            if tipo_solicitado == "producto":
+                candidatos = [
+                    candidato
+                    for candidato in candidatos
+                    if candidato[0] == "producto"
+                ]
+            elif tipo_solicitado in [
+                PaqueteCatalogo.Tipo.PERFIL,
+                PaqueteCatalogo.Tipo.COMBO,
+            ]:
+                candidatos = [
+                    candidato
+                    for candidato in candidatos
+                    if candidato[0] == "paquete"
+                    and candidato[1].tipo == tipo_solicitado
+                ]
+            coincidencias_filtradas.append(candidatos)
+
+        no_encontrados = [
+            item["codigo"]
+            for item, candidatos in zip(items, coincidencias_filtradas)
+            if not candidatos
+        ]
+        if no_encontrados:
+            raise serializers.ValidationError(
+                {
+                    "items": (
+                        "No existen o no estan activos estos articulos: "
+                        + ", ".join(no_encontrados)
+                    )
+                }
+            )
+
+        ambiguos = [
+            item["codigo"]
+            for item, candidatos in zip(items, coincidencias_filtradas)
+            if len(candidatos) > 1
+        ]
+        if ambiguos:
+            raise serializers.ValidationError(
+                {
+                    "items": (
+                        "Estos codigos coinciden con mas de un articulo: "
+                        + ", ".join(ambiguos)
+                    )
+                }
+            )
+
+        lineas = []
+        for item, candidatos in zip(items, coincidencias_filtradas):
+            tipo, articulo = candidatos[0]
+            if tipo == "producto":
+                lineas.append(
+                    {
+                        "producto": articulo,
+                        "paquete": None,
+                        "cantidad": item["cantidad"],
+                    }
+                )
+                continue
+
+            for componente in articulo.items_productos.all():
+                producto = componente.producto
+                if not producto.activo:
+                    raise serializers.ValidationError(
+                        {
+                            "items": (
+                                f"El componente {producto.nombre} del paquete "
+                                "ya no esta activo."
+                            )
+                        }
+                    )
+            lineas.append(
+                {
+                    "producto": None,
+                    "paquete": articulo,
+                    "cantidad": item["cantidad"],
+                }
+            )
+
+        inventario_requerido = {}
+        for linea in lineas:
+            if linea["producto"]:
+                componentes = [(linea["producto"], linea["cantidad"])]
+            else:
+                componentes = [
+                    (componente.producto, linea["cantidad"])
+                    for componente in linea["paquete"].items_productos.all()
+                ]
+
+            for producto, cantidad in componentes:
+                if not producto.controla_inventario:
+                    continue
+                inventario_requerido[producto.pk] = (
+                    producto,
+                    inventario_requerido.get(producto.pk, (producto, 0))[1]
+                    + cantidad,
+                )
+
+        for producto, cantidad in inventario_requerido.values():
+            if cantidad > producto.existencia:
+                raise serializers.ValidationError(
+                    {
+                        "items": (
+                            f"El articulo {producto.nombre} no tiene existencia "
+                            "suficiente para completar el carrito."
+                        )
+                    }
+                )
+
+        attrs["empresa"] = empresa
+        attrs["lineas"] = lineas
+        return attrs
+
+
+class DescuentoAplicadoCarritoSerializer(serializers.Serializer):
+    codigo = serializers.CharField()
+    titulo = serializers.CharField()
+    alcance = serializers.CharField()
+    porcentaje = serializers.IntegerField()
+
+
+class LineaCalculoCarritoSalidaSerializer(serializers.Serializer):
+    codigo = serializers.CharField()
+    codigo_barra = serializers.CharField(allow_null=True)
+    nombre = serializers.CharField()
+    tipo_articulo = serializers.CharField()
+    tipo_item = serializers.CharField()
+    controla_inventario = serializers.BooleanField()
+    cantidad = serializers.IntegerField()
+    precio_unitario = serializers.DecimalField(max_digits=12, decimal_places=2)
+    descuento_aplicado = DescuentoAplicadoCarritoSerializer(allow_null=True)
+    descuento_unitario = serializers.DecimalField(max_digits=12, decimal_places=2)
+    precio_unitario_final = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+    )
+    subtotal = serializers.DecimalField(max_digits=12, decimal_places=2)
+    descuento_total = serializers.DecimalField(max_digits=12, decimal_places=2)
+    subtotal_final = serializers.DecimalField(max_digits=12, decimal_places=2)
+
+
+class CalcularCarritoSalidaSerializer(serializers.Serializer):
+    empresa_slug = serializers.CharField()
+    moneda = serializers.CharField()
+    cobra_impuesto = serializers.BooleanField()
+    porcentaje_impuesto = serializers.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+    )
+    items = LineaCalculoCarritoSalidaSerializer(many=True)
+    subtotal = serializers.DecimalField(max_digits=12, decimal_places=2)
+    descuento_total = serializers.DecimalField(max_digits=12, decimal_places=2)
+    base_imponible = serializers.DecimalField(max_digits=12, decimal_places=2)
+    impuesto = serializers.DecimalField(max_digits=12, decimal_places=2)
+    envio = serializers.DecimalField(max_digits=12, decimal_places=2)
+    total_sin_envio = serializers.DecimalField(max_digits=12, decimal_places=2)
 
 
 class TarifaEntregaSerializer(serializers.ModelSerializer):
@@ -382,14 +687,28 @@ class TarifaEntregaSerializer(serializers.ModelSerializer):
 
 
 class PrefacturaDetalleSerializer(serializers.ModelSerializer):
+    componentes = DetallePedidoComponenteSerializer(many=True, read_only=True)
+
     class Meta:
         model = DetallePedido
         fields = [
+            "tipo_articulo",
+            "codigo_articulo",
+            "nombre_articulo",
+            "codigo_interno",
             "codigo_barra",
             "nombre_producto",
             "precio_unitario",
             "cantidad",
             "subtotal",
+            "promocion_codigo",
+            "promocion_titulo",
+            "porcentaje_descuento",
+            "descuento_unitario",
+            "precio_unitario_final",
+            "descuento_total",
+            "subtotal_final",
+            "componentes",
         ]
         read_only_fields = fields
 
@@ -432,6 +751,16 @@ class PrefacturaSerializer(serializers.ModelSerializer):
         decimal_places=2,
         read_only=True,
     )
+    aplica_impuesto = serializers.BooleanField(
+        source="pedido.aplica_impuesto",
+        read_only=True,
+    )
+    tasa_impuesto = serializers.DecimalField(
+        source="pedido.tasa_impuesto",
+        max_digits=5,
+        decimal_places=4,
+        read_only=True,
+    )
     envio = serializers.DecimalField(
         source="pedido.envio",
         max_digits=12,
@@ -466,6 +795,8 @@ class PrefacturaSerializer(serializers.ModelSerializer):
             "subtotal",
             "descuento_total",
             "impuesto",
+            "aplica_impuesto",
+            "tasa_impuesto",
             "envio",
             "total",
             "moneda",

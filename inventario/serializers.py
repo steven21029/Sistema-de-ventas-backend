@@ -12,6 +12,12 @@ class ProductoInventarioSerializer(serializers.ModelSerializer):
     agotado = serializers.BooleanField(read_only=True)
     inventario_bajo = serializers.BooleanField(read_only=True)
     estado_inventario = serializers.CharField(read_only=True)
+    codigo = serializers.CharField(source="codigo_venta", read_only=True)
+    tipo_item_nombre = serializers.CharField(
+        source="get_tipo_item_display",
+        read_only=True,
+    )
+    controla_inventario = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Producto
@@ -20,7 +26,11 @@ class ProductoInventarioSerializer(serializers.ModelSerializer):
             "empresa_slug",
             "familia_nombre",
             "categoria_nombre",
+            "codigo",
+            "codigo_interno",
             "codigo_barra",
+            "tipo_item",
+            "tipo_item_nombre",
             "nombre",
             "precio",
             "existencia",
@@ -28,6 +38,7 @@ class ProductoInventarioSerializer(serializers.ModelSerializer):
             "agotado",
             "inventario_bajo",
             "estado_inventario",
+            "controla_inventario",
             "activo",
             "fecha_actualizacion",
         ]
@@ -93,6 +104,11 @@ class MovimientoInventarioSerializer(serializers.ModelSerializer):
         if empresa and producto and empresa != producto.empresa:
             raise serializers.ValidationError(
                 {"producto": "El producto debe pertenecer a la misma empresa del movimiento."}
+            )
+
+        if producto and not producto.controla_inventario:
+            raise serializers.ValidationError(
+                {"producto": "Los servicios no admiten movimientos de inventario."}
             )
 
         if attrs.get("tipo") in [

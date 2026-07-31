@@ -1,7 +1,11 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from .views import BannerPromocionalViewSet, OfertaPromocionalViewSet
+from .views import (
+    BannerPromocionalViewSet,
+    DescuentoPromocionalViewSet,
+    OfertaPromocionalViewSet,
+)
 
 router = DefaultRouter()
 router.register(
@@ -13,6 +17,11 @@ router.register(
     "promociones/ofertas",
     OfertaPromocionalViewSet,
     basename="promociones-ofertas",
+)
+router.register(
+    "promociones/descuentos",
+    DescuentoPromocionalViewSet,
+    basename="promociones-descuentos",
 )
 
 urlpatterns = [

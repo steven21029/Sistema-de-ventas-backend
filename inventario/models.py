@@ -55,6 +55,11 @@ class MovimientoInventario(models.Model):
                 {"producto": "El producto debe pertenecer a la misma empresa del movimiento."}
             )
 
+        if self.producto_id and not self.producto.controla_inventario:
+            raise ValidationError(
+                {"producto": "Los servicios no admiten movimientos de inventario."}
+            )
+
         if self.pk:
             return
 
@@ -81,6 +86,11 @@ class MovimientoInventario(models.Model):
 
         with transaction.atomic():
             producto = Producto.objects.select_for_update().get(pk=self.producto_id)
+            if not producto.controla_inventario:
+                raise ValidationError(
+                    {"producto": "Los servicios no admiten movimientos de inventario."}
+                )
+
             self.existencia_anterior = producto.existencia
             self.existencia_nueva = self._calcular_existencia_nueva(producto.existencia)
 

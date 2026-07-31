@@ -5,7 +5,8 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
 from empresas.models import Empresa
 from .models import CodigoVerificacionCorreo, PerfilUsuario
@@ -101,6 +102,20 @@ class LoginJWTSerializer(serializers.Serializer):
             "usuario": UsuarioBasicoSerializer(user).data,
             "perfil": PerfilUsuarioSerializer(perfil).data if perfil else None,
         }
+
+
+class SesionLimitadaTokenRefreshSerializer(TokenRefreshSerializer):
+    def validate(self, attrs):
+        refresh = self.token_class(attrs["refresh"])
+        limite_sesion = int(refresh["exp"])
+        data = super().validate(attrs)
+        access = AccessToken(data["access"])
+
+        if int(access["exp"]) > limite_sesion:
+            access["exp"] = limite_sesion
+            data["access"] = str(access)
+
+        return data
 
 
 class RegistroCompradorSerializer(serializers.Serializer):

@@ -7,6 +7,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from catalogo.models import Producto
+from empresas.models import Empresa
 from .models import MovimientoInventario
 from .permissions import IsInventarioManager
 from .serializers import (
@@ -56,6 +57,11 @@ class ProductoInventarioQuerysetMixin(InventarioEmpresaMixin):
     def get_queryset(self):
         queryset = Producto.objects.select_related("empresa", "familia", "categoria")
         queryset = self.filtrar_por_permiso(queryset)
+        queryset = queryset.filter(
+            tipo_item=Producto.TipoItem.PRODUCTO_FISICO,
+        ).exclude(
+            empresa__modo_inventario=Empresa.ModoInventario.SIN_INVENTARIO
+        )
         return self.aplicar_filtros(queryset)
 
     def aplicar_filtros(self, queryset):
@@ -65,6 +71,7 @@ class ProductoInventarioQuerysetMixin(InventarioEmpresaMixin):
         if buscar:
             queryset = queryset.filter(
                 Q(nombre__icontains=buscar)
+                | Q(codigo_interno__icontains=buscar)
                 | Q(codigo_barra__icontains=buscar)
                 | Q(familia__nombre__icontains=buscar)
                 | Q(categoria__nombre__icontains=buscar)
@@ -111,6 +118,11 @@ class ResumenInventarioView(InventarioEmpresaMixin, generics.GenericAPIView):
     def get(self, request, *args, **kwargs):
         queryset = Producto.objects.select_related("empresa")
         queryset = self.filtrar_por_permiso(queryset)
+        queryset = queryset.filter(
+            tipo_item=Producto.TipoItem.PRODUCTO_FISICO,
+        ).exclude(
+            empresa__modo_inventario=Empresa.ModoInventario.SIN_INVENTARIO
+        )
 
         valor_expression = ExpressionWrapper(
             F("existencia") * F("precio"),
@@ -175,7 +187,16 @@ class AjustarExistenciaView(InventarioEmpresaMixin, generics.GenericAPIView):
 
     def _obtener_producto(self, codigo_barra):
         queryset = Producto.objects.select_related("empresa", "familia", "categoria")
-        queryset = self.filtrar_por_permiso(queryset).filter(codigo_barra=codigo_barra)
+        queryset = (
+            self.filtrar_por_permiso(queryset)
+            .filter(
+                codigo_barra=codigo_barra,
+                tipo_item=Producto.TipoItem.PRODUCTO_FISICO,
+            )
+            .exclude(
+                empresa__modo_inventario=Empresa.ModoInventario.SIN_INVENTARIO
+            )
+        )
 
         if queryset.count() > 1:
             raise ValidationError(

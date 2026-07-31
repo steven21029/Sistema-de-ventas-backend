@@ -3,10 +3,10 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
 
-from catalogo.models import Producto
+from catalogo.models import PaqueteCatalogo, Producto
 from empresas.models import Empresa
 
 
@@ -63,6 +63,15 @@ class ItemCarrito(models.Model):
         Producto,
         on_delete=models.PROTECT,
         related_name="items_carrito",
+        blank=True,
+        null=True,
+    )
+    paquete = models.ForeignKey(
+        PaqueteCatalogo,
+        on_delete=models.PROTECT,
+        related_name="items_carrito",
+        blank=True,
+        null=True,
     )
     cantidad = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)])
     precio_unitario = models.DecimalField(max_digits=12, decimal_places=2, editable=False)
@@ -70,18 +79,68 @@ class ItemCarrito(models.Model):
     fecha_actualizacion = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["producto__nombre"]
+        ordering = ["id"]
         verbose_name = "item de carrito"
         verbose_name_plural = "items de carrito"
         constraints = [
             models.UniqueConstraint(
                 fields=["carrito", "producto"],
                 name="item_carrito_producto_unico",
-            )
+            ),
+            models.UniqueConstraint(
+                fields=["carrito", "paquete"],
+                name="item_carrito_paquete_unico",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(producto__isnull=False, paquete__isnull=True)
+                    | models.Q(producto__isnull=True, paquete__isnull=False)
+                ),
+                name="item_carrito_un_solo_tipo_articulo",
+            ),
         ]
 
     def __str__(self):
-        return f"{self.producto} x {self.cantidad}"
+        return f"{self.articulo} x {self.cantidad}"
+
+    @property
+    def articulo(self):
+        return self.producto or self.paquete
+
+    @property
+    def tipo_articulo(self):
+        if self.producto_id:
+            return "producto"
+
+        return self.paquete.tipo if self.paquete_id else None
+
+    @property
+    def codigo_articulo(self):
+        if self.producto_id:
+            return self.producto.codigo_venta
+
+        return self.paquete.codigo if self.paquete_id else None
+
+    @property
+    def nombre_articulo(self):
+        return self.articulo.nombre if self.articulo else ""
+
+    @property
+    def controla_inventario(self):
+        if self.producto_id:
+            return self.producto.controla_inventario
+
+        if self.paquete_id:
+            return any(
+                producto.controla_inventario
+                for producto in self.paquete.productos.all()
+            )
+
+        return False
+
+    @property
+    def agotado(self):
+        return self.articulo.agotado if self.articulo else False
 
     @property
     def subtotal(self):
@@ -90,25 +149,83 @@ class ItemCarrito(models.Model):
     def clean(self):
         super().clean()
 
+        if bool(self.producto_id) == bool(self.paquete_id):
+            raise ValidationError(
+                "El item debe tener un producto, perfil o combo, pero no varios."
+            )
+
         if self.producto_id and self.carrito_id:
             if self.producto.empresa_id != self.carrito.empresa_id:
                 raise ValidationError(
                     {"producto": "El producto debe pertenecer a la empresa del carrito."}
                 )
-
-            if self.cantidad > self.producto.existencia:
+            if (
+                self.producto.controla_inventario
+                and self.cantidad > self.producto.existencia
+            ):
                 raise ValidationError(
                     {"cantidad": "La cantidad no puede superar la existencia disponible."}
                 )
 
+        if self.paquete_id and self.carrito_id:
+            if self.paquete.empresa_id != self.carrito.empresa_id:
+                raise ValidationError(
+                    {"paquete": "El perfil o combo debe pertenecer a la empresa del carrito."}
+                )
+
+            for componente in self.paquete.items_productos.select_related(
+                "producto"
+            ):
+                producto = componente.producto
+                if (
+                    producto.controla_inventario
+                    and self.cantidad > producto.existencia
+                ):
+                    raise ValidationError(
+                        {
+                            "cantidad": (
+                                f"El paquete {self.paquete.nombre} no tiene "
+                                f"existencia suficiente de {producto.nombre}."
+                            )
+                        }
+                    )
+
     def save(self, *args, **kwargs):
         if not self.precio_unitario:
-            self.precio_unitario = self.producto.precio
+            self.precio_unitario = (
+                self.producto.precio
+                if self.producto_id
+                else self.paquete.precio_paquete
+            )
 
+        self.full_clean()
         super().save(*args, **kwargs)
 
 
 class Pedido(models.Model):
+    CAMPOS_FOTOGRAFIA = (
+        "empresa_id",
+        "usuario_id",
+        "carrito_origen_id",
+        "numero",
+        "tipo_entrega",
+        "nombre_recibe",
+        "telefono_recibe",
+        "direccion_entrega",
+        "referencia_entrega",
+        "departamento_entrega",
+        "municipio_entrega",
+        "subtotal",
+        "descuento_total",
+        "impuesto",
+        "aplica_impuesto",
+        "tasa_impuesto",
+        "envio",
+        "total",
+        "moneda",
+        "observaciones",
+    )
+
     class TipoEntrega(models.TextChoices):
         RETIRO_EN_LOCAL = "retiro_en_local", "Retiro en local"
         ENVIO_LOCAL = "envio_local", "Envio local"
@@ -155,6 +272,13 @@ class Pedido(models.Model):
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     descuento_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     impuesto = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    aplica_impuesto = models.BooleanField(default=True, editable=False)
+    tasa_impuesto = models.DecimalField(
+        max_digits=5,
+        decimal_places=4,
+        default=ISV_RATE,
+        editable=False,
+    )
     envio = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     moneda = models.CharField(max_length=3, default="HNL")
@@ -173,6 +297,15 @@ class Pedido(models.Model):
 
     def clean(self):
         super().clean()
+        if self.pk:
+            try:
+                original = Pedido.objects.get(pk=self.pk)
+            except Pedido.DoesNotExist:
+                pass
+            else:
+                self._validar_fotografia_inmutable(original)
+                return
+
         self._validar_tipo_entrega()
         self._validar_direccion_entrega()
         self._obtener_monto_envio()
@@ -186,25 +319,82 @@ class Pedido(models.Model):
             super().save(*args, **kwargs)
             return
 
-        debe_descontar_inventario = (
-            self.pk
-            and self.estado_pago == self.EstadoPago.PAGADO
-            and not self.inventario_descontado
-        )
+        if self._state.adding:
+            if self.empresa_id:
+                self.aplica_impuesto = self.empresa.cobra_impuesto
+                self.tasa_impuesto = (
+                    ISV_RATE if self.aplica_impuesto else Decimal("0.0000")
+                )
 
-        self._validar_tipo_entrega()
-        self._validar_direccion_entrega()
-        self.envio = self._obtener_monto_envio()
-        self._calcular_totales()
+            self._validar_tipo_entrega()
+            self._validar_direccion_entrega()
+            self.envio = self._obtener_monto_envio()
+            self._calcular_totales()
 
-        if not self.numero:
-            self.numero = self._generar_numero()
+            if not self.numero:
+                self.numero = self._generar_numero()
 
-        super().save(*args, **kwargs)
+            super().save(*args, **kwargs)
+            return
 
-        if debe_descontar_inventario:
-            self.descontar_inventario_por_pago()
-            Prefactura.obtener_o_crear_para_pedido(self)
+        with transaction.atomic():
+            original = Pedido.objects.select_for_update().get(pk=self.pk)
+            self._validar_fotografia_inmutable(original)
+            debe_descontar_inventario = (
+                original.estado_pago == self.EstadoPago.PENDIENTE
+                and self.estado_pago == self.EstadoPago.PAGADO
+                and not original.inventario_descontado
+            )
+
+            super().save(*args, **kwargs)
+
+            if debe_descontar_inventario:
+                self.descontar_inventario_por_pago()
+                Prefactura.obtener_o_crear_para_pedido(self)
+
+    def _validar_fotografia_inmutable(self, original):
+        modificados = [
+            campo
+            for campo in self.CAMPOS_FOTOGRAFIA
+            if getattr(self, campo) != getattr(original, campo)
+        ]
+        if modificados:
+            raise ValidationError(
+                {
+                    "pedido": (
+                        "La fotografia comercial del pedido no puede modificarse "
+                        "despues del checkout."
+                    )
+                }
+            )
+
+        if self.inventario_descontado != original.inventario_descontado:
+            raise ValidationError(
+                {
+                    "inventario_descontado": (
+                        "Este estado se actualiza automaticamente al confirmar el pago."
+                    )
+                }
+            )
+
+        estados_validos = {opcion for opcion, _nombre in self.EstadoPago.choices}
+        if self.estado_pago not in estados_validos:
+            raise ValidationError({"estado_pago": "El estado de pago no es valido."})
+
+        if (
+            original.estado_pago == self.EstadoPago.PAGADO
+            and self.estado_pago != self.EstadoPago.PAGADO
+        ):
+            raise ValidationError(
+                {"estado_pago": "Un pedido pagado no puede volver a pendiente."}
+            )
+
+    def delete(self, *args, **kwargs):
+        if self.pk:
+            raise ValidationError(
+                {"pedido": "Los pedidos confirmados se conservan como historial."}
+            )
+        return super().delete(*args, **kwargs)
 
     def _validar_tipo_entrega(self):
         if not self.empresa_id:
@@ -288,7 +478,8 @@ class Pedido(models.Model):
         self._validar_descuento()
 
         base_imponible = self.subtotal - self.descuento_total
-        self.impuesto = self._redondear_monto(base_imponible * ISV_RATE)
+        tasa = self.tasa_impuesto if self.aplica_impuesto else Decimal("0.0000")
+        self.impuesto = self._redondear_monto(base_imponible * tasa)
         self.total = self._redondear_monto(base_imponible + self.impuesto + self.envio)
 
     def _redondear_monto(self, monto):
@@ -319,7 +510,12 @@ class Pedido(models.Model):
                 )
 
             detalles = list(
-                pedido.detalles.select_related("producto").order_by("id")
+                pedido.detalles.select_related(
+                    "producto",
+                    "paquete",
+                )
+                .prefetch_related("componentes__producto")
+                .order_by("id")
             )
 
             if not detalles:
@@ -327,12 +523,35 @@ class Pedido(models.Model):
                     {"detalles": "No se puede descontar inventario de un pedido sin detalles."}
                 )
 
+            salidas = {}
             for detalle in detalles:
+                if detalle.producto_id:
+                    componentes = [(detalle.producto, detalle.cantidad)]
+                else:
+                    componentes = [
+                        (
+                            componente.producto,
+                            detalle.cantidad * componente.cantidad_por_unidad,
+                        )
+                        for componente in detalle.componentes.all()
+                    ]
+
+                for producto, cantidad in componentes:
+                    if not producto.controla_inventario:
+                        continue
+                    if producto.pk not in salidas:
+                        salidas[producto.pk] = {
+                            "producto": producto,
+                            "cantidad": 0,
+                        }
+                    salidas[producto.pk]["cantidad"] += cantidad
+
+            for salida in salidas.values():
                 MovimientoInventario.objects.create(
                     empresa=pedido.empresa,
-                    producto=detalle.producto,
+                    producto=salida["producto"],
                     tipo=MovimientoInventario.Tipo.SALIDA,
-                    cantidad=detalle.cantidad,
+                    cantidad=salida["cantidad"],
                     motivo=f"Pedido pagado {pedido.numero}",
                     referencia=pedido.numero,
                     usuario=pedido.usuario,
@@ -366,7 +585,11 @@ class Pedido(models.Model):
                 )
 
             items = list(
-                ItemCarrito.objects.select_related("producto")
+                ItemCarrito.objects.select_related(
+                    "producto",
+                    "paquete",
+                )
+                .prefetch_related("paquete__items_productos__producto")
                 .filter(carrito=carrito)
                 .order_by("id")
             )
@@ -376,50 +599,126 @@ class Pedido(models.Model):
                     {"carrito": "No se puede generar un pedido con el carrito vacio."}
                 )
 
-            subtotal = Decimal("0.00")
+            inventario_requerido = {}
             for item in items:
-                if item.producto.empresa_id != carrito.empresa_id:
-                    raise ValidationError(
-                        {
-                            "producto": (
-                                "Todos los productos deben pertenecer a la empresa "
-                                "del carrito."
+                if item.producto_id:
+                    articulo = item.producto
+                    if articulo.empresa_id != carrito.empresa_id:
+                        raise ValidationError(
+                            {
+                                "producto": (
+                                    "Todos los productos deben pertenecer a la empresa "
+                                    "del carrito."
+                                )
+                            }
+                        )
+                    if not articulo.activo:
+                        raise ValidationError(
+                            {
+                                "producto": (
+                                    f"El articulo {articulo.nombre} ya no esta activo."
+                                )
+                            }
+                        )
+                    componentes = [(articulo, item.cantidad)]
+                else:
+                    articulo = item.paquete
+                    if articulo.empresa_id != carrito.empresa_id:
+                        raise ValidationError(
+                            {
+                                "paquete": (
+                                    "Todos los perfiles y combos deben pertenecer "
+                                    "a la empresa del carrito."
+                                )
+                            }
+                        )
+                    if not articulo.activo:
+                        raise ValidationError(
+                            {
+                                "paquete": (
+                                    f"El articulo {articulo.nombre} ya no esta activo."
+                                )
+                            }
+                        )
+                    componentes = []
+                    for componente in articulo.items_productos.all():
+                        producto = componente.producto
+                        if not producto.activo:
+                            raise ValidationError(
+                                {
+                                    "paquete": (
+                                        f"El componente {producto.nombre} del paquete "
+                                        "ya no esta activo."
+                                    )
+                                }
                             )
-                        }
-                    )
+                        componentes.append((producto, item.cantidad))
 
-                if item.cantidad > item.producto.existencia:
+                for producto, cantidad in componentes:
+                    if not producto.controla_inventario:
+                        continue
+                    if producto.pk not in inventario_requerido:
+                        inventario_requerido[producto.pk] = {
+                            "producto": producto,
+                            "cantidad": 0,
+                        }
+                    inventario_requerido[producto.pk]["cantidad"] += cantidad
+
+            for requerido in inventario_requerido.values():
+                producto = requerido["producto"]
+                if requerido["cantidad"] > producto.existencia:
                     raise ValidationError(
                         {
                             "cantidad": (
-                                f"El producto {item.producto.nombre} no tiene "
-                                "existencia suficiente."
+                                f"El articulo {producto.nombre} no tiene "
+                                "existencia suficiente para completar el carrito."
                             )
                         }
                     )
 
-                subtotal += item.subtotal
+            from .services import calcular_carrito
+
+            calculo = calcular_carrito(
+                carrito.empresa,
+                [
+                    {
+                        "producto": item.producto,
+                        "paquete": item.paquete,
+                        "cantidad": item.cantidad,
+                    }
+                    for item in items
+                ],
+            )
 
             pedido = cls(
                 empresa=carrito.empresa,
                 usuario=carrito.usuario,
                 carrito_origen=carrito,
                 tipo_entrega=tipo_entrega,
-                subtotal=subtotal,
-                descuento_total=Decimal("0.00"),
+                subtotal=calculo["subtotal"],
+                descuento_total=calculo["descuento_total"],
                 observaciones=observaciones,
                 **(datos_entrega or {}),
             )
             pedido.full_clean()
             pedido.save()
 
-            for item in items:
-                DetallePedido.objects.create(
+            for linea in calculo["lineas"]:
+                detalle = DetallePedido.objects.create(
                     pedido=pedido,
-                    producto=item.producto,
-                    precio_unitario=item.precio_unitario,
-                    cantidad=item.cantidad,
+                    producto=linea["producto"],
+                    paquete=linea["paquete"],
+                    precio_unitario=linea["precio_unitario"],
+                    cantidad=linea["cantidad"],
+                    descuento_promocional=linea["descuento"],
+                    porcentaje_descuento=linea["porcentaje_descuento"],
                 )
+                if linea["paquete"]:
+                    for componente in linea["paquete"].items_productos.all():
+                        DetallePedidoComponente.objects.create(
+                            detalle=detalle,
+                            producto=componente.producto,
+                        )
 
             carrito.activo = False
             carrito.save(update_fields=["activo", "fecha_actualizacion"])
@@ -476,6 +775,29 @@ class TarifaEntrega(models.Model):
 
 
 class DetallePedido(models.Model):
+    CAMPOS_FOTOGRAFIA = (
+        "pedido_id",
+        "producto_id",
+        "paquete_id",
+        "tipo_articulo",
+        "codigo_articulo",
+        "nombre_articulo",
+        "codigo_interno",
+        "codigo_barra",
+        "nombre_producto",
+        "precio_unitario",
+        "cantidad",
+        "subtotal",
+        "descuento_promocional_id",
+        "promocion_codigo",
+        "promocion_titulo",
+        "porcentaje_descuento",
+        "descuento_unitario",
+        "precio_unitario_final",
+        "descuento_total",
+        "subtotal_final",
+    )
+
     pedido = models.ForeignKey(
         Pedido,
         on_delete=models.CASCADE,
@@ -485,23 +807,110 @@ class DetallePedido(models.Model):
         Producto,
         on_delete=models.PROTECT,
         related_name="detalles_pedido",
+        blank=True,
+        null=True,
     )
-    codigo_barra = models.CharField(max_length=80, editable=False)
+    paquete = models.ForeignKey(
+        PaqueteCatalogo,
+        on_delete=models.PROTECT,
+        related_name="detalles_pedido",
+        blank=True,
+        null=True,
+    )
+    tipo_articulo = models.CharField(
+        max_length=20,
+        default="producto",
+        editable=False,
+    )
+    codigo_articulo = models.CharField(
+        max_length=80,
+        blank=True,
+        editable=False,
+    )
+    nombre_articulo = models.CharField(
+        max_length=180,
+        blank=True,
+        editable=False,
+    )
+    codigo_interno = models.CharField(max_length=80, editable=False)
+    codigo_barra = models.CharField(
+        max_length=80,
+        editable=False,
+        null=True,
+        blank=True,
+    )
     nombre_producto = models.CharField(max_length=180, editable=False)
     precio_unitario = models.DecimalField(max_digits=12, decimal_places=2)
     cantidad = models.PositiveIntegerField(validators=[MinValueValidator(1)])
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, editable=False)
+    descuento_promocional = models.ForeignKey(
+        "promociones.DescuentoPromocional",
+        on_delete=models.SET_NULL,
+        related_name="detalles_pedido",
+        null=True,
+        blank=True,
+        editable=False,
+    )
+    promocion_codigo = models.CharField(max_length=80, blank=True, editable=False)
+    promocion_titulo = models.CharField(max_length=160, blank=True, editable=False)
+    porcentaje_descuento = models.PositiveSmallIntegerField(
+        default=0,
+        validators=[MaxValueValidator(99)],
+        editable=False,
+    )
+    descuento_unitario = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        editable=False,
+    )
+    precio_unitario_final = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        editable=False,
+    )
+    descuento_total = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        editable=False,
+    )
+    subtotal_final = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        editable=False,
+    )
 
     class Meta:
         ordering = ["id"]
         verbose_name = "detalle de pedido"
         verbose_name_plural = "detalles de pedido"
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(producto__isnull=False, paquete__isnull=True)
+                    | models.Q(producto__isnull=True, paquete__isnull=False)
+                ),
+                name="detalle_pedido_un_solo_tipo_articulo",
+            )
+        ]
 
     def __str__(self):
-        return f"{self.nombre_producto} x {self.cantidad}"
+        return f"{self.nombre_articulo or self.nombre_producto} x {self.cantidad}"
+
+    @property
+    def articulo(self):
+        return self.producto or self.paquete
 
     def clean(self):
         super().clean()
+
+        if bool(self.producto_id) == bool(self.paquete_id):
+            raise ValidationError(
+                "El detalle debe tener un producto, perfil o combo, pero no varios."
+            )
 
         if self.producto_id and self.pedido_id:
             if self.producto.empresa_id != self.pedido.empresa_id:
@@ -509,18 +918,175 @@ class DetallePedido(models.Model):
                     {"producto": "El producto debe pertenecer a la empresa del pedido."}
                 )
 
+        if self.paquete_id and self.pedido_id:
+            if self.paquete.empresa_id != self.pedido.empresa_id:
+                raise ValidationError(
+                    {"paquete": "El perfil o combo debe pertenecer a la empresa del pedido."}
+                )
+
     def save(self, *args, **kwargs):
+        if self.pk:
+            original = DetallePedido.objects.get(pk=self.pk)
+            if any(
+                getattr(self, campo) != getattr(original, campo)
+                for campo in self.CAMPOS_FOTOGRAFIA
+            ):
+                raise ValidationError(
+                    {
+                        "detalle": (
+                            "La fotografia del articulo comprado no puede modificarse."
+                        )
+                    }
+                )
+            return super().save(*args, **kwargs)
+
+        if self.producto_id:
+            self.tipo_articulo = "producto"
+            if not self.codigo_articulo:
+                self.codigo_articulo = self.producto.codigo_venta
+            if not self.nombre_articulo:
+                self.nombre_articulo = self.producto.nombre
+            if not self.codigo_interno:
+                self.codigo_interno = self.producto.codigo_interno
+            if not self.codigo_barra:
+                self.codigo_barra = self.producto.codigo_barra
+            if not self.nombre_producto:
+                self.nombre_producto = self.producto.nombre
+            if not self.precio_unitario:
+                self.precio_unitario = self.producto.precio
+        elif self.paquete_id:
+            self.tipo_articulo = self.paquete.tipo
+            if not self.codigo_articulo:
+                self.codigo_articulo = self.paquete.codigo
+            if not self.nombre_articulo:
+                self.nombre_articulo = self.paquete.nombre
+            if not self.codigo_interno:
+                self.codigo_interno = self.paquete.codigo
+            if not self.nombre_producto:
+                self.nombre_producto = self.paquete.nombre
+            if not self.precio_unitario:
+                self.precio_unitario = self.paquete.precio_paquete
+
+        if self.descuento_promocional_id:
+            if not self.promocion_codigo:
+                self.promocion_codigo = self.descuento_promocional.codigo
+            if not self.promocion_titulo:
+                self.promocion_titulo = self.descuento_promocional.titulo
+
+        porcentaje = Decimal(self.porcentaje_descuento) / Decimal("100")
+        self.descuento_unitario = (
+            self.precio_unitario * porcentaje
+        ).quantize(MONEY_QUANTIZER, rounding=ROUND_HALF_UP)
+        self.precio_unitario_final = self.precio_unitario - self.descuento_unitario
+        self.subtotal = self.precio_unitario * self.cantidad
+        self.descuento_total = self.descuento_unitario * self.cantidad
+        self.subtotal_final = self.precio_unitario_final * self.cantidad
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        if self.pk:
+            raise ValidationError(
+                {"detalle": "Los detalles comprados se conservan como historial."}
+            )
+        return super().delete(*args, **kwargs)
+
+
+class DetallePedidoComponente(models.Model):
+    CAMPOS_FOTOGRAFIA = (
+        "detalle_id",
+        "producto_id",
+        "codigo_interno",
+        "codigo_barra",
+        "nombre_producto",
+        "cantidad_por_unidad",
+    )
+
+    detalle = models.ForeignKey(
+        DetallePedido,
+        on_delete=models.CASCADE,
+        related_name="componentes",
+    )
+    producto = models.ForeignKey(
+        Producto,
+        on_delete=models.PROTECT,
+        related_name="componentes_pedido",
+    )
+    codigo_interno = models.CharField(max_length=80, editable=False)
+    codigo_barra = models.CharField(
+        max_length=80,
+        editable=False,
+        null=True,
+        blank=True,
+    )
+    nombre_producto = models.CharField(max_length=180, editable=False)
+    cantidad_por_unidad = models.PositiveIntegerField(
+        default=1,
+        validators=[MinValueValidator(1)],
+    )
+
+    class Meta:
+        ordering = ["id"]
+        verbose_name = "componente de detalle de pedido"
+        verbose_name_plural = "componentes de detalles de pedido"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["detalle", "producto"],
+                name="detalle_pedido_componente_unico",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.nombre_producto} - {self.detalle}"
+
+    def clean(self):
+        super().clean()
+        if self.detalle_id and not self.detalle.paquete_id:
+            raise ValidationError(
+                {"detalle": "Solo los perfiles y combos admiten componentes."}
+            )
+
+        if (
+            self.detalle_id
+            and self.producto_id
+            and self.detalle.pedido.empresa_id != self.producto.empresa_id
+        ):
+            raise ValidationError(
+                {"producto": "El componente debe pertenecer a la empresa del pedido."}
+            )
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            original = DetallePedidoComponente.objects.get(pk=self.pk)
+            if any(
+                getattr(self, campo) != getattr(original, campo)
+                for campo in self.CAMPOS_FOTOGRAFIA
+            ):
+                raise ValidationError(
+                    {
+                        "componente": (
+                            "La fotografia del componente comprado no puede modificarse."
+                        )
+                    }
+                )
+            return super().save(*args, **kwargs)
+
+        if not self.codigo_interno:
+            self.codigo_interno = self.producto.codigo_interno
         if not self.codigo_barra:
             self.codigo_barra = self.producto.codigo_barra
-
         if not self.nombre_producto:
             self.nombre_producto = self.producto.nombre
 
-        if not self.precio_unitario:
-            self.precio_unitario = self.producto.precio
-
-        self.subtotal = self.precio_unitario * self.cantidad
+        self.full_clean()
         super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        if self.pk:
+            raise ValidationError(
+                {"componente": "Los componentes comprados se conservan como historial."}
+            )
+        return super().delete(*args, **kwargs)
 
 
 class Prefactura(models.Model):

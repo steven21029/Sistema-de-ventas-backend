@@ -209,6 +209,7 @@ Campos relevantes:
 - `direccion`
 - `sitio_web`
 - `tiene_envios`
+- `modo_inventario`: `inventariado`, `sin_inventario` o `mixto`
 - `activa`
 - `creada_por`
 - fechas de creacion y actualizacion
@@ -384,7 +385,9 @@ Reglas aprobadas:
 - Una familia tiene varias categorias.
 - Una categoria tiene varios productos.
 - Un producto pertenece a una empresa, una familia y una categoria.
-- El codigo de barra es unico por empresa.
+- Un registro de catalogo puede ser `producto_fisico` o `servicio`.
+- El codigo interno se genera automaticamente y es unico por empresa.
+- El codigo de barra es unico por empresa y obligatorio solo para fisicos.
 - El mismo codigo de barra puede existir en empresas diferentes.
 - El `id` interno existe solo para base de datos y no debe mostrarse al cliente.
 - Productos, familias y paquetes pueden usar imagen local o `imagen_url`.
@@ -417,6 +420,8 @@ Producto:
 - empresa
 - familia
 - categoria
+- tipo_item
+- codigo_interno
 - codigo_barra
 - nombre
 - descripcion
@@ -479,14 +484,18 @@ Servicios:
 
 Reglas de existencia:
 
-- Todo producto inicia siempre con existencia `0` al crearse.
-- La existencia no se cambia desde producto.
-- La existencia se cambia desde inventario mediante movimientos.
+- Los productos fisicos inician con existencia `0`.
+- Los servicios no controlan existencia y nunca aparecen agotados.
+- La existencia fisica se cambia desde inventario mediante movimientos.
 - `existencia_minima` sirve para alertar inventario bajo.
 - Estado interno de inventario:
   - `agotado` cuando existencia es `0`;
   - `bajo` cuando existencia es mayor que `0` y menor o igual a `existencia_minima`;
-  - `ok` cuando hay existencia suficiente.
+  - `ok` cuando hay existencia suficiente;
+  - `no_aplica` para servicios.
+- Analiza esta configurada como `sin_inventario`.
+- Empresas mixtas deben seleccionar el tipo al crear cada registro.
+- Las ventas se cuentan desde detalles de pedidos pagados, incluso sin inventario.
 
 Orden:
 
@@ -499,6 +508,7 @@ Migraciones:
 - `catalogo.0001_initial`
 - `catalogo.0002_producto_existencia_minima`
 - `catalogo.0003_familia_imagen_familia_imagen_url_and_more`
+- `catalogo.0004_producto_tipo_item_y_codigo_interno`
 
 ## 9. App inventario
 
@@ -530,6 +540,8 @@ Campos relevantes:
 Reglas:
 
 - El producto debe pertenecer a la misma empresa del movimiento.
+- Solo los productos fisicos admiten movimientos.
+- Los servicios quedan excluidos de listados, alertas y resumen de inventario.
 - Una entrada suma existencia.
 - Una salida resta existencia.
 - Un ajuste fija la existencia final contada.
@@ -593,19 +605,25 @@ Campos:
 
 - empresa
 - usuario
-- producto
+- producto, opcional
+- paquete, opcional para perfiles y combos
 - fecha_creacion
 
 Reglas:
 
-- Un favorito pertenece a una empresa, un usuario y un producto.
-- Un usuario no puede duplicar el mismo producto como favorito en la misma empresa.
-- El producto debe pertenecer a la misma empresa del favorito.
-- La API permite agregar favoritos por `codigo_barra`, sin exponer el `id` interno del producto.
+- Un favorito pertenece a una empresa, un usuario y un solo articulo.
+- El articulo puede ser un producto, servicio, examen, perfil o combo.
+- Exactamente uno entre `producto` y `paquete` debe tener valor.
+- Un usuario no puede duplicar el mismo articulo en la misma empresa.
+- El articulo debe pertenecer a la misma empresa del favorito.
+- El listado se filtra por el usuario autenticado y persiste entre sesiones.
+- La API recibe `codigo` y `tipo_articulo`, sin exponer ids internos.
+- La respuesta unificada usa campos `articulo_*`.
 
 Migraciones:
 
 - `favoritos.0001_initial`
+- `favoritos.0002_favorito_paquete_alter_favorito_producto_and_more`
 
 ## 11. App promociones
 
@@ -791,17 +809,23 @@ Reglas:
 Campos:
 
 - carrito
-- producto
+- producto, opcional
+- paquete, opcional para perfiles y combos
 - cantidad
 - precio_unitario
 - fechas
 
 Reglas:
 
-- El producto debe pertenecer a la misma empresa del carrito.
-- La cantidad no puede superar la existencia disponible.
-- El precio unitario se copia desde el producto al agregarlo.
-- Un producto solo puede aparecer una vez dentro del mismo carrito.
+- Exactamente uno entre `producto` y `paquete` debe tener valor.
+- El articulo debe pertenecer a la misma empresa del carrito.
+- En productos fisicos, la cantidad no puede superar la existencia disponible.
+- En servicios, la cantidad no se compara contra existencia.
+- Perfiles y combos validan la existencia de todos sus componentes fisicos.
+- La validacion suma componentes compartidos entre diferentes lineas.
+- El precio unitario se copia desde el articulo al agregarlo.
+- `mi-carrito` sincroniza cambios posteriores de precio.
+- Un articulo solo puede aparecer una vez dentro del mismo carrito.
 
 ### Pedido
 
@@ -887,19 +911,29 @@ Acciones:
 
 - valida que el carrito este activo;
 - valida que el carrito tenga items;
-- valida que todos los productos pertenezcan a la empresa;
-- valida existencia disponible;
+- valida que todos los articulos pertenezcan a la empresa;
+- acepta productos, servicios, examenes, perfiles y combos;
+- valida existencia acumulada para productos fisicos y componentes de paquetes;
+- permite servicios sin existencia;
 - copia items a detalles del pedido;
+- guarda una fotografia de los componentes de perfiles y combos;
 - calcula subtotal, impuesto, envio y total;
+- aplica descuentos promocionales solamente a productos simples;
 - cierra el carrito;
 - evita convertir el mismo carrito dos veces.
+- deja el pedido en estado `pendiente`;
+- congela los importes y datos comerciales del checkout.
 
 ### DetallePedido
 
 Campos:
 
 - pedido
-- producto
+- producto o paquete
+- tipo_articulo copiado
+- codigo_articulo copiado
+- nombre_articulo copiado
+- codigo_interno copiado
 - codigo_barra copiado
 - nombre_producto copiado
 - precio_unitario
@@ -908,7 +942,15 @@ Campos:
 
 Regla:
 
-- El detalle conserva una copia del nombre, codigo y precio para que el pedido no cambie si luego se edita el producto.
+- El detalle conserva una copia del nombre, codigo, tipo y precio.
+- Perfiles y combos guardan sus productos en `DetallePedidoComponente`.
+- El pedido no cambia si luego se edita el articulo o la composicion del paquete.
+- Pedido, detalle y componentes son inmutables despues del checkout.
+- La API de pedidos y detalles permite solamente listar y consultar.
+- No se permite crear, editar ni eliminar pedidos por las rutas genericas.
+- En Django Admin solamente puede cambiarse `estado_pago` de pendiente a pagado.
+- Un pedido pagado no puede regresar a pendiente.
+- Cambiar una tarifa de entrega no recalcula pedidos anteriores.
 
 ### TarifaEntrega
 
@@ -939,8 +981,11 @@ pagado
 
 el sistema:
 
-- crea movimientos de inventario tipo `salida`;
-- descuenta existencia de cada producto;
+- crea movimientos de inventario tipo `salida` solo para productos fisicos;
+- descuenta existencia solo de productos fisicos;
+- descuenta los componentes fisicos fotografiados de perfiles y combos;
+- agrupa cantidades del mismo producto antes de crear la salida;
+- registra servicios vendidos sin crear movimientos de inventario;
 - usa el numero del pedido como referencia;
 - marca `inventario_descontado = True`;
 - evita descontar dos veces si el pedido se guarda nuevamente.
@@ -976,7 +1021,48 @@ Migraciones:
 - `pedidos.0006_prefactura`
 - `pedidos.0007_pedido_departamento_entrega_pedido_direccion_entrega_and_more`
 
-## 14. Endpoints API actuales
+## 14. App pagos
+
+Modelos:
+
+- `Pago`: intento asociado a un pedido, con monto y moneda copiados desde la
+  fotografia comercial.
+- `EventoWebhookPago`: auditoria sin datos de tarjeta para controlar eventos
+  repetidos del proveedor.
+
+Estados de pago externo:
+
+- `pendiente`
+- `aprobado`
+- `rechazado`
+
+Reglas:
+
+- Solo se inicia un pago para pedidos pendientes y con detalles.
+- Solo existe un intento pendiente por pedido.
+- Repetir el inicio devuelve el mismo intento pendiente.
+- Un pago rechazado permite crear un intento nuevo.
+- Monto, moneda, empresa y cliente se toman del pedido, no del frontend.
+- El webhook requiere firma HMAC SHA-256 configurada en el entorno.
+- `evento_id` es unico por proveedor y evita procesar dos veces una
+  notificacion.
+- Una aprobacion marca el pedido pagado dentro de una transaccion y activa el
+  descuento de inventario y la prefactura.
+- Pagos y eventos webhook no se eliminan; forman parte de la auditoria.
+- La API de pagos es de solo lectura, excepto la accion controlada `iniciar`.
+- No se guardan numeros de tarjeta, CVV ni credenciales bancarias.
+- El proveedor `simulado` es solamente una base tecnica; no cobra dinero real.
+
+Configuracion:
+
+- `PAGOS_PROVEEDOR_DEFAULT`
+- `PAGOS_WEBHOOK_SECRET`
+
+Migracion:
+
+- `pagos.0001_initial`
+
+## 15. Endpoints API actuales
 
 Rutas principales incluidas bajo `/api/`:
 
@@ -1012,12 +1098,16 @@ Rutas principales incluidas bajo `/api/`:
 - `promociones/ofertas/`
 - `pedidos/carritos/`
 - `pedidos/carritos/mi-carrito/`
-- `pedidos/carritos/{id}/agregar-producto/`
+- `pedidos/carritos/{id}/agregar-articulo/`
 - `pedidos/items-carrito/`
-- `pedidos/pedidos/`
+- `pedidos/pedidos/` (solo lectura)
 - `pedidos/pedidos/{id}/prefactura/`
-- `pedidos/detalles/`
+- `pedidos/detalles/` (solo lectura)
 - `pedidos/tarifas-entrega/`
+- `pagos/`
+- `pagos/{referencia}/`
+- `pagos/iniciar/`
+- `pagos/webhooks/{proveedor}/` (solo proveedor con firma valida)
 
 Catalogo publico:
 
@@ -1027,7 +1117,7 @@ Catalogo publico:
 - Para crear, editar o eliminar catalogo sigue siendo obligatorio iniciar sesion y tener permisos.
 - Productos aceptan filtros `buscar`, `familia`, `categoria`, `agotado` y `orden`.
 
-## 15. Base de datos
+## 16. Base de datos
 
 Actual:
 
@@ -1044,7 +1134,7 @@ Nota:
 
 El superusuario y los datos creados en SQLite local no existen automaticamente en Supabase. Cuando se cambie a Supabase se deberan crear/aplicar alli.
 
-## 16. Autenticacion
+## 17. Autenticacion
 
 Decision aprobada e implementada en backend:
 
@@ -1065,7 +1155,18 @@ Endpoints actuales:
 - `POST /api/usuarios/solicitar-recuperacion-contrasena/`
 - `POST /api/usuarios/confirmar-recuperacion-contrasena/`
 - `POST /api/usuarios/token/refresh/`
+- `POST /api/usuarios/token/logout/`
 - `POST /api/usuarios/token/verify/`
+
+Seguridad de sesion implementada:
+
+- El access token dura 15 minutos.
+- La sesion completa vence como maximo 5 horas despues del login.
+- El limite de 5 horas no se extiende al renovar el access token.
+- El refresh token se entrega unicamente como cookie `HttpOnly`.
+- El frontend no debe guardar tokens en `localStorage` ni `sessionStorage`.
+- El refresh y logout requieren `credentials: "include"`.
+- Cerrar sesion bloquea el refresh token y elimina la cookie.
 
 Pendiente por implementar:
 
@@ -1088,7 +1189,7 @@ Correo:
 - El perfil guarda `numero_identidad` hondureno de 13 digitos.
 - La misma identidad no puede repetirse dentro de la misma empresa.
 
-## 17. Pruebas realizadas
+## 18. Pruebas realizadas
 
 Se han ejecutado validaciones frecuentes con:
 
@@ -1155,7 +1256,7 @@ Pruebas hechas con rollback:
 - Ajuste de existencia por codigo de barra.
 - Ajuste de existencia a `0`.
 
-## 18. Pendientes recomendados en orden
+## 19. Pendientes recomendados en orden
 
 1. Conectar Supabase como base PostgreSQL real.
 2. Probar login JWT y registro desde el frontend o con cliente API.
@@ -1165,7 +1266,7 @@ Pruebas hechas con rollback:
 6. Definir PDF de prefactura.
 7. Definir almacenamiento de imagenes en produccion.
 
-## 19. Reglas de trabajo pendientes de respetar
+## 20. Reglas de trabajo pendientes de respetar
 
 - No instalar dependencias sin autorizacion.
 - No crear o modificar archivos sin autorizacion.
@@ -1175,6 +1276,6 @@ Pruebas hechas con rollback:
 - No crear credenciales ni escribir secretos reales en codigo.
 - Cada cambio importante debe explicarse antes de ejecutarse.
 
-## 20. Ultimo estado
+## 21. Ultimo estado
 
 El backend local tiene empresas, empresa publica por slug, usuarios/perfiles, catalogo publico con filtros, inventario con resumen/listado/alertas/ajustes, favoritos, banners promocionales, carrito por codigo de barra, pedidos con direccion simple para envios, prefactura, login JWT, registro de compradores, verificacion de correo y recuperacion de contrasena funcionando como base inicial. Falta conexion con Supabase, claves reales de Brevo, integracion de pago, descuentos/promociones de productos, PDF de prefactura y almacenamiento de imagenes en produccion antes de usuarios reales en produccion.

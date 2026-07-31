@@ -1,0 +1,882 @@
+# Registro de cambios continuos
+
+Este documento registra las modificaciones realizadas desde el 29 de julio
+de 2026. A partir de esta fecha, cada cambio aprobado del backend debe
+agregarse aqui, incluyendo su impacto para el frontend cuando corresponda.
+
+## 2026-07-29 - Seguridad y duracion de la sesion JWT
+
+Estado: implementado y verificado.
+
+Cambios:
+
+- El access token paso de 30 a 15 minutos.
+- La sesion completa paso de 7 dias a un maximo absoluto de 5 horas.
+- Renovar el access token no extiende el limite original de la sesion.
+- El refresh token dejo de exponerse en la respuesta JSON del login.
+- El refresh token se guarda en una cookie `HttpOnly`.
+- El endpoint de renovacion ahora lee el refresh token desde la cookie.
+- Se agrego un endpoint de cierre de sesion que bloquea el refresh token.
+- Se habilito el registro interno de tokens bloqueados de SimpleJWT.
+- Una sesion ausente, vencida o bloqueada responde con estado HTTP `401`.
+- Se agregaron pruebas para login, renovacion, limite absoluto y logout.
+
+API afectada:
+
+- `POST /api/usuarios/login/`
+- `POST /api/usuarios/token/refresh/`
+- `POST /api/usuarios/token/logout/`
+
+Impacto para el frontend:
+
+- Usar `credentials: "include"` en login, refresh y logout.
+- Guardar el access token solamente en memoria.
+- No esperar el campo `refresh` en la respuesta del login.
+- Enviar un objeto vacio al endpoint de refresh.
+- Al recibir `401` despues de vencer la sesion, mostrar nuevamente el login.
+
+Archivos modificados:
+
+- `config/settings.py`
+- `usuarios/serializers.py`
+- `usuarios/views.py`
+- `usuarios/urls.py`
+- `usuarios/tests.py`
+- `.env.example`
+- `docs/BRIEF_FRONTEND.md`
+- `docs/ESTADO_PROYECTO.md`
+
+Verificacion:
+
+- Migraciones oficiales de `token_blacklist` aplicadas correctamente.
+- `python manage.py check`: sin problemas.
+- `python manage.py test usuarios`: 4 pruebas aprobadas.
+- `python manage.py test`: 32 pruebas completas aprobadas.
+- `python manage.py makemigrations --check --dry-run`: sin cambios pendientes.
+
+- Aviso no bloqueante: la carpeta generada `staticfiles` aun no existe.
+
+## 2026-07-29 - Empresas con productos fisicos y servicios
+
+Estado: implementado, migrado y verificado por modulos.
+
+Cambios:
+
+- Se agregaron tres modos de empresa: `inventariado`, `sin_inventario` y `mixto`.
+- Analiza quedo configurada como `sin_inventario`.
+- Se agregaron los tipos `producto_fisico` y `servicio` al catalogo.
+- En empresas inventariadas el tipo se asigna como producto fisico.
+- En empresas sin inventario el tipo se asigna como servicio.
+- En empresas mixtas la API exige seleccionar el tipo al crear.
+- Cada registro recibe un `codigo_interno` automatico y unico por empresa.
+- El codigo de barras quedo obligatorio solo para productos fisicos.
+- Los servicios pueden tener `codigo_barra = null`.
+- Los servicios no aparecen agotados y usan `estado_inventario = no_aplica`.
+- Los servicios se excluyen de listados, resumen, alertas y movimientos de inventario.
+- El carrito acepta `codigo` general y conserva `codigo_barra` como compatibilidad.
+- El carrito valida existencia solo para productos fisicos.
+- Al pagar, solo los productos fisicos generan salidas de inventario.
+- Los servicios vendidos permanecen en los detalles para estadisticas y reportes.
+- `productos-mas-vendidos` devuelve `total_vendido` desde pedidos pagados.
+- Favoritos acepta servicios mediante el campo `codigo`.
+- Promociones devuelve codigo y tipo de cada producto o servicio.
+- DetallePedido conserva `codigo_interno` como dato historico.
+- Se conservaron la existencia y los movimientos historicos de Analiza.
+
+API afectada:
+
+- `GET /api/empresas/actual/`
+- `GET /api/empresas/publica/`
+- APIs de productos y paginas publicas de catalogo.
+- `POST /api/pedidos/carritos/{id}/agregar-producto/`
+- APIs de carrito, pedidos y prefactura.
+- `POST /api/favoritos/`
+- APIs de promociones.
+- Todas las APIs internas de inventario.
+
+Impacto para el frontend:
+
+- Leer `modo_inventario` al cargar la empresa.
+- En empresa mixta preguntar por `tipo_item` al crear cada registro.
+- Usar `codigo` para carrito y favoritos.
+- Mostrar existencia solo cuando `controla_inventario` sea `true`.
+- Tratar `existencia = null` como servicio, no como producto agotado.
+- Ocultar inventario completo cuando la empresa use `sin_inventario`.
+- Usar `total_vendido` para mostrar cantidad vendida.
+
+Migraciones:
+
+- `empresas.0011_empresa_modo_inventario`
+- `catalogo.0004_producto_tipo_item_y_codigo_interno`
+- `pedidos.0008_detallepedido_codigo_interno`
+
+Verificacion:
+
+- Las tres migraciones se aplicaron correctamente.
+- Analiza tiene 3 servicios y conserva 1 movimiento historico.
+- `python manage.py test empresas catalogo inventario pedidos`: 27 pruebas aprobadas.
+- `python manage.py test favoritos promociones`: 6 pruebas aprobadas.
+- `python manage.py test`: 40 pruebas completas aprobadas.
+
+## 2026-07-29 - Motor de descuentos porcentuales
+
+Estado: implementado, migrado y verificado por modulos.
+
+Reglas aprobadas:
+
+- Los descuentos se administran por empresa.
+- El porcentaje permitido es de 1 a 99.
+- Un descuento puede aplicarse a todos los articulos, a varios articulos
+  seleccionados o a un solo articulo.
+- Pueden existir varias reglas activas al mismo tiempo.
+- Cada articulo recibe unicamente el descuento vigente de mayor porcentaje.
+- Los porcentajes nunca se suman.
+- Si dos reglas empatan, gana `individual`, luego `seleccionados` y por ultimo
+  `todos`.
+- Las reglas aplican tanto a productos fisicos como a servicios.
+- Los banners y las ofertas visuales permanecen separados de este motor.
+
+Cambios:
+
+- Se agregaron `DescuentoPromocional` y `DescuentoProducto`.
+- Cada regla tiene empresa, codigo, titulo, descripcion, alcance, porcentaje,
+  estado y periodo opcional de vigencia.
+- El administrador de Django valida la cantidad de articulos segun el alcance.
+- La API valida que todos los articulos pertenezcan a la misma empresa.
+- Las reglas vencidas, futuras, inactivas o mal configuradas no se aplican.
+- Se agrego un servicio que resuelve una regla ganadora por articulo.
+- Se agrego el calculo publico del carrito sin exigir inicio de sesion.
+- El calculo publico recibe solo empresa, codigo y cantidad.
+- Los precios, descuentos, impuesto y totales siempre se calculan en Django.
+- Al confirmar un pedido se vuelven a consultar precios y reglas vigentes.
+- Cada detalle de pedido conserva la fotografia historica del descuento.
+- Los detalles antiguos conservaron su precio y subtotal como valores finales.
+
+API de administracion y consulta:
+
+- `GET /api/promociones/descuentos/?empresa_slug=analiza`
+- `POST /api/promociones/descuentos/`
+- `PATCH /api/promociones/descuentos/{id}/`
+- `DELETE /api/promociones/descuentos/{id}/`
+- Un administrador puede agregar `incluir_inactivos=true`.
+
+Campos principales para crear una regla:
+
+```json
+{
+  "empresa": 1,
+  "codigo": "JULIO-20",
+  "titulo": "Descuento de julio",
+  "descripcion": "",
+  "alcance": "seleccionados",
+  "porcentaje": 20,
+  "productos_ids": [10, 11],
+  "activo": true,
+  "fecha_inicio": null,
+  "fecha_fin": null
+}
+```
+
+Valores de `alcance`:
+
+- `todos`: enviar `productos_ids: []`.
+- `seleccionados`: enviar dos o mas identificadores.
+- `individual`: enviar exactamente un identificador.
+
+API publica para calcular el carrito:
+
+- `POST /api/pedidos/carrito/calcular/`
+- No requiere token.
+- Maximo 100 articulos distintos y 999 unidades por articulo.
+- Un codigo no se puede repetir dentro de la solicitud.
+
+Ejemplo de solicitud:
+
+```json
+{
+  "empresa_slug": "analiza",
+  "items": [
+    {
+      "codigo": "ANA-000001",
+      "cantidad": 2
+    }
+  ]
+}
+```
+
+La respuesta incluye por linea:
+
+- Datos basicos del articulo y cantidad.
+- `precio_unitario`.
+- `descuento_aplicado` o `null`.
+- `descuento_unitario`.
+- `precio_unitario_final`.
+- `subtotal`.
+- `descuento_total`.
+- `subtotal_final`.
+
+La respuesta general incluye:
+
+- `subtotal`.
+- `descuento_total`.
+- `base_imponible`.
+- `impuesto`, calculado al 15 por ciento sobre la base con descuento.
+- `envio`, con valor cero porque se calcula al seleccionar la entrega.
+- `total_sin_envio`.
+
+Fotografia guardada en cada detalle de pedido:
+
+- Codigo y titulo de la regla aplicada.
+- Porcentaje aplicado.
+- Precio original y precio final.
+- Descuento unitario y total.
+- Subtotal original y subtotal final.
+- Referencia opcional a la regla, sin depender de ella para conservar el
+  historial.
+
+Migraciones:
+
+- `promociones.0003_descuentoproducto_descuentopromocional_and_more`
+- `pedidos.0009_detallepedido_descuento_promocional_and_more`
+
+Verificacion:
+
+- `python manage.py check`: sin problemas.
+- `python manage.py makemigrations --check --dry-run`: sin cambios pendientes.
+
+- Las dos migraciones se aplicaron correctamente.
+- `python manage.py test promociones pedidos`: 13 pruebas aprobadas.
+- `python manage.py test`: 46 pruebas completas aprobadas.
+
+## 2026-07-30 - Administracion unificada de descuentos
+
+Estado: implementado.
+
+Cambios:
+
+- Se oculto `Productos de descuento` del menu principal de Django Admin.
+- `DescuentoProducto` se conserva como relacion interna de base de datos.
+- Los productos se seleccionan dentro del formulario de cada
+  `Descuento promocional`.
+- Crear, configurar el alcance y activar o desactivar una regla se realiza
+  desde una sola pantalla.
+
+## 2026-07-30 - Perfiles, combos e impuesto configurable
+
+Estado: implementado, migrado y verificado por modulos.
+
+Reglas:
+
+- Los descuentos promocionales se aplican solamente a productos simples.
+- Los perfiles y combos no reciben descuentos promocionales.
+- Cada perfil o combo conserva su precio independiente definido en
+  `precio_paquete`.
+- Cada empresa puede decidir si cobra o no el 15 por ciento de ISV.
+- Los pedidos conservan la configuracion fiscal usada al momento de crearse.
+
+Cambios:
+
+- El calculador publico acepta codigos de `Producto` y `PaqueteCatalogo`.
+- Los paquetes activos pueden ser de tipo `perfil` o `combo`.
+- Un perfil o combo devuelve `descuento_aplicado: null`.
+- Para paquetes se usa `precio_paquete` como `precio_unitario`.
+- Si un paquete contiene productos fisicos, se valida su existencia.
+- Se agrego `cobra_impuesto` al perfil administrativo y a las APIs de empresa.
+- El calculador devuelve `cobra_impuesto` y `porcentaje_impuesto`.
+- Cuando `cobra_impuesto` es falso, `impuesto` vale `0.00`.
+- Se agregaron `aplica_impuesto` y `tasa_impuesto` al pedido como fotografia
+  historica.
+- Cambiar la configuracion fiscal de la empresa no modifica pedidos anteriores.
+
+API publica de empresa:
+
+- `GET /api/empresas/actual/`
+- El resultado ahora incluye `cobra_impuesto`.
+
+API publica del calculador:
+
+- `POST /api/pedidos/carrito/calcular/`
+- La solicitud conserva el mismo formato de `empresa_slug`, `codigo` y
+  `cantidad`.
+- En cada linea se agrego `tipo_articulo`.
+- `tipo_articulo` puede ser `producto`, `perfil` o `combo`.
+- La respuesta general incluye `cobra_impuesto` y `porcentaje_impuesto`.
+
+Comportamiento fiscal:
+
+- Empresa con impuesto: `porcentaje_impuesto = 15.00`.
+- Empresa sin impuesto: `porcentaje_impuesto = 0.00` e `impuesto = 0.00`.
+- El total se calcula sobre la base imponible despues del descuento de
+  productos simples.
+
+Migraciones:
+
+- `empresas.0012_empresa_cobra_impuesto`
+- `pedidos.0010_pedido_aplica_impuesto_pedido_tasa_impuesto`
+
+Verificacion:
+
+- Las dos migraciones se aplicaron correctamente.
+- `python manage.py test empresas pedidos`: 19 pruebas aprobadas.
+- `python manage.py test`: 50 pruebas completas aprobadas.
+
+## 2026-07-30 - Importacion del catalogo de examenes
+
+Estado: implementado, importado y verificado.
+
+Fuente:
+
+- `Areas-Examenes(Recuperado automaticamente).xlsx`.
+- Se utilizo la hoja `PRECIOS`.
+- Columnas importadas: codigo, examen, area y precio 2026.
+
+Validacion previa:
+
+- 328 examenes.
+- 12 categorias.
+- Sin codigos duplicados.
+- Sin nombres duplicados.
+- Sin campos obligatorios vacios.
+- Sin precios invalidos o negativos.
+- Los precios se redondean a dos decimales con redondeo comercial.
+
+Destino:
+
+- Empresa: `Analiza`.
+- Familia: `Examenes`.
+- Los codigos del Excel se guardaron como `codigo_barra`.
+- Cada examen recibio tambien su `codigo_interno` automatico.
+- Los 328 registros se crearon como servicios sin control de inventario.
+- Los productos que ya existian en Analiza no fueron modificados.
+
+Categorias y cantidades:
+
+- `Bacteriologia`: 5.
+- `Biologia molecular`: 2.
+- `Coagulacion`: 11.
+- `Coprologia`: 15.
+- `Farmacos y drogas de abuso`: 1.
+- `Hematologia`: 17.
+- `Microbiologia`: 27.
+- `Patologia`: 2.
+- `Pruebas especiales`: 7.
+- `Quimica e Inmunologia`: 231.
+- `Uroanalisis`: 7.
+- `Uroanalisis y Coprologia`: 3.
+
+Comando agregado:
+
+- `python manage.py importar_examenes_excel --archivo <archivo.xlsx>`
+- Usa por defecto la empresa `Analiza`, la familia `Examenes` y la hoja
+  `PRECIOS`.
+- `--dry-run` valida y muestra el resumen sin guardar.
+- Es idempotente: los codigos existentes se omiten y no se duplican.
+- `--actualizar-existentes` permite actualizar datos solo cuando se solicita
+  explicitamente.
+- Toda importacion real se ejecuta dentro de una unica transaccion.
+
+Verificacion:
+
+- Importacion real: 12 categorias y 328 examenes creados.
+- Base local: 328 importados, 328 activos y 328 servicios.
+- Segunda simulacion: 0 categorias nuevas, 0 examenes nuevos y 328 existentes.
+- `python manage.py test catalogo`: 9 pruebas aprobadas.
+- `python manage.py test`: 50 pruebas completas aprobadas.
+
+## 2026-07-30 - Imagenes de productos configurables por empresa
+
+Estado: implementado, migrado y verificado.
+
+Objetivo:
+
+- Cada empresa decide si sus productos usan imagenes individuales.
+- Las empresas con catalogos grandes de servicios pueden trabajar solamente
+  con imagenes de familias y categorias.
+- La configuracion inicial de `Analiza` queda sin imagenes individuales de
+  productos.
+
+Configuracion de empresa:
+
+- Se agrego `productos_con_imagen` al perfil de empresa.
+- Valor predeterminado para empresas nuevas: activo.
+- El administrador maestro puede modificarlo desde Django Admin.
+- La API `GET /api/empresas/actual/` devuelve `productos_con_imagen`.
+
+Comportamiento:
+
+- Cuando `productos_con_imagen` es verdadero, cada producto puede usar
+  `imagen_principal` o `imagen_url`.
+- Cuando es falso, las APIs devuelven `imagen_final: null` para los productos.
+- Tambien se ocultan los campos crudos de imagen en la respuesta administrativa
+  de productos.
+- No se aceptan nuevas imagenes individuales mediante API, Django Admin,
+  importadores ni procesos internos mientras la opcion esta desactivada.
+- Las imagenes antiguas no se borran al desactivar la configuracion; quedan
+  ocultas y pueden recuperarse si la empresa vuelve a activarla.
+- Los perfiles y combos conservan sus propias imagenes porque representan una
+  oferta agrupada, no un producto simple.
+
+Imagenes de clasificacion:
+
+- `Familia` conserva `imagen`, `imagen_url` e `imagen_final`.
+- Se agregaron `imagen`, `imagen_url` e `imagen_final` a `Categoria`.
+- La URL externa tiene prioridad sobre el archivo local.
+- Las APIs publicas de servicios incluyen `imagen_final` tanto para la familia
+  como para cada categoria.
+
+Uso esperado en frontend:
+
+- Consultar `productos_con_imagen` desde `/api/empresas/actual/`.
+- Si es verdadero, mostrar `imagen_final` de cada producto.
+- Si es falso, no reservar espacio de imagen en la tarjeta del producto.
+- En las pantallas de familias y categorias, usar siempre su propio
+  `imagen_final` cuando exista.
+- No reutilizar automaticamente la imagen de categoria en cada uno de los
+  cientos de productos; la presencia visual se mantiene en los niveles de
+  familia y categoria.
+
+Migraciones:
+
+- `catalogo.0005_categoria_imagen_categoria_imagen_url`
+- `empresas.0013_empresa_productos_con_imagen`
+
+Verificacion:
+
+- Las dos migraciones se aplicaron correctamente.
+- La base local confirma `Analiza.productos_con_imagen = False`.
+- `python manage.py check`: sin problemas.
+- `python manage.py makemigrations --check --dry-run`: sin cambios pendientes.
+- `python manage.py test empresas catalogo`: 24 pruebas aprobadas.
+- `python manage.py test`: 53 pruebas completas aprobadas.
+
+## 2026-07-30 - Descripciones breves del catalogo de examenes
+
+Estado: implementado, cargado y verificado.
+
+Alcance:
+
+- Se agrego una descripcion informativa a cada uno de los 328 examenes
+  importados del archivo de Analiza.
+- Cada descripcion contiene exactamente seis palabras.
+- La relacion se guarda por `codigo_barra`, evitando depender de nombres que
+  puedan escribirse de formas diferentes.
+- Los productos manuales `barrer` y `prueba` no se modificaron porque no
+  pertenecen al archivo importado.
+- La API publica de examenes ya entrega el texto mediante el campo
+  `descripcion` existente.
+
+Implementacion:
+
+- Catalogo auditable:
+  `catalogo/datos/descripciones_examenes.py`.
+- Comando reproducible:
+  `python manage.py agregar_descripciones_examenes`.
+- Simulacion sin escritura:
+  `python manage.py agregar_descripciones_examenes --dry-run`.
+- El comando exige exactamente 328 entradas.
+- El comando falla antes de escribir si falta algun codigo o si una
+  descripcion no contiene seis palabras.
+- La actualizacion se ejecuta dentro de una transaccion y es idempotente.
+
+Fuentes medicas de referencia:
+
+- MedlinePlus en espanol, directorio de pruebas de laboratorio:
+  `https://medlineplus.gov/spanish/pruebas-de-laboratorio/`.
+- CDC, directorio y conceptos de pruebas para enfermedades infecciosas:
+  `https://cdc.gov/infectious-diseases-labs/php/test-directory/`.
+- Mayo Clinic Laboratories, catalogo interpretativo de pruebas:
+  `https://www.mayocliniclabs.com/test-catalog/`.
+- NIDDK, pruebas diagnosticas de la tiroides:
+  `https://www.niddk.nih.gov/health-information/informacion-de-la-salud/pruebas-diagnosticas/pruebas-tiroides`.
+- American Thyroid Association, pruebas de funcion tiroidea:
+  `https://www.thyroid.org/las-pruebas-de-funcion-tiroidea/`.
+
+Consideracion clinica:
+
+- Los textos describen de forma general para que sirve cada prueba y no
+  sustituyen una indicacion, interpretacion o diagnostico medico.
+- Antes de publicarlos como contenido clinico definitivo conviene que el
+  director tecnico del laboratorio confirme que cada descripcion coincide con
+  la metodologia y el alcance exacto ofrecido por Analiza.
+
+Verificacion:
+
+- Primera simulacion: 328 examenes por actualizar.
+- Carga real: 328 descripciones actualizadas.
+- Segunda simulacion: 0 por actualizar y 328 sin cambios.
+- Base local: 328 descripciones con exactamente seis palabras.
+- API publica verificada con `Hemograma Completo`.
+- `python manage.py check`: sin problemas.
+- `python manage.py makemigrations --check --dry-run`: sin cambios pendientes.
+- `python manage.py test catalogo`: 12 pruebas aprobadas.
+- `python manage.py test`: 54 pruebas completas aprobadas.
+
+## 2026-07-30 - Favoritos persistentes para todo el catalogo
+
+Estado: implementado, migrado y verificado por modulo.
+
+Alcance:
+
+- Cada favorito continua perteneciendo a una empresa y un usuario autenticado.
+- Ahora puede apuntar a un producto, servicio, examen, perfil o combo.
+- Los favoritos permanecen en la base de datos y vuelven a mostrarse cuando el
+  cliente inicia sesion desde otro momento o dispositivo.
+- Los favoritos de cada cliente se mantienen separados.
+
+Integridad de datos:
+
+- `producto` ahora es opcional.
+- Se agrego `paquete` como referencia opcional a `PaqueteCatalogo`.
+- Una restriccion exige que exactamente uno de esos campos tenga valor.
+- Existen restricciones independientes para impedir duplicados de productos y
+  de perfiles/combos por empresa y usuario.
+- Los registros de favoritos existentes se conservan durante la migracion.
+
+API:
+
+- Listar: `GET /api/favoritos/?empresa_slug=Analiza`.
+- Agregar: `POST /api/favoritos/`.
+- Eliminar: `DELETE /api/favoritos/{id}/`.
+- El payload usa `codigo` y `tipo_articulo`.
+- `tipo_articulo` acepta `producto`, `perfil` o `combo`.
+- Si el tipo se omite y el codigo coincide con mas de un tipo, la API exige
+  indicarlo para evitar guardar el articulo equivocado.
+
+Respuesta unificada:
+
+- `articulo_codigo`.
+- `articulo_nombre`.
+- `articulo_descripcion`.
+- `articulo_imagen_final`.
+- `articulo_precio`.
+- `articulo_agotado`.
+- `articulo_familia`.
+- `articulo_categoria`.
+- Los campos anteriores `producto_*` se mantienen temporalmente para no romper
+  integraciones existentes.
+
+Imagenes:
+
+- Los productos y examenes respetan `productos_con_imagen`.
+- Cuando la empresa desactiva imagenes individuales, Favoritos devuelve
+  `articulo_imagen_final: null` para esos productos.
+- Los perfiles y combos conservan su imagen independiente.
+
+Migracion:
+
+- `favoritos.0002_favorito_paquete_alter_favorito_producto_and_more`
+
+Verificacion:
+
+- La migracion se aplico correctamente en la base local.
+- `python manage.py test favoritos`: 6 pruebas aprobadas.
+- `python manage.py makemigrations --check --dry-run`: sin cambios pendientes.
+- `python manage.py test`: 59 pruebas completas aprobadas.
+
+## 2026-07-30 - Carrito persistente con perfiles y combos
+
+Estado: implementado, migrado y verificado.
+
+Alcance:
+
+- El carrito guardado en la base de datos ahora acepta productos fisicos,
+  servicios, examenes, perfiles y combos.
+- Cada item apunta exactamente a un producto o a un `PaqueteCatalogo`.
+- Los articulos permanecen en `mi-carrito` entre sesiones del cliente.
+- Agregar nuevamente el mismo articulo aumenta su cantidad sin crear
+  duplicados.
+
+API:
+
+- Nueva ruta recomendada:
+  `POST /api/pedidos/carritos/{id}/agregar-articulo/`.
+- La ruta `agregar-producto` se conserva temporalmente como alias compatible.
+- El payload usa `codigo`, `tipo_articulo` y `cantidad`.
+- `tipo_articulo` acepta `producto`, `perfil` o `combo`.
+- El calculador publico tambien acepta `tipo_articulo` en cada linea.
+- Si un codigo coincide entre tipos y no se especifica el tipo, la solicitud se
+  rechaza para evitar ambiguedad.
+
+Respuesta de items:
+
+- `tipo_articulo`.
+- `articulo_nombre`.
+- `codigo`.
+- `codigo_interno`.
+- `codigo_barra`.
+- `tipo_item`.
+- `controla_inventario`.
+- `agotado`.
+- `imagen_final`.
+- `cantidad`.
+- `precio_unitario`.
+- `subtotal`.
+- Se mantienen nombres anteriores como `producto_nombre` e
+  `imagen_principal` durante la transicion del frontend.
+
+Seguridad:
+
+- El endpoint directo de items valida el propietario del carrito al crear y
+  tambien al intentar mover un item.
+- Un comprador no puede escribir en el carrito de otro usuario, aunque ambos
+  pertenezcan a la misma empresa.
+- Los carritos, productos, perfiles, combos y componentes inactivos se
+  rechazan antes de guardar.
+
+Precios y descuentos:
+
+- Productos y servicios simples usan su precio actual.
+- Perfiles y combos usan `precio_paquete`.
+- `mi-carrito` sincroniza el precio persistido cuando cambia el precio actual.
+- Los descuentos promocionales siguen aplicandose solamente a productos
+  simples.
+- Perfiles y combos conservan su precio independiente y descuento cero.
+
+Inventario:
+
+- Los servicios no controlan existencia.
+- Cada perfil o combo valida sus componentes fisicos.
+- La validacion suma cantidades cuando varios paquetes comparten un producto.
+- El calculador publico y el carrito persistente aplican la misma regla.
+- Al pagar se agrupan las salidas del mismo producto para evitar descuentos
+  parciales o duplicados.
+
+Fotografia historica del pedido:
+
+- `DetallePedido` ahora puede apuntar a producto o paquete.
+- Se agregaron `tipo_articulo`, `codigo_articulo` y `nombre_articulo`.
+- Se creo `DetallePedidoComponente` para fotografiar los productos incluidos
+  en perfiles y combos.
+- Si la composicion del paquete cambia despues de comprar, el pedido conserva
+  los componentes originales.
+- El inventario se descuenta usando esa fotografia historica.
+- La respuesta de pedido y la prefactura incluyen `componentes`.
+- Los detalles de pedidos existentes se completan automaticamente durante la
+  migracion.
+
+Migracion:
+
+- `pedidos.0011_detallepedidocomponente_alter_itemcarrito_options_and_more`
+
+Verificacion:
+
+- La migracion se aplico correctamente en la base local.
+- `python manage.py test pedidos`: 13 pruebas aprobadas.
+- `python manage.py check`: sin problemas.
+- `python manage.py makemigrations --check --dry-run`: sin cambios pendientes.
+- `python manage.py test`: 65 pruebas completas aprobadas.
+
+## 2026-07-30 - Limpieza del flujo de carrito y pedidos
+
+Codigo simplificado:
+
+- `AgregarProductoCarritoSerializer` se renombro internamente a
+  `AgregarArticuloCarritoSerializer`, porque procesa productos, perfiles y
+  combos.
+- Las opciones validas de `tipo_articulo` se centralizaron para no mantener
+  dos listas iguales.
+- Se retiro la validacion individual de existencia del calculador publico,
+  porque la validacion acumulada posterior cubre cada linea y tambien los
+  productos compartidos entre paquetes.
+- El calculador publico ahora rechaza perfiles o combos que contengan un
+  componente inactivo, igual que el carrito persistente y la generacion del
+  pedido.
+
+Compatibilidad conservada intencionalmente:
+
+- `agregar-producto` continua como alias temporal de `agregar-articulo`.
+- `codigo_barra` continua como entrada alternativa temporal de `codigo`.
+- `producto_nombre`, `imagen_principal` y `producto_nombre_actual` permanecen
+  en las respuestas mientras el frontend termina de adoptar los nombres
+  genericos.
+- Estos elementos no son codigo muerto: forman parte del contrato anterior
+  documentado para el frontend y retirarlos ahora podria romper una
+  integracion pendiente.
+
+Auditoria:
+
+- No se encontraron imports, clases nuevas, rutas internas ni metodos del
+  flujo actualizado sin referencias.
+- Los archivos de `pedidos` compilan correctamente.
+- `python manage.py test pedidos`: 14 pruebas aprobadas.
+- `python manage.py test`: 66 pruebas completas aprobadas.
+- `python manage.py check`: sin problemas.
+- `python manage.py makemigrations --check --dry-run`: sin cambios pendientes.
+
+## 2026-07-31 - Retiro del contrato antiguo del carrito
+
+El frontend termino la migracion al carrito unificado. Desde esta fecha queda
+un solo contrato oficial para productos, servicios, examenes, perfiles y
+combos.
+
+Elementos retirados:
+
+- Ruta `POST /api/pedidos/carritos/{id}/agregar-producto/`.
+- Entrada alternativa `codigo_barra` al agregar un articulo. Ahora el payload
+  exige `codigo`.
+- Campo duplicado `producto_nombre` en los items del carrito.
+- Campo duplicado `imagen_principal` en los items del carrito.
+- Campo duplicado `producto_nombre_actual` en los detalles del pedido.
+
+Contrato vigente:
+
+- Ruta `POST /api/pedidos/carritos/{id}/agregar-articulo/`.
+- Entrada con `codigo`, `tipo_articulo` y `cantidad`.
+- Items con `articulo_nombre` e `imagen_final`.
+- Detalles de pedido con `nombre_articulo` como valor historico.
+
+Alcance:
+
+- `codigo_barra` permanece como dato de salida para productos que tengan
+  codigo de barras; solo se retiro como nombre alternativo del payload.
+- `imagen_principal` permanece en el modelo y las APIs del catalogo; solo se
+  retiro su duplicado en la respuesta del carrito.
+- Las notas anteriores sobre compatibilidad quedan conservadas unicamente
+  como historial y ya no describen el contrato vigente.
+
+Verificacion:
+
+- La ruta antigua responde `404 Not Found`.
+- El payload con solo `codigo_barra` responde `400 Bad Request` y exige
+  `codigo`.
+- Las respuestas del carrito ya no contienen `producto_nombre` ni
+  `imagen_principal`.
+- Los detalles del pedido ya no contienen `producto_nombre_actual`.
+- `python manage.py test pedidos`: 16 pruebas aprobadas.
+- `python manage.py test`: 68 pruebas completas aprobadas.
+- `python manage.py check`: sin problemas.
+- `python manage.py makemigrations --check --dry-run`: sin cambios pendientes.
+
+## 2026-07-31 - Fotografia comercial inmutable del checkout
+
+La fotografia del pedido ya no es solamente una copia inicial. Desde este
+cambio tambien queda protegida contra modificaciones posteriores.
+
+Datos congelados:
+
+- Empresa, cliente y carrito de origen.
+- Numero y tipo de entrega.
+- Destinatario, telefono y direccion.
+- Subtotal, descuento, impuesto, tarifa de envio y total.
+- Moneda y observaciones.
+- Tipo, codigo, nombre, precio y cantidad de cada articulo.
+- Promocion aplicada y valores finales de cada linea.
+- Componentes incluidos originalmente en perfiles y combos.
+
+Reglas:
+
+- Cambiar productos, paquetes, impuestos o tarifas no altera pedidos creados.
+- Al marcar como pagado no se recalcula la tarifa ni el total.
+- Pago, descuento de inventario y creacion de prefactura se ejecutan dentro de
+  una misma transaccion.
+- Un pedido pagado no puede volver a pendiente.
+- Pedido, detalles y componentes no pueden eliminarse como registros
+  ordinarios.
+- Las APIs `pedidos/pedidos` y `pedidos/detalles` son de solo lectura.
+- En Django Admin los datos comerciales son de solo lectura y unicamente se
+  permite cambiar `estado_pago`.
+- `articulo_nombre_actual` se retiro de la respuesta. El frontend debe usar
+  `nombre_articulo`, que representa el valor historico comprado.
+
+Verificacion:
+
+- `python manage.py test pedidos`: 19 pruebas aprobadas.
+- `python manage.py test`: 71 pruebas completas aprobadas.
+- `python manage.py check`: sin problemas.
+- `python manage.py makemigrations --check --dry-run`: sin cambios pendientes.
+
+## 2026-07-31 - Base neutral de pagos y webhooks
+
+Se creo la app independiente `pagos` para conectar una pasarela sin acoplarla
+al carrito ni a los modelos comerciales del pedido.
+
+Modelos:
+
+- `Pago` conserva pedido, empresa, cliente, referencia UUID, proveedor, monto,
+  moneda, estado, identificador externo y fechas.
+- `EventoWebhookPago` registra el identificador del evento, hash del payload,
+  resultado y estado de procesamiento sin guardar datos sensibles.
+
+API:
+
+- `POST /api/pagos/iniciar/` crea o recupera el intento pendiente.
+- `GET /api/pagos/` lista los pagos visibles para el usuario o personal de la
+  empresa.
+- `GET /api/pagos/{referencia}/` consulta un intento por su referencia publica.
+- `POST /api/pagos/webhooks/{proveedor}/` recibe resultados firmados del
+  proveedor.
+
+Seguridad e integridad:
+
+- El frontend solo envia `pedido_id`; monto y moneda siempre salen del pedido.
+- Un cliente no puede iniciar ni consultar pagos de otro cliente.
+- Solo existe un pago pendiente por pedido.
+- Los eventos repetidos con el mismo contenido son idempotentes.
+- Reutilizar `evento_id` con otro contenido se rechaza.
+- La firma se valida con HMAC SHA-256 y comparacion de tiempo constante.
+- Un pago solo cambia de estado mediante un webhook verificado.
+- La aprobacion, el cambio del pedido, el inventario y la prefactura se
+  procesan de forma atomica.
+- Pagos confirmados y eventos se conservan como auditoria.
+- No se almacenan datos de tarjeta, CVV ni credenciales bancarias.
+
+Configuracion agregada:
+
+- `PAGOS_PROVEEDOR_DEFAULT`
+- `PAGOS_WEBHOOK_SECRET`
+
+Estado de integracion:
+
+- La base neutral y el proveedor local `simulado` estan preparados.
+- Todavia no existe un cobro real ni una URL de redireccion.
+- Al elegir la pasarela se implementara su adaptador de inicio, firma y
+  traduccion de estados.
+
+Migracion:
+
+- `pagos.0001_initial`
+
+Verificacion:
+
+- `python manage.py test pagos`: 7 pruebas aprobadas.
+- `python manage.py test pagos pedidos`: 26 pruebas aprobadas.
+- `python manage.py test`: 78 pruebas completas aprobadas.
+- `python manage.py check`: sin problemas.
+- `python manage.py makemigrations --check --dry-run`: sin cambios pendientes.
+- `pagos.0001_initial`: aplicada correctamente en la base local.
+
+## 2026-07-31 - Cuentas locales para pruebas de roles
+
+Se prepararon dos cuentas en la base local.
+
+Superadministrador:
+
+- Usuario de Django Admin: `admin`
+- Correo para el login del frontend: `analizahn2025@gmail.com`
+- Contrasena temporal: `0000`
+- Rol: `administrador_maestro`
+- Empresa fija: ninguna
+- Cuenta activa y verificada.
+
+Comprador de Analiza:
+
+- Usuario: `compras`
+- Correo para el login: `compras@example.com`
+- Contrasena temporal: `0000`
+- Rol: `comprador`
+- Empresa: `Analiza`
+- Cuenta activa y verificada.
+
+Decision multiempresa:
+
+- La supercuenta utilizara una sola identidad para administrar cualquier empresa.
+- La empresa activa se determinara mediante dominio, subdominio o slug.
+- La cuenta compradora permanece vinculada exclusivamente con Analiza.
+- Antes del frontend administrativo se debe centralizar el contexto de empresa
+  en las APIs.
+
+Seguridad:
+
+- Estas credenciales son exclusivamente para desarrollo local.
+- Deben cambiarse antes de publicar el sistema o permitir acceso desde internet.
+- No se crearon migraciones ni se modificaron archivos de codigo.

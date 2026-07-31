@@ -40,6 +40,11 @@ MENU_PREDETERMINADO = [
 
 
 class Empresa(models.Model):
+    class ModoInventario(models.TextChoices):
+        INVENTARIADO = "inventariado", "Con inventario"
+        SIN_INVENTARIO = "sin_inventario", "Sin inventario (servicios)"
+        MIXTO = "mixto", "Mixto"
+
     nombre = models.CharField(max_length=150, unique=True)
     slug = models.SlugField(max_length=170, unique=True, blank=True)
     subdominio = models.CharField(
@@ -105,6 +110,25 @@ class Empresa(models.Model):
         default=False,
         help_text="Si esta activo, la empresa podra ofrecer envio local y envio nacional.",
     )
+    cobra_impuesto = models.BooleanField(
+        default=True,
+        help_text="Si esta activo, las ventas calcularan el 15% de ISV.",
+    )
+    productos_con_imagen = models.BooleanField(
+        default=True,
+        help_text=(
+            "Si esta activo, los productos pueden mostrar imagenes individuales. "
+            "Si esta desactivado, se usan imagenes de familias y categorias."
+        ),
+    )
+    modo_inventario = models.CharField(
+        max_length=20,
+        choices=ModoInventario.choices,
+        default=ModoInventario.INVENTARIADO,
+        help_text=(
+            "Define si la empresa vende productos fisicos, servicios o ambos."
+        ),
+    )
     activa = models.BooleanField(default=True)
     creada_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -132,6 +156,20 @@ class Empresa(models.Model):
         return ["retiro_en_local"]
 
     @property
+    def permite_productos_fisicos(self):
+        return self.modo_inventario in [
+            self.ModoInventario.INVENTARIADO,
+            self.ModoInventario.MIXTO,
+        ]
+
+    @property
+    def permite_servicios(self):
+        return self.modo_inventario in [
+            self.ModoInventario.SIN_INVENTARIO,
+            self.ModoInventario.MIXTO,
+        ]
+
+    @property
     def imagen_sucursales_final(self):
         if self.imagen_sucursales_url:
             return self.imagen_sucursales_url
@@ -144,6 +182,7 @@ class Empresa(models.Model):
     def clean(self):
         super().clean()
         self._normalizar_dominios()
+        self._validar_cambio_modo_inventario()
 
         if self.subdominio in SUBDOMINIOS_RESERVADOS:
             raise ValidationError(
@@ -153,6 +192,7 @@ class Empresa(models.Model):
     def save(self, *args, **kwargs):
         es_nueva = self.pk is None
         self._normalizar_dominios()
+        self._validar_cambio_modo_inventario()
         if not self.slug:
             self.slug = self._generar_slug_unico()
         super().save(*args, **kwargs)
@@ -220,6 +260,30 @@ class Empresa(models.Model):
         self.dominio_personalizado = (
             self.normalizar_host(self.dominio_personalizado) or None
         )
+
+    def _validar_cambio_modo_inventario(self):
+        if not self.pk:
+            return
+
+        modo_anterior = (
+            Empresa.objects.filter(pk=self.pk)
+            .values_list("modo_inventario", flat=True)
+            .first()
+        )
+        if (
+            modo_anterior
+            and modo_anterior != self.modo_inventario
+            and self.productos.exists()
+        ):
+            raise ValidationError(
+                {
+                    "modo_inventario": (
+                        "No se puede cambiar el modo porque la empresa ya tiene "
+                        "productos o servicios. La conversion requiere una revision "
+                        "controlada de esos registros."
+                    )
+                }
+            )
 
     def _generar_slug_unico(self):
         base_slug = slugify(self.nombre) or "empresa"

@@ -20,6 +20,12 @@ class ItemMenuEmpresaSerializer(serializers.ModelSerializer):
 class EmpresaSerializer(serializers.ModelSerializer):
     creada_por = serializers.StringRelatedField(read_only=True)
     opciones_entrega_disponibles = serializers.ListField(read_only=True)
+    modo_inventario_nombre = serializers.CharField(
+        source="get_modo_inventario_display",
+        read_only=True,
+    )
+    permite_productos_fisicos = serializers.BooleanField(read_only=True)
+    permite_servicios = serializers.BooleanField(read_only=True)
     imagen_sucursales_final = serializers.SerializerMethodField()
 
     class Meta:
@@ -44,7 +50,13 @@ class EmpresaSerializer(serializers.ModelSerializer):
             "direccion",
             "sitio_web",
             "tiene_envios",
+            "cobra_impuesto",
+            "productos_con_imagen",
             "opciones_entrega_disponibles",
+            "modo_inventario",
+            "modo_inventario_nombre",
+            "permite_productos_fisicos",
+            "permite_servicios",
             "activa",
             "creada_por",
             "fecha_creacion",
@@ -67,6 +79,12 @@ class EmpresaSerializer(serializers.ModelSerializer):
 
 class EmpresaPublicaSerializer(serializers.ModelSerializer):
     opciones_entrega_disponibles = serializers.ListField(read_only=True)
+    modo_inventario_nombre = serializers.CharField(
+        source="get_modo_inventario_display",
+        read_only=True,
+    )
+    permite_productos_fisicos = serializers.BooleanField(read_only=True)
+    permite_servicios = serializers.BooleanField(read_only=True)
     menu = serializers.SerializerMethodField()
     imagen_sucursales_final = serializers.SerializerMethodField()
 
@@ -90,7 +108,13 @@ class EmpresaPublicaSerializer(serializers.ModelSerializer):
             "direccion",
             "sitio_web",
             "tiene_envios",
+            "cobra_impuesto",
+            "productos_con_imagen",
             "opciones_entrega_disponibles",
+            "modo_inventario",
+            "modo_inventario_nombre",
+            "permite_productos_fisicos",
+            "permite_servicios",
             "menu",
         ]
         read_only_fields = fields

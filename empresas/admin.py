@@ -38,11 +38,21 @@ class EmpresaAdmin(admin.ModelAdmin):
         "dominio_personalizado",
         "correo",
         "telefono",
+        "modo_inventario",
         "tiene_envios",
+        "cobra_impuesto",
+        "productos_con_imagen",
         "activa",
         "fecha_creacion",
     )
-    list_filter = ("tiene_envios", "activa", "fecha_creacion")
+    list_filter = (
+        "modo_inventario",
+        "tiene_envios",
+        "cobra_impuesto",
+        "productos_con_imagen",
+        "activa",
+        "fecha_creacion",
+    )
     search_fields = (
         "nombre",
         "slug",
@@ -101,10 +111,13 @@ class EmpresaAdmin(admin.ModelAdmin):
             },
         ),
         (
-            "Entrega",
+            "Operación",
             {
                 "fields": (
+                    "modo_inventario",
                     "tiene_envios",
+                    "cobra_impuesto",
+                    "productos_con_imagen",
                 )
             },
         ),

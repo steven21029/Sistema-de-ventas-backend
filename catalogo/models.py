@@ -1,3 +1,5 @@
+import uuid
+
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
@@ -77,6 +79,15 @@ class Categoria(models.Model):
     )
     nombre = models.CharField(max_length=120)
     descripcion = models.TextField(blank=True)
+    imagen = models.ImageField(
+        upload_to="catalogo/categorias/",
+        blank=True,
+        null=True,
+    )
+    imagen_url = models.URLField(
+        blank=True,
+        help_text="URL externa futura para almacenamiento en linea.",
+    )
     activa = models.BooleanField(default=True)
     orden = models.PositiveIntegerField(default=0)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
@@ -95,6 +106,16 @@ class Categoria(models.Model):
 
     def __str__(self):
         return f"{self.nombre} - {self.familia.nombre}"
+
+    @property
+    def imagen_final(self):
+        if self.imagen_url:
+            return self.imagen_url
+
+        if self.imagen:
+            return self.imagen.url
+
+        return None
 
     def clean(self):
         super().clean()
@@ -117,6 +138,10 @@ class Categoria(models.Model):
 
 
 class Producto(models.Model):
+    class TipoItem(models.TextChoices):
+        PRODUCTO_FISICO = "producto_fisico", "Producto fisico"
+        SERVICIO = "servicio", "Servicio"
+
     empresa = models.ForeignKey(
         Empresa,
         on_delete=models.PROTECT,
@@ -132,7 +157,16 @@ class Producto(models.Model):
         on_delete=models.PROTECT,
         related_name="productos",
     )
-    codigo_barra = models.CharField(max_length=80)
+    tipo_item = models.CharField(
+        max_length=20,
+        choices=TipoItem.choices,
+        default=TipoItem.PRODUCTO_FISICO,
+        help_text=(
+            "En empresas mixtas indica si se controla existencia o si es un servicio."
+        ),
+    )
+    codigo_interno = models.CharField(max_length=80, editable=False)
+    codigo_barra = models.CharField(max_length=80, null=True, blank=True)
     nombre = models.CharField(max_length=180)
     descripcion = models.TextField(blank=True)
     imagen_principal = models.ImageField(
@@ -170,20 +204,38 @@ class Producto(models.Model):
             models.UniqueConstraint(
                 fields=["empresa", "codigo_barra"],
                 name="producto_codigo_barra_unico_por_empresa",
-            )
+            ),
+            models.UniqueConstraint(
+                fields=["empresa", "codigo_interno"],
+                name="producto_codigo_interno_unico_por_empresa",
+            ),
         ]
 
     def __str__(self):
-        return f"{self.nombre} - {self.codigo_barra}"
+        return f"{self.nombre} - {self.codigo_venta}"
 
     def save(self, *args, **kwargs):
-        if not self.pk:
+        es_nuevo = self.pk is None
+        self._aplicar_tipo_segun_empresa()
+        self.codigo_barra = (self.codigo_barra or "").strip() or None
+
+        if not self.codigo_interno:
+            self.codigo_interno = self._generar_codigo_interno()
+
+        if es_nuevo and self.controla_inventario:
             self.existencia = 0
 
+        self.clean()
         super().save(*args, **kwargs)
 
     def clean(self):
         super().clean()
+        self._aplicar_tipo_segun_empresa()
+
+        if self.controla_inventario and not self.codigo_barra:
+            raise ValidationError(
+                {"codigo_barra": "Los productos fisicos requieren codigo de barras."}
+            )
 
         if self.familia_id and self.empresa_id != self.familia.empresa_id:
             raise ValidationError(
@@ -204,8 +256,63 @@ class Producto(models.Model):
                 {"categoria": "La categoria debe pertenecer a la familia seleccionada."}
             )
 
+        self._validar_imagen_segun_empresa()
+        self._validar_cambio_tipo_item()
+
+    def _validar_imagen_segun_empresa(self):
+        if (
+            not self.empresa_id
+            or self.empresa.productos_con_imagen
+            or (not self.imagen_principal and not self.imagen_url)
+        ):
+            return
+
+        imagen_modificada = self._state.adding
+        if not imagen_modificada:
+            original = (
+                type(self)
+                .objects.filter(pk=self.pk)
+                .values("imagen_principal", "imagen_url")
+                .first()
+            )
+            imagen_modificada = original is None or (
+                (original["imagen_principal"] or "")
+                != (self.imagen_principal.name if self.imagen_principal else "")
+                or (original["imagen_url"] or "") != (self.imagen_url or "")
+            )
+
+        if imagen_modificada:
+            raise ValidationError(
+                {
+                    "imagen_principal": (
+                        "Esta empresa desactivo las imagenes individuales "
+                        "de productos."
+                    )
+                }
+            )
+
+    @property
+    def codigo_venta(self):
+        return self.codigo_barra or self.codigo_interno
+
+    @property
+    def controla_inventario(self):
+        if not self.empresa_id:
+            return self.tipo_item == self.TipoItem.PRODUCTO_FISICO
+
+        if self.empresa.modo_inventario == Empresa.ModoInventario.INVENTARIADO:
+            return True
+
+        if self.empresa.modo_inventario == Empresa.ModoInventario.SIN_INVENTARIO:
+            return False
+
+        return self.tipo_item == self.TipoItem.PRODUCTO_FISICO
+
     @property
     def imagen_final(self):
+        if self.empresa_id and not self.empresa.productos_con_imagen:
+            return None
+
         if self.imagen_url:
             return self.imagen_url
 
@@ -216,14 +323,23 @@ class Producto(models.Model):
 
     @property
     def agotado(self):
+        if not self.controla_inventario:
+            return False
+
         return self.existencia == 0
 
     @property
     def inventario_bajo(self):
+        if not self.controla_inventario:
+            return False
+
         return self.existencia > 0 and self.existencia <= self.existencia_minima
 
     @property
     def estado_inventario(self):
+        if not self.controla_inventario:
+            return "no_aplica"
+
         if self.agotado:
             return "agotado"
 
@@ -231,6 +347,52 @@ class Producto(models.Model):
             return "bajo"
 
         return "ok"
+
+    def _aplicar_tipo_segun_empresa(self):
+        if not self.empresa_id:
+            return
+
+        if self.empresa.modo_inventario == Empresa.ModoInventario.INVENTARIADO:
+            self.tipo_item = self.TipoItem.PRODUCTO_FISICO
+        elif self.empresa.modo_inventario == Empresa.ModoInventario.SIN_INVENTARIO:
+            self.tipo_item = self.TipoItem.SERVICIO
+
+    def _validar_cambio_tipo_item(self):
+        if not self.pk:
+            return
+
+        tipo_anterior = (
+            Producto.objects.filter(pk=self.pk)
+            .values_list("tipo_item", flat=True)
+            .first()
+        )
+        if not tipo_anterior or tipo_anterior == self.tipo_item:
+            return
+
+        if self.existencia > 0 or self.movimientos_inventario.exists():
+            raise ValidationError(
+                {
+                    "tipo_item": (
+                        "No se puede cambiar el tipo porque el producto tiene "
+                        "existencia o movimientos de inventario."
+                    )
+                }
+            )
+
+    def _generar_codigo_interno(self):
+        prefijo = (
+            "SRV"
+            if self.tipo_item == self.TipoItem.SERVICIO
+            else "PRD"
+        )
+
+        while True:
+            codigo = f"{prefijo}-{uuid.uuid4().hex[:12].upper()}"
+            if not Producto.objects.filter(
+                empresa_id=self.empresa_id,
+                codigo_interno=codigo,
+            ).exists():
+                return codigo
 
 
 class PaqueteCatalogo(models.Model):

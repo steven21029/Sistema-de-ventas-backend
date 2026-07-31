@@ -7,6 +7,7 @@ from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.permissions import AllowAny
 from rest_framework.permissions import SAFE_METHODS
 
+from empresas.models import Empresa
 from .models import Categoria, Familia, PaqueteCatalogo, Producto
 from .permissions import IsCatalogoManagerOrReadOnly
 from .serializers import (
@@ -70,9 +71,20 @@ class EmpresaQuerysetMixin:
             queryset = self._filtrar_categoria(queryset, categoria)
 
         if queryset.model == Producto and agotado in ["true", "1", "si", "yes"]:
-            queryset = queryset.filter(existencia=0)
+            queryset = queryset.filter(
+                tipo_item=Producto.TipoItem.PRODUCTO_FISICO,
+                existencia=0,
+            ).exclude(
+                empresa__modo_inventario=Empresa.ModoInventario.SIN_INVENTARIO
+            )
         elif queryset.model == Producto and agotado in ["false", "0", "no"]:
-            queryset = queryset.filter(existencia__gt=0)
+            queryset = queryset.filter(
+                Q(tipo_item=Producto.TipoItem.SERVICIO)
+                | Q(existencia__gt=0)
+                | Q(
+                    empresa__modo_inventario=Empresa.ModoInventario.SIN_INVENTARIO
+                )
+            )
 
         if queryset.model == Producto:
             if orden == "precio_asc":
@@ -88,6 +100,7 @@ class EmpresaQuerysetMixin:
         if queryset.model == Producto:
             return queryset.filter(
                 Q(nombre__icontains=buscar)
+                | Q(codigo_interno__icontains=buscar)
                 | Q(codigo_barra__icontains=buscar)
                 | Q(descripcion__icontains=buscar)
                 | Q(familia__nombre__icontains=buscar)
@@ -232,6 +245,7 @@ class ProductoPaginaPublicaMixin(CatalogoPublicoEmpresaMixin):
     def filtrar_busqueda(self, queryset, buscar):
         return queryset.filter(
             Q(nombre__icontains=buscar)
+            | Q(codigo_interno__icontains=buscar)
             | Q(codigo_barra__icontains=buscar)
             | Q(descripcion__icontains=buscar)
             | Q(familia__nombre__icontains=buscar)

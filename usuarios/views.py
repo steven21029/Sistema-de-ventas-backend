@@ -1,5 +1,8 @@
+from django.conf import settings
 from rest_framework import decorators, response, status, views, viewsets
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import PerfilUsuario
 from .permissions import IsSuperUserOrReadOwnProfile
@@ -9,9 +12,34 @@ from .serializers import (
     PerfilUsuarioSerializer,
     ReenviarVerificacionCorreoSerializer,
     RegistroCompradorSerializer,
+    SesionLimitadaTokenRefreshSerializer,
     SolicitarRecuperacionContrasenaSerializer,
     VerificarCorreoSerializer,
 )
+
+
+def guardar_refresh_cookie(respuesta, refresh):
+    respuesta.set_cookie(
+        key=settings.JWT_REFRESH_COOKIE_NAME,
+        value=refresh,
+        max_age=settings.JWT_SESSION_MAX_SECONDS,
+        path=settings.JWT_REFRESH_COOKIE_PATH,
+        secure=settings.JWT_REFRESH_COOKIE_SECURE,
+        httponly=True,
+        samesite=settings.JWT_REFRESH_COOKIE_SAMESITE,
+    )
+
+
+def eliminar_refresh_cookie(respuesta):
+    respuesta.set_cookie(
+        key=settings.JWT_REFRESH_COOKIE_NAME,
+        value="",
+        max_age=0,
+        path=settings.JWT_REFRESH_COOKIE_PATH,
+        secure=settings.JWT_REFRESH_COOKIE_SECURE,
+        httponly=True,
+        samesite=settings.JWT_REFRESH_COOKIE_SAMESITE,
+    )
 
 
 class LoginJWTView(views.APIView):
@@ -24,7 +52,60 @@ class LoginJWTView(views.APIView):
             context={"request": request},
         )
         serializer.is_valid(raise_exception=True)
-        return response.Response(serializer.validated_data, status=status.HTTP_200_OK)
+        datos = dict(serializer.validated_data)
+        refresh = datos.pop("refresh")
+        respuesta = response.Response(datos, status=status.HTTP_200_OK)
+        guardar_refresh_cookie(respuesta, refresh)
+        return respuesta
+
+
+class RefreshJWTView(views.APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        refresh = request.COOKIES.get(settings.JWT_REFRESH_COOKIE_NAME)
+        if not refresh:
+            return response.Response(
+                {"detalle": "No hay una sesion disponible para renovar."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        serializer = SesionLimitadaTokenRefreshSerializer(
+            data={"refresh": refresh}
+        )
+        try:
+            serializer.is_valid(raise_exception=True)
+        except TokenError:
+            return response.Response(
+                {"detalle": "La sesion no es valida o ya vencio."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        return response.Response(
+            serializer.validated_data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class LogoutJWTView(views.APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        refresh = request.COOKIES.get(settings.JWT_REFRESH_COOKIE_NAME)
+        if refresh:
+            try:
+                RefreshToken(refresh).blacklist()
+            except TokenError:
+                pass
+
+        respuesta = response.Response(
+            {"detalle": "Sesion cerrada correctamente."},
+            status=status.HTTP_200_OK,
+        )
+        eliminar_refresh_cookie(respuesta)
+        return respuesta
 
 
 class RegistroCompradorView(views.APIView):

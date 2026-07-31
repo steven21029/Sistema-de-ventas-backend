@@ -55,12 +55,14 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'empresas.apps.EmpresasConfig',
     'usuarios.apps.UsuariosConfig',
     'catalogo.apps.CatalogoConfig',
     'inventario.apps.InventarioConfig',
     'pedidos.apps.PedidosConfig',
+    'pagos.apps.PagosConfig',
     'favoritos.apps.FavoritosConfig',
     'promociones.apps.PromocionesConfig',
     'contacto.apps.ContactoConfig',
@@ -178,13 +180,32 @@ REST_FRAMEWORK = {
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(
-        minutes=config('JWT_ACCESS_TOKEN_MINUTES', default=30, cast=int)
+        minutes=config('JWT_ACCESS_TOKEN_MINUTES', default=15, cast=int)
     ),
     'REFRESH_TOKEN_LIFETIME': timedelta(
-        days=config('JWT_REFRESH_TOKEN_DAYS', default=7, cast=int)
+        hours=config('JWT_SESSION_MAX_HOURS', default=5, cast=int)
     ),
+    'ROTATE_REFRESH_TOKENS': False,
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
+
+JWT_SESSION_MAX_SECONDS = int(
+    SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds()
+)
+JWT_REFRESH_COOKIE_NAME = config(
+    'JWT_REFRESH_COOKIE_NAME',
+    default='ventas_refresh',
+)
+JWT_REFRESH_COOKIE_SECURE = config(
+    'JWT_REFRESH_COOKIE_SECURE',
+    default=not DEBUG,
+    cast=bool,
+)
+JWT_REFRESH_COOKIE_SAMESITE = config(
+    'JWT_REFRESH_COOKIE_SAMESITE',
+    default='Strict',
+)
+JWT_REFRESH_COOKIE_PATH = '/api/usuarios/token/'
 
 EMAIL_BACKEND = config(
     'EMAIL_BACKEND',
@@ -198,6 +219,15 @@ EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config(
     'DEFAULT_FROM_EMAIL',
     default='Sistema de Ventas <no-reply@example.com>',
+)
+
+PAGOS_PROVEEDOR_DEFAULT = config(
+    'PAGOS_PROVEEDOR_DEFAULT',
+    default='simulado',
+)
+PAGOS_WEBHOOK_SECRET = config(
+    'PAGOS_WEBHOOK_SECRET',
+    default='',
 )
 
 # Default primary key field type

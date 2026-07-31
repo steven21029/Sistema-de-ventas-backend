@@ -2,6 +2,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
+    CalcularCarritoPublicoView,
     CarritoViewSet,
     DetallePedidoViewSet,
     ItemCarritoViewSet,
@@ -17,5 +18,10 @@ router.register("pedidos/detalles", DetallePedidoViewSet, basename="pedidos-deta
 router.register("pedidos/tarifas-entrega", TarifaEntregaViewSet, basename="pedidos-tarifas-entrega")
 
 urlpatterns = [
+    path(
+        "pedidos/carrito/calcular/",
+        CalcularCarritoPublicoView.as_view(),
+        name="pedidos-carrito-calcular",
+    ),
     path("", include(router.urls)),
 ]

@@ -1,6 +1,14 @@
 from django.contrib import admin
+from django.core.exceptions import ValidationError
+from django.forms.models import BaseInlineFormSet
 
-from .models import BannerPromocional, OfertaProducto, OfertaPromocional
+from .models import (
+    BannerPromocional,
+    DescuentoProducto,
+    DescuentoPromocional,
+    OfertaProducto,
+    OfertaPromocional,
+)
 
 
 @admin.register(BannerPromocional)
@@ -70,6 +78,43 @@ class OfertaProductoInline(admin.TabularInline):
     extra = 0
     autocomplete_fields = ("producto",)
     fields = ("producto", "orden")
+
+
+class DescuentoProductoInlineFormSet(BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
+        cantidad = sum(
+            1
+            for form in self.forms
+            if form.cleaned_data
+            and not form.cleaned_data.get("DELETE", False)
+            and form.cleaned_data.get("producto")
+        )
+        alcance = self.instance.alcance
+
+        if alcance == DescuentoPromocional.Alcance.TODOS and cantidad:
+            raise ValidationError(
+                "Un descuento para todos los articulos no debe seleccionar productos."
+            )
+        if alcance == DescuentoPromocional.Alcance.INDIVIDUAL and cantidad != 1:
+            raise ValidationError(
+                "Un descuento individual debe seleccionar exactamente un articulo."
+            )
+        if alcance == DescuentoPromocional.Alcance.SELECCIONADOS and cantidad < 2:
+            raise ValidationError(
+                "Un descuento para articulos seleccionados requiere al menos dos."
+            )
+
+
+class DescuentoProductoInline(admin.TabularInline):
+    model = DescuentoProducto
+    formset = DescuentoProductoInlineFormSet
+    extra = 0
+    autocomplete_fields = ("producto",)
+    fields = ("producto",)
 
 
 @admin.register(OfertaPromocional)
@@ -173,6 +218,72 @@ class OfertaProductoAdmin(admin.ModelAdmin):
         "oferta__titulo",
         "oferta__codigo",
         "producto__nombre",
+        "producto__codigo_interno",
         "producto__codigo_barra",
     )
     autocomplete_fields = ("oferta", "producto")
+
+
+@admin.register(DescuentoPromocional)
+class DescuentoPromocionalAdmin(admin.ModelAdmin):
+    list_display = (
+        "titulo",
+        "codigo",
+        "empresa",
+        "alcance",
+        "porcentaje",
+        "activo",
+        "esta_vigente",
+        "fecha_inicio",
+        "fecha_fin",
+    )
+    list_filter = ("empresa", "alcance", "activo", "fecha_inicio", "fecha_fin")
+    search_fields = (
+        "titulo",
+        "codigo",
+        "descripcion",
+        "empresa__nombre",
+        "empresa__slug",
+        "productos__nombre",
+        "productos__codigo_interno",
+        "productos__codigo_barra",
+    )
+    autocomplete_fields = ("empresa",)
+    readonly_fields = ("fecha_creacion", "fecha_actualizacion")
+    ordering = ("empresa__nombre", "-porcentaje", "titulo")
+    inlines = [DescuentoProductoInline]
+
+    fieldsets = (
+        (
+            "Empresa y regla",
+            {
+                "fields": (
+                    "empresa",
+                    "codigo",
+                    "titulo",
+                    "descripcion",
+                    "alcance",
+                    "porcentaje",
+                )
+            },
+        ),
+        (
+            "Vigencia",
+            {
+                "fields": (
+                    "activo",
+                    "fecha_inicio",
+                    "fecha_fin",
+                )
+            },
+        ),
+        (
+            "Fechas",
+            {
+                "fields": (
+                    "fecha_creacion",
+                    "fecha_actualizacion",
+                )
+            },
+        ),
+    )

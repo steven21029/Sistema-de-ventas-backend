@@ -156,6 +156,46 @@ class EmpresaActualAPITests(APITestCase):
             "https://example.com/sucursales-general.jpg",
         )
 
+    def test_empresa_publica_devuelve_configuracion_de_inventario(self):
+        self.empresa.modo_inventario = Empresa.ModoInventario.SIN_INVENTARIO
+        self.empresa.save(update_fields=["modo_inventario", "fecha_actualizacion"])
+
+        response = self.client.get(
+            reverse("empresas-actual"),
+            {"slug": self.empresa.slug},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["modo_inventario"], "sin_inventario")
+        self.assertFalse(response.data["permite_productos_fisicos"])
+        self.assertTrue(response.data["permite_servicios"])
+
+    def test_empresa_publica_devuelve_configuracion_de_impuesto(self):
+        self.empresa.cobra_impuesto = False
+        self.empresa.save(update_fields=["cobra_impuesto", "fecha_actualizacion"])
+
+        response = self.client.get(
+            reverse("empresas-actual"),
+            {"slug": self.empresa.slug},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data["cobra_impuesto"])
+
+    def test_empresa_publica_devuelve_configuracion_de_imagenes_de_producto(self):
+        self.empresa.productos_con_imagen = False
+        self.empresa.save(
+            update_fields=["productos_con_imagen", "fecha_actualizacion"]
+        )
+
+        response = self.client.get(
+            reverse("empresas-actual"),
+            {"slug": self.empresa.slug},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data["productos_con_imagen"])
+
     def test_sucursales_aceptan_coordenadas_largas(self):
         latitud = Decimal("14.083697123456789")
         longitud = Decimal("-87.206811987654321")

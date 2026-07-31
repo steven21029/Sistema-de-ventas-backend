@@ -8,6 +8,13 @@ class ImagenFinalMixin:
     imagen_final = serializers.SerializerMethodField()
 
     def get_imagen_final(self, obj):
+        if (
+            isinstance(obj, Producto)
+            and obj.empresa_id
+            and not obj.empresa.productos_con_imagen
+        ):
+            return None
+
         imagen_url = getattr(obj, "imagen_url", "")
         if imagen_url:
             return imagen_url
@@ -66,7 +73,7 @@ class FamiliaSerializer(serializers.ModelSerializer):
         return obj.imagen.url
 
 
-class CategoriaSerializer(serializers.ModelSerializer):
+class CategoriaSerializer(ImagenFinalMixin, serializers.ModelSerializer):
     empresa_nombre = serializers.CharField(source="empresa.nombre", read_only=True)
     familia_nombre = serializers.CharField(source="familia.nombre", read_only=True)
 
@@ -80,6 +87,9 @@ class CategoriaSerializer(serializers.ModelSerializer):
             "familia_nombre",
             "nombre",
             "descripcion",
+            "imagen",
+            "imagen_url",
+            "imagen_final",
             "activa",
             "orden",
             "fecha_creacion",
@@ -89,6 +99,7 @@ class CategoriaSerializer(serializers.ModelSerializer):
             "id",
             "empresa_nombre",
             "familia_nombre",
+            "imagen_final",
             "orden",
             "fecha_creacion",
             "fecha_actualizacion",
@@ -110,6 +121,12 @@ class ProductoSerializer(serializers.ModelSerializer):
     empresa_nombre = serializers.CharField(source="empresa.nombre", read_only=True)
     familia_nombre = serializers.CharField(source="familia.nombre", read_only=True)
     categoria_nombre = serializers.CharField(source="categoria.nombre", read_only=True)
+    codigo = serializers.CharField(source="codigo_venta", read_only=True)
+    tipo_item_nombre = serializers.CharField(
+        source="get_tipo_item_display",
+        read_only=True,
+    )
+    controla_inventario = serializers.BooleanField(read_only=True)
     agotado = serializers.BooleanField(read_only=True)
     inventario_bajo = serializers.BooleanField(read_only=True)
     estado_inventario = serializers.CharField(read_only=True)
@@ -124,6 +141,10 @@ class ProductoSerializer(serializers.ModelSerializer):
             "familia_nombre",
             "categoria",
             "categoria_nombre",
+            "tipo_item",
+            "tipo_item_nombre",
+            "codigo",
+            "codigo_interno",
             "codigo_barra",
             "nombre",
             "descripcion",
@@ -134,6 +155,7 @@ class ProductoSerializer(serializers.ModelSerializer):
             "existencia",
             "existencia_minima",
             "orden_destacado",
+            "controla_inventario",
             "agotado",
             "inventario_bajo",
             "estado_inventario",
@@ -145,6 +167,10 @@ class ProductoSerializer(serializers.ModelSerializer):
             "empresa_nombre",
             "familia_nombre",
             "categoria_nombre",
+            "tipo_item_nombre",
+            "codigo",
+            "codigo_interno",
+            "controla_inventario",
             "imagen_final",
             "existencia",
             "agotado",
@@ -158,6 +184,36 @@ class ProductoSerializer(serializers.ModelSerializer):
         empresa = attrs.get("empresa") or getattr(self.instance, "empresa", None)
         familia = attrs.get("familia") or getattr(self.instance, "familia", None)
         categoria = attrs.get("categoria") or getattr(self.instance, "categoria", None)
+        tipo_item = attrs.get("tipo_item") or getattr(
+            self.instance,
+            "tipo_item",
+            None,
+        )
+        codigo_barra = attrs.get("codigo_barra")
+        if "codigo_barra" not in attrs and self.instance:
+            codigo_barra = self.instance.codigo_barra
+
+        if empresa:
+            if empresa.modo_inventario == empresa.ModoInventario.INVENTARIADO:
+                tipo_item = Producto.TipoItem.PRODUCTO_FISICO
+                attrs["tipo_item"] = tipo_item
+            elif empresa.modo_inventario == empresa.ModoInventario.SIN_INVENTARIO:
+                tipo_item = Producto.TipoItem.SERVICIO
+                attrs["tipo_item"] = tipo_item
+            elif self.instance is None and "tipo_item" not in attrs:
+                raise serializers.ValidationError(
+                    {
+                        "tipo_item": (
+                            "En una empresa mixta debes elegir producto fisico "
+                            "o servicio."
+                        )
+                    }
+                )
+
+        if tipo_item == Producto.TipoItem.PRODUCTO_FISICO and not codigo_barra:
+            raise serializers.ValidationError(
+                {"codigo_barra": "Los productos fisicos requieren codigo de barras."}
+            )
 
         if empresa and familia and empresa != familia.empresa:
             raise serializers.ValidationError(
@@ -174,9 +230,23 @@ class ProductoSerializer(serializers.ModelSerializer):
                 {"categoria": "La categoria debe pertenecer a la familia seleccionada."}
             )
 
+        if empresa and not empresa.productos_con_imagen:
+            if attrs.get("imagen_principal") or attrs.get("imagen_url"):
+                raise serializers.ValidationError(
+                    {
+                        "imagen_principal": (
+                            "Esta empresa desactivo las imagenes individuales "
+                            "de productos."
+                        )
+                    }
+                )
+
         return attrs
 
     def get_imagen_final(self, obj):
+        if obj.empresa_id and not obj.empresa.productos_con_imagen:
+            return None
+
         if obj.imagen_url:
             return obj.imagen_url
 
@@ -189,35 +259,72 @@ class ProductoSerializer(serializers.ModelSerializer):
 
         return obj.imagen_principal.url
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance.empresa_id and not instance.empresa.productos_con_imagen:
+            data["imagen_principal"] = None
+            data["imagen_url"] = ""
+        return data
+
 
 class ProductoPaginaPublicaSerializer(ImagenFinalMixin, serializers.ModelSerializer):
     familia_nombre = serializers.CharField(source="familia.nombre", read_only=True)
     categoria_nombre = serializers.CharField(source="categoria.nombre", read_only=True)
+    codigo = serializers.CharField(source="codigo_venta", read_only=True)
+    tipo_item_nombre = serializers.CharField(
+        source="get_tipo_item_display",
+        read_only=True,
+    )
+    controla_inventario = serializers.BooleanField(read_only=True)
     agotado = serializers.BooleanField(read_only=True)
+    existencia = serializers.SerializerMethodField()
+    total_vendido = serializers.SerializerMethodField()
 
     class Meta:
         model = Producto
         fields = [
+            "codigo",
             "codigo_barra",
+            "tipo_item",
+            "tipo_item_nombre",
             "nombre",
             "descripcion",
             "precio",
             "imagen_final",
             "categoria_nombre",
             "familia_nombre",
+            "controla_inventario",
             "agotado",
             "existencia",
+            "total_vendido",
         ]
         read_only_fields = fields
 
+    def get_existencia(self, obj):
+        if not obj.controla_inventario:
+            return None
+
+        return obj.existencia
+
+    def get_total_vendido(self, obj):
+        return getattr(obj, "total_vendido", 0)
+
 
 class ProductoPaquetePublicoSerializer(serializers.ModelSerializer):
+    codigo = serializers.CharField(source="codigo_venta", read_only=True)
+    controla_inventario = serializers.BooleanField(read_only=True)
+    agotado = serializers.BooleanField(read_only=True)
+
     class Meta:
         model = Producto
         fields = [
+            "codigo",
             "codigo_barra",
+            "tipo_item",
             "nombre",
             "precio",
+            "controla_inventario",
+            "agotado",
         ]
         read_only_fields = fields
 
@@ -252,7 +359,9 @@ class ComboDestacadoPublicoSerializer(ImagenFinalMixin, serializers.ModelSeriali
         )
         return [
             {
+                "codigo": item.producto.codigo_venta,
                 "codigo_barra": item.producto.codigo_barra,
+                "tipo_item": item.producto.tipo_item,
                 "nombre": item.producto.nombre,
             }
             for item in items
@@ -295,7 +404,7 @@ class PerfilPublicoSerializer(ImagenFinalMixin, serializers.ModelSerializer):
         return ProductoPaquetePublicoSerializer(productos, many=True).data
 
 
-class CategoriaServicioPublicoSerializer(serializers.ModelSerializer):
+class CategoriaServicioPublicoSerializer(ImagenFinalMixin, serializers.ModelSerializer):
     clave = serializers.SerializerMethodField()
     cantidad_productos = serializers.IntegerField(read_only=True)
 
@@ -305,6 +414,7 @@ class CategoriaServicioPublicoSerializer(serializers.ModelSerializer):
             "clave",
             "nombre",
             "descripcion",
+            "imagen_final",
             "orden",
             "cantidad_productos",
         ]

@@ -279,3 +279,126 @@ class OfertaProducto(models.Model):
             self.orden = ultimo_orden + 1
 
         super().save(*args, **kwargs)
+
+
+class DescuentoPromocional(models.Model):
+    class Alcance(models.TextChoices):
+        TODOS = "todos", "Todos los articulos"
+        SELECCIONADOS = "seleccionados", "Articulos seleccionados"
+        INDIVIDUAL = "individual", "Un articulo"
+
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.PROTECT,
+        related_name="descuentos_promocionales",
+    )
+    codigo = models.CharField(max_length=80)
+    titulo = models.CharField(max_length=160)
+    descripcion = models.TextField(blank=True)
+    alcance = models.CharField(max_length=20, choices=Alcance.choices)
+    porcentaje = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(99)]
+    )
+    productos = models.ManyToManyField(
+        Producto,
+        through="DescuentoProducto",
+        related_name="descuentos_promocionales",
+        blank=True,
+    )
+    activo = models.BooleanField(default=True)
+    fecha_inicio = models.DateTimeField(null=True, blank=True)
+    fecha_fin = models.DateTimeField(null=True, blank=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-porcentaje", "-fecha_creacion", "-id"]
+        verbose_name = "descuento promocional"
+        verbose_name_plural = "descuentos promocionales"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["empresa", "codigo"],
+                name="descuento_codigo_unico_por_empresa",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["empresa", "activo", "alcance"]),
+            models.Index(fields=["empresa", "fecha_inicio", "fecha_fin"]),
+        ]
+
+    def __str__(self):
+        return f"{self.empresa} - {self.titulo} ({self.porcentaje}%)"
+
+    @property
+    def esta_vigente(self):
+        ahora = timezone.now()
+        if not self.activo:
+            return False
+        if self.fecha_inicio and self.fecha_inicio > ahora:
+            return False
+        if self.fecha_fin and self.fecha_fin < ahora:
+            return False
+        return True
+
+    @property
+    def prioridad_alcance(self):
+        return {
+            self.Alcance.TODOS: 1,
+            self.Alcance.SELECCIONADOS: 2,
+            self.Alcance.INDIVIDUAL: 3,
+        }[self.alcance]
+
+    def clean(self):
+        super().clean()
+        if self.fecha_inicio and self.fecha_fin and self.fecha_fin < self.fecha_inicio:
+            raise ValidationError(
+                {"fecha_fin": "La fecha final no puede ser menor que la fecha inicial."}
+            )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class DescuentoProducto(models.Model):
+    descuento = models.ForeignKey(
+        DescuentoPromocional,
+        on_delete=models.CASCADE,
+        related_name="items_productos",
+    )
+    producto = models.ForeignKey(
+        Producto,
+        on_delete=models.PROTECT,
+        related_name="items_descuentos",
+    )
+
+    class Meta:
+        ordering = ["producto__nombre", "producto_id"]
+        verbose_name = "producto de descuento"
+        verbose_name_plural = "productos de descuento"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["descuento", "producto"],
+                name="descuento_producto_unico",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.descuento} - {self.producto}"
+
+    def clean(self):
+        super().clean()
+        if self.descuento_id and self.producto_id:
+            if self.descuento.empresa_id != self.producto.empresa_id:
+                raise ValidationError(
+                    {
+                        "producto": (
+                            "El producto debe pertenecer a la misma empresa "
+                            "del descuento."
+                        )
+                    }
+                )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)

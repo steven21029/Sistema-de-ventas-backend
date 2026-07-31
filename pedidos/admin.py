@@ -1,12 +1,20 @@
 from django.contrib import admin
 
-from .models import Carrito, DetallePedido, ItemCarrito, Pedido, Prefactura, TarifaEntrega
+from .models import (
+    Carrito,
+    DetallePedido,
+    DetallePedidoComponente,
+    ItemCarrito,
+    Pedido,
+    Prefactura,
+    TarifaEntrega,
+)
 
 
 class ItemCarritoInline(admin.TabularInline):
     model = ItemCarrito
     extra = 0
-    autocomplete_fields = ("producto",)
+    autocomplete_fields = ("producto", "paquete")
     readonly_fields = ("precio_unitario", "fecha_creacion", "fecha_actualizacion")
 
 
@@ -23,8 +31,30 @@ class CarritoAdmin(admin.ModelAdmin):
 class DetallePedidoInline(admin.TabularInline):
     model = DetallePedido
     extra = 0
-    autocomplete_fields = ("producto",)
-    readonly_fields = ("codigo_barra", "nombre_producto", "subtotal")
+    can_delete = False
+    readonly_fields = (
+        "producto",
+        "paquete",
+        "tipo_articulo",
+        "codigo_articulo",
+        "nombre_articulo",
+        "codigo_interno",
+        "codigo_barra",
+        "nombre_producto",
+        "precio_unitario",
+        "cantidad",
+        "promocion_codigo",
+        "promocion_titulo",
+        "porcentaje_descuento",
+        "descuento_unitario",
+        "precio_unitario_final",
+        "descuento_total",
+        "subtotal",
+        "subtotal_final",
+    )
+
+    def has_add_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Pedido)
@@ -37,6 +67,7 @@ class PedidoAdmin(admin.ModelAdmin):
         "estado_pago",
         "inventario_descontado",
         "subtotal",
+        "impuesto",
         "total",
         "fecha_creacion",
     )
@@ -49,17 +80,38 @@ class PedidoAdmin(admin.ModelAdmin):
         "fecha_creacion",
     )
     search_fields = ("numero", "usuario__username", "usuario__email", "empresa__nombre")
-    autocomplete_fields = ("empresa", "usuario", "carrito_origen")
     readonly_fields = (
+        "empresa",
+        "usuario",
+        "carrito_origen",
         "numero",
+        "tipo_entrega",
+        "nombre_recibe",
+        "telefono_recibe",
+        "direccion_entrega",
+        "referencia_entrega",
+        "departamento_entrega",
+        "municipio_entrega",
+        "subtotal",
+        "descuento_total",
         "impuesto",
+        "aplica_impuesto",
+        "tasa_impuesto",
         "envio",
         "total",
+        "moneda",
+        "observaciones",
         "inventario_descontado",
         "fecha_creacion",
         "fecha_actualizacion",
     )
     inlines = [DetallePedidoInline]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(TarifaEntrega)
@@ -79,19 +131,108 @@ class TarifaEntregaAdmin(admin.ModelAdmin):
 
 @admin.register(ItemCarrito)
 class ItemCarritoAdmin(admin.ModelAdmin):
-    list_display = ("carrito", "producto", "cantidad", "precio_unitario", "fecha_actualizacion")
+    list_display = (
+        "carrito",
+        "tipo_articulo",
+        "articulo",
+        "cantidad",
+        "precio_unitario",
+        "fecha_actualizacion",
+    )
     list_filter = ("carrito__empresa",)
-    search_fields = ("producto__nombre", "producto__codigo_barra", "carrito__usuario__username")
-    autocomplete_fields = ("carrito", "producto")
+    search_fields = (
+        "producto__nombre",
+        "producto__codigo_interno",
+        "producto__codigo_barra",
+        "paquete__nombre",
+        "paquete__codigo",
+        "carrito__usuario__username",
+    )
+    autocomplete_fields = ("carrito", "producto", "paquete")
     readonly_fields = ("precio_unitario", "fecha_creacion", "fecha_actualizacion")
 
 
 @admin.register(DetallePedido)
 class DetallePedidoAdmin(admin.ModelAdmin):
-    list_display = ("pedido", "nombre_producto", "codigo_barra", "cantidad", "precio_unitario", "subtotal")
-    search_fields = ("pedido__numero", "nombre_producto", "codigo_barra")
-    autocomplete_fields = ("pedido", "producto")
-    readonly_fields = ("codigo_barra", "nombre_producto", "subtotal")
+    list_display = (
+        "pedido",
+        "tipo_articulo",
+        "nombre_articulo",
+        "codigo_articulo",
+        "codigo_barra",
+        "cantidad",
+        "precio_unitario",
+        "porcentaje_descuento",
+        "descuento_total",
+        "subtotal",
+        "subtotal_final",
+    )
+    search_fields = (
+        "pedido__numero",
+        "nombre_producto",
+        "nombre_articulo",
+        "codigo_articulo",
+        "codigo_interno",
+        "codigo_barra",
+        "promocion_codigo",
+        "promocion_titulo",
+    )
+    readonly_fields = (
+        "pedido",
+        "producto",
+        "paquete",
+        "tipo_articulo",
+        "codigo_articulo",
+        "nombre_articulo",
+        "codigo_interno",
+        "codigo_barra",
+        "nombre_producto",
+        "precio_unitario",
+        "cantidad",
+        "promocion_codigo",
+        "promocion_titulo",
+        "porcentaje_descuento",
+        "descuento_unitario",
+        "precio_unitario_final",
+        "descuento_total",
+        "subtotal",
+        "subtotal_final",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(DetallePedidoComponente)
+class DetallePedidoComponenteAdmin(admin.ModelAdmin):
+    list_display = (
+        "detalle",
+        "nombre_producto",
+        "cantidad_por_unidad",
+    )
+    search_fields = (
+        "detalle__pedido__numero",
+        "nombre_producto",
+        "codigo_interno",
+        "codigo_barra",
+    )
+    readonly_fields = (
+        "detalle",
+        "producto",
+        "codigo_interno",
+        "codigo_barra",
+        "nombre_producto",
+        "cantidad_por_unidad",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Prefactura)

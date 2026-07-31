@@ -260,11 +260,15 @@ Respuesta esperada:
 ```json
 {
   "access": "...",
-  "refresh": "...",
   "usuario": {},
   "perfil": {}
 }
 ```
+
+El `refresh token` no se entrega al codigo React. El backend lo guarda en una
+cookie `HttpOnly` con duracion maxima de 5 horas. Todas las solicitudes de
+login, renovacion y cierre de sesion deben usar `credentials: "include"`.
+El `access token` dura 15 minutos y debe mantenerse solo en memoria.
 
 Si el usuario no verifico correo, no puede iniciar sesion.
 
@@ -276,11 +280,35 @@ Endpoint:
 POST /api/usuarios/token/refresh/
 ```
 
-Payload:
+No requiere payload. El navegador envia automaticamente la cookie protegida:
+
+```json
+{}
+```
+
+Respuesta:
 
 ```json
 {
-  "refresh": "REFRESH_TOKEN"
+  "access": "..."
+}
+```
+
+La renovacion no extiende la sesion original. Al cumplirse 5 horas desde el
+login, el usuario debe volver a ingresar correo y contrasena.
+
+### Cerrar sesion
+
+```text
+POST /api/usuarios/token/logout/
+```
+
+No requiere payload. Debe enviarse con `credentials: "include"`. El backend
+bloquea el refresh token y elimina la cookie.
+
+```json
+{
+  "detalle": "Sesion cerrada correctamente."
 }
 ```
 
@@ -387,10 +415,13 @@ Reglas:
 - Solo devuelve familias/categorias/productos activos.
 - Crear, editar o eliminar catalogo requiere login y permisos.
 - El `id` interno del producto no se muestra al cliente.
-- El codigo de barra es unico por empresa.
-- Todo producto inicia con existencia `0` al crearse.
-- La existencia se cambia desde inventario, no desde catalogo.
-- Los productos pueden traer `existencia`, `existencia_minima`, `agotado`, `inventario_bajo` y `estado_inventario`.
+- Cada registro trae `codigo`, generado desde `codigo_barra` o `codigo_interno`.
+- El codigo de barra es unico por empresa y obligatorio solo para productos fisicos.
+- Los servicios usan un `codigo_interno` automatico y pueden tener `codigo_barra = null`.
+- `tipo_item` puede ser `producto_fisico` o `servicio`.
+- `controla_inventario` indica si el frontend debe mostrar existencia.
+- Un producto fisico inicia con existencia `0` y se ajusta desde inventario.
+- Un servicio devuelve `existencia = null`, `agotado = false` y no usa inventario.
 
 Estados de inventario:
 
@@ -398,7 +429,11 @@ Estados de inventario:
 agotado = existencia 0
 bajo = existencia mayor que 0 y menor o igual a existencia_minima
 ok = existencia suficiente
+no_aplica = servicio sin control de existencia
 ```
+
+La respuesta de productos tambien incluye `total_vendido`. En
+`productos-mas-vendidos` se calcula usando solamente pedidos pagados.
 
 ### Paginas dinamicas de catalogo
 
@@ -477,7 +512,22 @@ Uso:
 - direccion;
 - sitio web;
 - `tiene_envios`;
-- `opciones_entrega_disponibles`.
+- `opciones_entrega_disponibles`;
+- `modo_inventario`;
+- `modo_inventario_nombre`;
+- `permite_productos_fisicos`;
+- `permite_servicios`.
+
+Modos posibles:
+
+```text
+inventariado
+sin_inventario
+mixto
+```
+
+Analiza usa `sin_inventario`. En una empresa mixta, el formulario de alta
+debe preguntar si se agrega `producto_fisico` o `servicio`.
 
 Campos de imagen general de sucursales en empresa:
 
@@ -727,26 +777,44 @@ POST /api/pedidos/carritos/mi-carrito/
 
 Este endpoint crea o devuelve el carrito activo del usuario autenticado.
 
-Agregar producto al carrito sin exponer id interno:
+Agregar cualquier articulo al carrito sin exponer ids internos:
 
 ```text
-POST /api/pedidos/carritos/{id}/agregar-producto/
+POST /api/pedidos/carritos/{id}/agregar-articulo/
 ```
 
 Payload:
 
 ```json
 {
-  "codigo_barra": "ABC123",
+  "codigo": "PERFIL-001",
+  "tipo_articulo": "perfil",
   "cantidad": 1
 }
 ```
 
+`tipo_articulo` acepta:
+
+- `producto`: producto fisico, servicio o examen.
+- `perfil`: perfil de catalogo.
+- `combo`: combo de catalogo.
+
+El frontend debe enviar siempre `tipo_articulo`. Si se omite y el codigo
+coincide con mas de un tipo, el backend rechaza la solicitud.
+
 Respuesta:
 
 - devuelve el carrito actualizado;
-- los items incluyen codigo de barra, nombre, imagen, cantidad y precio;
-- no devuelve el `id` interno del producto.
+- los items incluyen `codigo`, `tipo_articulo`, `articulo_nombre`,
+  `codigo_barra`, `tipo_item`, `controla_inventario`, `agotado`,
+  `imagen_final`, cantidad, precio y subtotal;
+- no devuelve ids internos de productos o paquetes;
+- para productos fisicos valida la existencia disponible;
+- para servicios permite vender sin comparar contra existencia.
+- para perfiles y combos valida todos sus componentes fisicos;
+- suma el inventario compartido entre diferentes lineas del carrito;
+- agregar nuevamente el mismo articulo aumenta su cantidad sin duplicarlo;
+- `mi-carrito` actualiza los precios guardados con el precio actual.
 
 Carritos:
 
@@ -800,11 +868,85 @@ GET /api/pedidos/pedidos/
 GET /api/pedidos/pedidos/{id}/
 ```
 
+Los detalles del pedido usan:
+
+- `tipo_articulo`;
+- `codigo_articulo`;
+- `nombre_articulo`;
+- `componentes`, para perfiles y combos.
+
+Los componentes son una fotografia de lo comprado. Si el administrador cambia
+la composicion del paquete despues, el pedido conserva la composicion original.
+El frontend debe mostrar `nombre_articulo`, `codigo_articulo`, precios,
+descuentos y componentes guardados en el detalle. No debe reconstruir un
+pedido consultando nuevamente el catalogo.
+
+Los endpoints de pedidos y detalles son de solo lectura. `POST`, `PATCH`,
+`PUT` y `DELETE` no estan permitidos. Un pedido se crea exclusivamente con
+`generar-pedido`, siempre inicia pendiente y solo el proceso de pago puede
+cambiarlo a pagado.
+
+Despues del checkout quedan congelados el tipo de entrega, destinatario,
+direccion, subtotal, descuento, impuesto, tarifa de envio, total, moneda,
+articulos y componentes. Los cambios posteriores en catalogo, promociones,
+impuestos o tarifas no modifican pedidos anteriores.
+
 Prefactura:
 
 ```text
 GET /api/pedidos/pedidos/{id}/prefactura/
 ```
+
+### Pagos preparados para integrar una pasarela
+
+Iniciar o recuperar el intento pendiente del pedido autenticado:
+
+```text
+POST /api/pagos/iniciar/
+```
+
+```json
+{
+  "pedido_id": 25
+}
+```
+
+El frontend no debe enviar monto, moneda, empresa ni cliente. El backend los
+toma de la fotografia inmutable del pedido. Repetir la solicitud devuelve el
+mismo pago pendiente y no crea duplicados.
+
+Respuesta principal:
+
+```json
+{
+  "referencia": "4c07496c-5c30-4b41-8759-554c7811ae17",
+  "pedido_numero": "A1B2C3D4E5F6",
+  "proveedor": "simulado",
+  "identificador_externo": "",
+  "monto": "230.00",
+  "moneda": "HNL",
+  "estado": "pendiente",
+  "url_pago": ""
+}
+```
+
+Consultar pagos del usuario:
+
+```text
+GET /api/pagos/
+GET /api/pagos/{referencia}/
+```
+
+Reglas para el frontend:
+
+- Solo puede iniciar pagos del cliente autenticado.
+- Un rechazo permite iniciar un intento nuevo.
+- Un pago aprobado marca el pedido como pagado mediante webhook.
+- El frontend nunca marca un pago ni un pedido como aprobado.
+- El webhook es exclusivo del proveedor y el frontend no debe invocarlo.
+- `url_pago` se usara para redirigir cuando se conecte la pasarela real.
+- La configuracion `simulado` actual no cobra dinero real ni devuelve una URL.
+- No se envian ni almacenan numeros de tarjeta, CVV o credenciales bancarias.
 
 ## 14. Favoritos implementados
 
@@ -816,7 +958,7 @@ Listar favoritos:
 GET /api/favoritos/?empresa_slug=Analiza
 ```
 
-Agregar favorito sin exponer id interno del producto:
+Agregar favorito sin exponer ids internos:
 
 ```text
 POST /api/favoritos/
@@ -827,9 +969,43 @@ Payload:
 ```json
 {
   "empresa_slug": "Analiza",
-  "codigo_barra": "ABC123"
+  "codigo": "PERFIL-001",
+  "tipo_articulo": "perfil"
 }
 ```
+
+Valores de `tipo_articulo`:
+
+- `producto`: producto fisico, servicio o examen.
+- `perfil`: perfil de catalogo.
+- `combo`: combo de catalogo.
+
+Para mantener el contrato sin ambiguedades, el frontend debe enviar siempre
+`tipo_articulo`. Si se omite, el backend intenta identificarlo por el codigo y
+solo lo acepta cuando existe una unica coincidencia.
+
+Campos unificados de cada favorito:
+
+```json
+{
+  "id": 15,
+  "tipo_articulo": "perfil",
+  "articulo_codigo": "PERFIL-001",
+  "articulo_nombre": "Perfil preventivo",
+  "articulo_descripcion": "Evaluacion preventiva",
+  "articulo_imagen_final": "https://example.com/perfil.jpg",
+  "articulo_precio": "500.00",
+  "articulo_agotado": false,
+  "articulo_familia": null,
+  "articulo_categoria": null,
+  "fecha_creacion": "2026-07-30T21:00:00Z"
+}
+```
+
+Para productos, servicios o examenes, `articulo_familia` y
+`articulo_categoria` contienen su clasificacion. Los campos antiguos
+`producto_*` se conservan temporalmente para compatibilidad, pero las vistas
+nuevas deben usar los campos `articulo_*`.
 
 Eliminar favorito:
 
@@ -839,9 +1015,17 @@ DELETE /api/favoritos/{id}/
 
 Reglas:
 
-- No duplica el mismo producto como favorito para el mismo usuario y empresa.
-- El producto debe estar activo.
-- El producto se identifica por codigo de barra.
+- Los favoritos se guardan permanentemente por usuario y empresa.
+- No duplica el mismo articulo para el mismo usuario y empresa.
+- El producto, servicio, examen, perfil o combo debe estar activo.
+- Cada favorito apunta exactamente a un producto o a un perfil/combo.
+- Los favoritos de un cliente nunca aparecen en la cuenta de otro cliente.
+- Las imagenes de productos respetan `productos_con_imagen`.
+- Perfiles y combos conservan sus propias imagenes.
+- El articulo se identifica por `codigo` y `tipo_articulo`.
+- `codigo_barra` continua aceptado temporalmente para compatibilidad.
+- Un visitante sin sesion puede usar almacenamiento temporal del navegador,
+  pero debe iniciar sesion para persistir favoritos en la base de datos.
 
 ## 15. Inventario interno implementado
 
@@ -852,6 +1036,9 @@ Permisos:
 - Administrador maestro puede ver todas las empresas o filtrar por `empresa_slug`.
 - Administrador de empresa y gerente solo ven su empresa.
 - Comprador no puede entrar a inventario.
+- Los servicios no aparecen en ningun listado o resumen de inventario.
+- No se pueden crear movimientos de inventario para servicios.
+- Una empresa `sin_inventario`, como Analiza, obtiene listados de inventario vacios.
 
 Headers:
 
@@ -944,7 +1131,8 @@ Reglas:
 - El ajuste puede ser `0`.
 - Entrada y salida deben ser mayores que `0`.
 - Cada ajuste crea historial en movimientos.
-- El frontend debe identificar producto por `codigo_barra`, no por `id` interno.
+- Inventario solo trabaja con productos fisicos y continua usando
+  `codigo_barra`, no el `id` interno.
 
 ## 16. Entrega
 
@@ -1005,7 +1193,8 @@ pagado
 
 Cuando un pedido pasa a `pagado`:
 
-- se descuenta inventario;
+- se descuenta inventario solo de productos fisicos;
+- los servicios quedan registrados como ventas sin movimiento de inventario;
 - se genera prefactura;
 - no se descuenta inventario dos veces.
 

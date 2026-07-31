@@ -23,7 +23,8 @@ class FavoritoViewSet(
             "producto",
             "producto__familia",
             "producto__categoria",
-        )
+            "paquete",
+        ).prefetch_related("paquete__productos")
         empresa_slug = self.request.query_params.get("empresa_slug", "").strip()
 
         if self.request.user.is_superuser:
