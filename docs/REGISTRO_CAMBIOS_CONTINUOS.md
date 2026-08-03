@@ -1165,3 +1165,31 @@ Migracion y pruebas:
   `empresas.0016_empresa_facebook_url_empresa_instagram_url_and_more`.
 - `python manage.py test empresas`: 47 pruebas aprobadas.
 - `python manage.py test`: 151 pruebas aprobadas.
+
+## 2026-08-03 - Superusuario automatico para Render
+
+Motivo:
+
+- El plan actual de Render no permite usar Shell y la base desplegada inicia
+  vacia.
+
+Implementacion:
+
+- Se creo el comando `python manage.py asegurar_superusuario`.
+- Lee `DJANGO_SUPERUSER_USERNAME`, `DJANGO_SUPERUSER_EMAIL` y
+  `DJANGO_SUPERUSER_PASSWORD` desde el entorno.
+- Crea o actualiza el mismo usuario de forma idempotente, sin duplicarlo.
+- Asegura permisos de superusuario, acceso a Django Admin, perfil de
+  administrador maestro, correo verificado y usuario activo.
+- Valida la contrasena con las reglas de seguridad de Django y nunca la imprime
+  en los logs.
+- Se creo `start.sh` para ejecutar migraciones, asegurar el superusuario e
+  iniciar Gunicorn.
+- El Start Command de Render debe ser `bash start.sh`.
+- Las credenciales reales no se guardan en Git ni en la documentacion.
+
+Verificacion:
+
+- `python manage.py test usuarios.tests_comandos`: 4 pruebas aprobadas.
+- `python manage.py test`: 155 pruebas aprobadas.
+- Se agrego `docs/DESPLIEGUE_RENDER.md` con la configuracion completa.
