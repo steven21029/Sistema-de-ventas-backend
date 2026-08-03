@@ -7,6 +7,7 @@ from .views import (
     ExamenesListView,
     FamiliaViewSet,
     PerfilesListView,
+    PaqueteCatalogoViewSet,
     ProductoViewSet,
     ProductosMasVendidosListView,
     ServicioDetallePublicoView,
@@ -17,6 +18,7 @@ router = DefaultRouter()
 router.register("catalogo/familias", FamiliaViewSet, basename="catalogo-familias")
 router.register("catalogo/categorias", CategoriaViewSet, basename="catalogo-categorias")
 router.register("catalogo/productos", ProductoViewSet, basename="catalogo-productos")
+router.register("catalogo/paquetes", PaqueteCatalogoViewSet, basename="catalogo-paquetes")
 
 urlpatterns = [
     path(

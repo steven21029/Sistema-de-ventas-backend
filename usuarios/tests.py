@@ -18,6 +18,8 @@ class AutenticacionJWTTests(TestCase):
             password=self.password,
             is_active=True,
         )
+        self.usuario.perfil.correo_verificado = True
+        self.usuario.perfil.save(update_fields=["correo_verificado"])
 
     def iniciar_sesion(self):
         return self.client.post(

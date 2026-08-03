@@ -4,6 +4,7 @@ import hmac
 from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 
 from rest_framework import decorators, response, status, viewsets
@@ -12,13 +13,19 @@ from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 
 from pedidos.models import Pedido
+from config.api import FiltroRangoFechasMixin, PaginacionAdministrativaOpcionalMixin
+from empresas.contexto import empresas_administrables, obtener_empresa_administrable
 
 from .models import EventoWebhookPago, Pago
 from .permissions import IsPagoOwnerOrEmpresaStaff
 from .serializers import IniciarPagoSerializer, PagoSerializer, WebhookPagoSerializer
 
 
-class PagoViewSet(viewsets.ReadOnlyModelViewSet):
+class PagoViewSet(
+    PaginacionAdministrativaOpcionalMixin,
+    FiltroRangoFechasMixin,
+    viewsets.ReadOnlyModelViewSet,
+):
     serializer_class = PagoSerializer
     permission_classes = [IsPagoOwnerOrEmpresaStaff]
     lookup_field = "referencia"
@@ -26,19 +33,68 @@ class PagoViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         queryset = Pago.objects.select_related("pedido", "empresa", "usuario")
         user = self.request.user
+        empresa_slug = self.request.query_params.get("empresa_slug", "").strip()
         if user.is_superuser:
-            return queryset
+            if empresa_slug:
+                queryset = queryset.filter(empresa__slug__iexact=empresa_slug)
+            return self._aplicar_filtros(queryset)
 
         perfil = getattr(user, "perfil", None)
         if not perfil or not perfil.activo:
             return queryset.none()
         if perfil.es_administrador_maestro:
-            return queryset
+            queryset = queryset.filter(empresa__in=empresas_administrables(user))
+            if empresa_slug:
+                obtener_empresa_administrable(self.request)
+                queryset = queryset.filter(empresa__slug__iexact=empresa_slug)
+            return self._aplicar_filtros(queryset)
         if not perfil.empresa_id:
             return queryset.none()
         if perfil.es_administrador_empresa or perfil.es_gerente:
-            return queryset.filter(empresa=perfil.empresa)
-        return queryset.filter(empresa=perfil.empresa, usuario=user)
+            obtener_empresa_administrable(self.request)
+            queryset = queryset.filter(empresa=perfil.empresa)
+        else:
+            queryset = queryset.filter(empresa=perfil.empresa, usuario=user)
+        return self._aplicar_filtros(queryset)
+
+    def _aplicar_filtros(self, queryset):
+        estado = self.request.query_params.get("estado", "").strip()
+        if estado:
+            queryset = queryset.filter(estado=estado)
+
+        proveedor = self.request.query_params.get("proveedor", "").strip()
+        if proveedor:
+            queryset = queryset.filter(proveedor__iexact=proveedor)
+
+        cliente = self.request.query_params.get("cliente", "").strip()
+        if cliente:
+            queryset = queryset.filter(
+                Q(usuario__username__icontains=cliente)
+                | Q(usuario__email__icontains=cliente)
+                | Q(usuario__first_name__icontains=cliente)
+                | Q(usuario__last_name__icontains=cliente)
+            )
+
+        buscar = self.request.query_params.get("buscar", "").strip()
+        if buscar:
+            queryset = queryset.filter(
+                Q(referencia__icontains=buscar)
+                | Q(pedido__numero__icontains=buscar)
+                | Q(identificador_externo__icontains=buscar)
+                | Q(usuario__email__icontains=buscar)
+            )
+
+        queryset = self.filtrar_rango_fechas(queryset)
+        orden = self.request.query_params.get("orden", "").strip()
+        ordenes = {
+            "fecha": ("fecha_creacion", "id"),
+            "-fecha": ("-fecha_creacion", "-id"),
+            "monto": ("monto", "id"),
+            "-monto": ("-monto", "id"),
+            "estado": ("estado", "-fecha_creacion"),
+            "-estado": ("-estado", "-fecha_creacion"),
+        }
+        return queryset.order_by(*ordenes.get(orden, ("-fecha_creacion", "-id")))
 
     @decorators.action(detail=False, methods=["post"], url_path="iniciar")
     def iniciar(self, request):

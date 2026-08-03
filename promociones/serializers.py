@@ -9,7 +9,19 @@ from .models import (
 )
 
 
-class BannerPromocionalSerializer(serializers.ModelSerializer):
+class EmpresaContextoEntradaMixin:
+    def to_internal_value(self, data):
+        empresa = self.context.get("empresa")
+        if empresa:
+            data = data.copy()
+            data["empresa"] = empresa.pk
+        return super().to_internal_value(data)
+
+
+class BannerPromocionalSerializer(
+    EmpresaContextoEntradaMixin,
+    serializers.ModelSerializer,
+):
     empresa_nombre = serializers.CharField(source="empresa.nombre", read_only=True)
     empresa_slug = serializers.CharField(source="empresa.slug", read_only=True)
     imagen_final = serializers.SerializerMethodField()
@@ -47,6 +59,7 @@ class BannerPromocionalSerializer(serializers.ModelSerializer):
             "fecha_creacion",
             "fecha_actualizacion",
         ]
+        extra_kwargs = {"empresa": {"required": False}}
 
     def get_imagen_final(self, obj):
         if obj.imagen_url:
@@ -63,6 +76,9 @@ class BannerPromocionalSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         request = self.context.get("request")
+        empresa_contexto = self.context.get("empresa")
+        if empresa_contexto:
+            attrs["empresa"] = empresa_contexto
         empresa = attrs.get("empresa") or getattr(self.instance, "empresa", None)
         imagen = attrs.get("imagen") or getattr(self.instance, "imagen", None)
         imagen_url = attrs.get("imagen_url") or getattr(self.instance, "imagen_url", "")
@@ -125,13 +141,23 @@ class ProductoOfertaPublicoSerializer(serializers.Serializer):
     precio = serializers.DecimalField(max_digits=12, decimal_places=2)
 
 
-class OfertaPromocionalSerializer(serializers.ModelSerializer):
+class OfertaPromocionalSerializer(
+    EmpresaContextoEntradaMixin,
+    serializers.ModelSerializer,
+):
     empresa_nombre = serializers.CharField(source="empresa.nombre", read_only=True)
     empresa_slug = serializers.CharField(source="empresa.slug", read_only=True)
     tipo_nombre = serializers.CharField(source="get_tipo_display", read_only=True)
     imagen_final = serializers.SerializerMethodField()
     esta_vigente = serializers.BooleanField(read_only=True)
     productos = serializers.SerializerMethodField()
+    productos_ids = serializers.PrimaryKeyRelatedField(
+        source="productos",
+        queryset=Producto.objects.all(),
+        many=True,
+        write_only=True,
+        required=False,
+    )
     paquete_resumen = serializers.SerializerMethodField()
 
     class Meta:
@@ -156,6 +182,7 @@ class OfertaPromocionalSerializer(serializers.ModelSerializer):
             "paquete",
             "paquete_resumen",
             "productos",
+            "productos_ids",
             "orden",
             "activo",
             "esta_vigente",
@@ -176,6 +203,7 @@ class OfertaPromocionalSerializer(serializers.ModelSerializer):
             "fecha_creacion",
             "fecha_actualizacion",
         ]
+        extra_kwargs = {"empresa": {"required": False}}
 
     def get_imagen_final(self, obj):
         if obj.imagen_url:
@@ -218,6 +246,9 @@ class OfertaPromocionalSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         request = self.context.get("request")
+        empresa_contexto = self.context.get("empresa")
+        if empresa_contexto:
+            attrs["empresa"] = empresa_contexto
         empresa = attrs.get("empresa") or getattr(self.instance, "empresa", None)
         paquete = attrs.get("paquete") or getattr(self.instance, "paquete", None)
 
@@ -241,6 +272,35 @@ class OfertaPromocionalSerializer(serializers.ModelSerializer):
                 {"paquete": "El paquete debe pertenecer a la misma empresa."}
             )
 
+        productos = attrs.get("productos")
+        if productos is None and self.instance:
+            productos = list(self.instance.productos.all())
+        productos = productos or []
+        if len(productos) != len({producto.pk for producto in productos}):
+            raise serializers.ValidationError(
+                {"productos_ids": "No puedes repetir productos en la oferta."}
+            )
+        if empresa and any(
+            producto.empresa_id != empresa.id for producto in productos
+        ):
+            raise serializers.ValidationError(
+                {"productos_ids": "Todos los productos deben pertenecer a la empresa."}
+            )
+
+        tipo = attrs.get("tipo", getattr(self.instance, "tipo", None))
+        if tipo == OfertaPromocional.Tipo.PRODUCTO and len(productos) != 1:
+            raise serializers.ValidationError(
+                {"productos_ids": "La oferta de producto requiere exactamente uno."}
+            )
+        if tipo == OfertaPromocional.Tipo.PRODUCTOS and len(productos) < 2:
+            raise serializers.ValidationError(
+                {"productos_ids": "La oferta de varios productos requiere al menos dos."}
+            )
+        if tipo == OfertaPromocional.Tipo.PAQUETE and productos:
+            raise serializers.ValidationError(
+                {"productos_ids": "La oferta de paquete no debe seleccionar productos."}
+            )
+
         precio_normal = attrs.get(
             "precio_normal",
             getattr(self.instance, "precio_normal", None),
@@ -259,6 +319,19 @@ class OfertaPromocionalSerializer(serializers.ModelSerializer):
             )
 
         return attrs
+
+    def create(self, validated_data):
+        productos = validated_data.pop("productos", [])
+        instance = super().create(validated_data)
+        instance.productos.set(productos)
+        return instance
+
+    def update(self, instance, validated_data):
+        productos = validated_data.pop("productos", None)
+        instance = super().update(instance, validated_data)
+        if productos is not None:
+            instance.productos.set(productos)
+        return instance
 
 
 class OfertaPromocionalPublicaSerializer(OfertaPromocionalSerializer):
@@ -283,7 +356,10 @@ class OfertaPromocionalPublicaSerializer(OfertaPromocionalSerializer):
         read_only_fields = fields
 
 
-class DescuentoPromocionalSerializer(serializers.ModelSerializer):
+class DescuentoPromocionalSerializer(
+    EmpresaContextoEntradaMixin,
+    serializers.ModelSerializer,
+):
     empresa_nombre = serializers.CharField(source="empresa.nombre", read_only=True)
     empresa_slug = serializers.CharField(source="empresa.slug", read_only=True)
     alcance_nombre = serializers.CharField(
@@ -332,6 +408,7 @@ class DescuentoPromocionalSerializer(serializers.ModelSerializer):
             "fecha_creacion",
             "fecha_actualizacion",
         ]
+        extra_kwargs = {"empresa": {"required": False}}
 
     def get_productos(self, obj):
         return [
@@ -349,6 +426,9 @@ class DescuentoPromocionalSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         request = self.context.get("request")
+        empresa_contexto = self.context.get("empresa")
+        if empresa_contexto:
+            attrs["empresa"] = empresa_contexto
         empresa = attrs.get("empresa") or getattr(self.instance, "empresa", None)
 
         if request and not request.user.is_superuser:

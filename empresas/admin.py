@@ -1,11 +1,17 @@
 from django.contrib import admin
 
-from .models import Empresa, ItemMenuEmpresa, SucursalEmpresa
+from .models import (
+    Empresa,
+    ItemMenuEmpresa,
+    SobreNosotrosEmpresa,
+    SucursalEmpresa,
+)
 
 
 class ItemMenuEmpresaInline(admin.TabularInline):
     model = ItemMenuEmpresa
     extra = 0
+    can_delete = False
     fields = (
         "clave",
         "texto",
@@ -14,6 +20,10 @@ class ItemMenuEmpresaInline(admin.TabularInline):
         "activo",
         "abre_en_nueva_pestana",
     )
+    readonly_fields = ("clave", "ruta", "abre_en_nueva_pestana")
+
+    def has_add_permission(self, request, obj=None):
+        return False
 
 
 class SucursalEmpresaInline(admin.TabularInline):
@@ -111,6 +121,17 @@ class EmpresaAdmin(admin.ModelAdmin):
             },
         ),
         (
+            "Redes sociales",
+            {
+                "fields": (
+                    "instagram_url",
+                    "whatsapp_url",
+                    "facebook_url",
+                    "tiktok_url",
+                )
+            },
+        ),
+        (
             "Operación",
             {
                 "fields": (
@@ -153,9 +174,59 @@ class ItemMenuEmpresaAdmin(admin.ModelAdmin):
     )
     list_filter = ("empresa", "activo", "abre_en_nueva_pestana")
     search_fields = ("texto", "clave", "ruta", "empresa__nombre", "empresa__slug")
-    autocomplete_fields = ("empresa",)
-    readonly_fields = ("fecha_creacion", "fecha_actualizacion")
+    readonly_fields = (
+        "empresa",
+        "clave",
+        "ruta",
+        "abre_en_nueva_pestana",
+        "fecha_creacion",
+        "fecha_actualizacion",
+    )
     ordering = ("empresa__nombre", "orden", "texto")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(SobreNosotrosEmpresa)
+class SobreNosotrosEmpresaAdmin(admin.ModelAdmin):
+    list_display = ("empresa", "titulo", "fecha_actualizacion")
+    search_fields = ("empresa__nombre", "empresa__slug", "titulo")
+    readonly_fields = ("empresa", "fecha_creacion", "fecha_actualizacion")
+    fieldsets = (
+        (
+            "Empresa",
+            {
+                "fields": (
+                    "empresa",
+                    "titulo",
+                    "introduccion",
+                    "historia",
+                )
+            },
+        ),
+        (
+            "Identidad",
+            {"fields": ("mision", "vision", "valores", "compromiso")},
+        ),
+        (
+            "Imagen",
+            {"fields": ("imagen", "imagen_url")},
+        ),
+        (
+            "Control",
+            {"fields": ("fecha_creacion", "fecha_actualizacion")},
+        ),
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(SucursalEmpresa)

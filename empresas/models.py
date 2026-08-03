@@ -28,6 +28,40 @@ dominio_validator = RegexValidator(
 
 SUBDOMINIOS_RESERVADOS = {"admin", "api", "app", "media", "static", "www"}
 
+
+def _validar_url_red_social(value, dominios_permitidos, nombre_red):
+    if not value:
+        return
+
+    url = urlparse(value)
+    dominio = (url.hostname or "").lower()
+    if url.scheme != "https":
+        raise ValidationError(f"La URL de {nombre_red} debe usar HTTPS.")
+
+    if not any(
+        dominio == permitido or dominio.endswith(f".{permitido}")
+        for permitido in dominios_permitidos
+    ):
+        raise ValidationError(
+            f"La URL debe pertenecer al dominio oficial de {nombre_red}."
+        )
+
+
+def validar_url_instagram(value):
+    _validar_url_red_social(value, {"instagram.com"}, "Instagram")
+
+
+def validar_url_whatsapp(value):
+    _validar_url_red_social(value, {"wa.me", "whatsapp.com"}, "WhatsApp")
+
+
+def validar_url_facebook(value):
+    _validar_url_red_social(value, {"facebook.com", "fb.com"}, "Facebook")
+
+
+def validar_url_tiktok(value):
+    _validar_url_red_social(value, {"tiktok.com"}, "TikTok")
+
 MENU_PREDETERMINADO = [
     ("inicio", "Inicio", "/", 1),
     ("examenes", "Examenes", "/examenes", 2),
@@ -36,7 +70,13 @@ MENU_PREDETERMINADO = [
     ("promociones", "Promociones", "/promociones", 5),
     ("sucursales", "Sucursales", "/sucursales", 6),
     ("contacto", "Contacto", "/contacto", 7),
+    ("sobre_nosotros", "Sobre nosotros", "/sobre-nosotros", 8),
 ]
+
+MENU_RUTAS = {
+    clave: ruta for clave, _texto, ruta, _orden in MENU_PREDETERMINADO
+}
+MENU_CLAVES = tuple(MENU_RUTAS)
 
 
 class Empresa(models.Model):
@@ -105,6 +145,27 @@ class Empresa(models.Model):
     correo = models.EmailField(blank=True)
     direccion = models.TextField(blank=True)
     sitio_web = models.URLField(blank=True)
+    instagram_url = models.URLField(
+        max_length=500,
+        blank=True,
+        validators=[validar_url_instagram],
+    )
+    whatsapp_url = models.URLField(
+        max_length=500,
+        blank=True,
+        validators=[validar_url_whatsapp],
+        help_text="Ejemplo: https://wa.me/50499999999",
+    )
+    facebook_url = models.URLField(
+        max_length=500,
+        blank=True,
+        validators=[validar_url_facebook],
+    )
+    tiktok_url = models.URLField(
+        max_length=500,
+        blank=True,
+        validators=[validar_url_tiktok],
+    )
 
     tiene_envios = models.BooleanField(
         default=False,
@@ -199,6 +260,7 @@ class Empresa(models.Model):
 
         if es_nueva:
             self.crear_menu_predeterminado()
+            SobreNosotrosEmpresa.objects.get_or_create(empresa=self)
 
     def crear_menu_predeterminado(self):
         for clave, texto, ruta, orden in MENU_PREDETERMINADO:
@@ -305,7 +367,10 @@ class ItemMenuEmpresa(models.Model):
     )
     clave = models.SlugField(
         max_length=60,
-        help_text="Identificador estable, por ejemplo inicio, catalogo o contacto.",
+        choices=[
+            (clave, texto) for clave, texto, _ruta, _orden in MENU_PREDETERMINADO
+        ],
+        help_text="Modulo oficial del sistema. No puede cambiarse despues de crearlo.",
     )
     texto = models.CharField(max_length=80)
     ruta = models.CharField(
@@ -326,7 +391,11 @@ class ItemMenuEmpresa(models.Model):
             models.UniqueConstraint(
                 fields=["empresa", "clave"],
                 name="item_menu_clave_unica_por_empresa",
-            )
+            ),
+            models.CheckConstraint(
+                condition=models.Q(clave__in=MENU_CLAVES),
+                name="item_menu_clave_oficial",
+            ),
         ]
         indexes = [
             models.Index(fields=["empresa", "activo", "orden"]),
@@ -336,6 +405,31 @@ class ItemMenuEmpresa(models.Model):
         return f"{self.empresa} - {self.texto}"
 
     def save(self, *args, **kwargs):
+        if self.clave not in MENU_RUTAS:
+            raise ValidationError(
+                {"clave": "Debes seleccionar un modulo oficial del sistema."}
+            )
+
+        if self.pk:
+            clave_original = (
+                ItemMenuEmpresa.objects.filter(pk=self.pk)
+                .values_list("clave", flat=True)
+                .first()
+            )
+            if clave_original and clave_original != self.clave:
+                raise ValidationError(
+                    {"clave": "El modulo de un item existente no puede cambiarse."}
+                )
+
+        self.ruta = MENU_RUTAS[self.clave]
+        self.abre_en_nueva_pestana = False
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            kwargs["update_fields"] = set(update_fields) | {
+                "ruta",
+                "abre_en_nueva_pestana",
+            }
+
         if not self.pk and self.orden == 0:
             ultimo_orden = (
                 ItemMenuEmpresa.objects.filter(empresa=self.empresa)
@@ -345,7 +439,70 @@ class ItemMenuEmpresa(models.Model):
             )
             self.orden = ultimo_orden + 1
 
+        orden_repetido = ItemMenuEmpresa.objects.filter(
+            empresa=self.empresa,
+            orden=self.orden,
+        )
+        if self.pk:
+            orden_repetido = orden_repetido.exclude(pk=self.pk)
+        if orden_repetido.exists():
+            raise ValidationError(
+                {"orden": "Ya existe un modulo con este orden en la empresa."}
+            )
+
         super().save(*args, **kwargs)
+
+
+class SobreNosotrosEmpresa(models.Model):
+    empresa = models.OneToOneField(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name="sobre_nosotros",
+    )
+    titulo = models.CharField(max_length=180, default="Sobre nosotros")
+    introduccion = models.TextField(blank=True)
+    historia = models.TextField(blank=True)
+    mision = models.TextField(blank=True)
+    vision = models.TextField(blank=True)
+    valores = models.TextField(
+        blank=True,
+        help_text="Escribe un valor por linea.",
+    )
+    compromiso = models.TextField(blank=True)
+    imagen = models.ImageField(
+        upload_to="empresas/sobre_nosotros/",
+        blank=True,
+        null=True,
+    )
+    imagen_url = models.URLField(
+        blank=True,
+        help_text="URL externa futura para almacenamiento en linea.",
+    )
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "contenido de Sobre nosotros"
+        verbose_name_plural = "contenidos de Sobre nosotros"
+
+    def __str__(self):
+        return f"Sobre nosotros - {self.empresa}"
+
+    @property
+    def imagen_final(self):
+        if self.imagen_url:
+            return self.imagen_url
+        if self.imagen:
+            return self.imagen.url
+        return None
+
+    @property
+    def valores_lista(self):
+        return [
+            valor.strip()
+            for valor in self.valores.splitlines()
+            if valor.strip()
+        ]
 
 
 class SucursalEmpresa(models.Model):

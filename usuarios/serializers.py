@@ -10,6 +10,7 @@ from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
 from empresas.models import Empresa
 from .models import CodigoVerificacionCorreo, PerfilUsuario
+from .services import revocar_sesiones_usuario
 
 User = get_user_model()
 
@@ -33,6 +34,7 @@ class PerfilUsuarioSerializer(serializers.ModelSerializer):
     usuario_detalle = UsuarioBasicoSerializer(source="usuario", read_only=True)
     empresa_nombre = serializers.CharField(source="empresa.nombre", read_only=True)
     rol_nombre = serializers.CharField(source="get_rol_display", read_only=True)
+    empresas_permitidas_detalle = serializers.SerializerMethodField()
 
     class Meta:
         model = PerfilUsuario
@@ -42,6 +44,8 @@ class PerfilUsuarioSerializer(serializers.ModelSerializer):
             "usuario_detalle",
             "empresa",
             "empresa_nombre",
+            "empresas_permitidas",
+            "empresas_permitidas_detalle",
             "rol",
             "rol_nombre",
             "telefono",
@@ -56,10 +60,244 @@ class PerfilUsuarioSerializer(serializers.ModelSerializer):
             "id",
             "usuario_detalle",
             "empresa_nombre",
+            "empresas_permitidas_detalle",
             "rol_nombre",
             "fecha_creacion",
             "fecha_actualizacion",
         ]
+
+    def get_empresas_permitidas_detalle(self, obj):
+        return [
+            {"id": empresa.id, "nombre": empresa.nombre, "slug": empresa.slug}
+            for empresa in obj.empresas_permitidas.all().order_by("nombre")
+        ]
+
+
+class UsuarioAdministrativoSerializer(serializers.ModelSerializer):
+    usuario_id = serializers.IntegerField(source="usuario.id", read_only=True)
+    username = serializers.CharField(source="usuario.username", max_length=150)
+    email = serializers.EmailField(source="usuario.email")
+    first_name = serializers.CharField(
+        source="usuario.first_name",
+        max_length=150,
+        required=False,
+        allow_blank=True,
+    )
+    last_name = serializers.CharField(
+        source="usuario.last_name",
+        max_length=150,
+        required=False,
+        allow_blank=True,
+    )
+    password = serializers.CharField(
+        write_only=True,
+        required=False,
+        trim_whitespace=False,
+    )
+    empresa_nombre = serializers.CharField(source="empresa.nombre", read_only=True)
+    rol_nombre = serializers.CharField(source="get_rol_display", read_only=True)
+    empresas_permitidas_detalle = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PerfilUsuario
+        fields = [
+            "id",
+            "usuario_id",
+            "username",
+            "email",
+            "first_name",
+            "last_name",
+            "password",
+            "empresa",
+            "empresa_nombre",
+            "empresas_permitidas",
+            "empresas_permitidas_detalle",
+            "rol",
+            "rol_nombre",
+            "telefono",
+            "numero_identidad",
+            "correo_verificado",
+            "puede_crear_usuarios",
+            "activo",
+            "fecha_creacion",
+            "fecha_actualizacion",
+        ]
+        read_only_fields = [
+            "id",
+            "usuario_id",
+            "empresa_nombre",
+            "empresas_permitidas_detalle",
+            "rol_nombre",
+            "fecha_creacion",
+            "fecha_actualizacion",
+        ]
+
+    def get_empresas_permitidas_detalle(self, obj):
+        return [
+            {"id": empresa.id, "nombre": empresa.nombre, "slug": empresa.slug}
+            for empresa in obj.empresas_permitidas.all().order_by("nombre")
+        ]
+
+    def to_internal_value(self, data):
+        datos = data.copy()
+        empresa_forzada = self.context.get("empresa")
+        if empresa_forzada:
+            datos["empresa"] = empresa_forzada.pk
+        return super().to_internal_value(datos)
+
+    def validate(self, attrs):
+        actor = self.context["request"].user
+        usuario_datos = attrs.get("usuario", {})
+        empresa_forzada = self.context.get("empresa")
+        rol = attrs.get("rol", getattr(self.instance, "rol", None))
+        empresa = attrs.get("empresa", getattr(self.instance, "empresa", None))
+        empresas_permitidas = attrs.get("empresas_permitidas")
+
+        if empresa_forzada:
+            empresa = empresa_forzada
+            attrs["empresa"] = empresa_forzada
+
+        if rol == PerfilUsuario.Rol.ADMINISTRADOR_MAESTRO:
+            if not actor.is_superuser:
+                raise serializers.ValidationError(
+                    {"rol": "Solo el superusuario puede asignar administradores maestros."}
+                )
+            attrs["empresa"] = None
+            empresa = None
+        elif not empresa:
+            raise serializers.ValidationError(
+                {"empresa": "Este rol debe pertenecer a una empresa."}
+            )
+
+        if not actor.is_superuser:
+            roles_permitidos = self._roles_permitidos_para_actor(actor)
+            if "rol" in attrs and rol not in roles_permitidos:
+                raise serializers.ValidationError(
+                    {"rol": "No puedes asignar este rol."}
+                )
+            if empresas_permitidas is not None:
+                raise serializers.ValidationError(
+                    {
+                        "empresas_permitidas": (
+                            "Solo el superusuario puede asignar empresas permitidas."
+                        )
+                    }
+                )
+
+        email = usuario_datos.get("email")
+        if email:
+            repetido = User.objects.filter(email__iexact=email.strip())
+            if self.instance:
+                repetido = repetido.exclude(pk=self.instance.usuario_id)
+            if repetido.exists():
+                raise serializers.ValidationError(
+                    {"email": "Ya existe un usuario con este correo."}
+                )
+
+        username = usuario_datos.get("username")
+        if username:
+            repetido = User.objects.filter(username__iexact=username.strip())
+            if self.instance:
+                repetido = repetido.exclude(pk=self.instance.usuario_id)
+            if repetido.exists():
+                raise serializers.ValidationError(
+                    {"username": "Ya existe un usuario con este nombre."}
+                )
+
+        password = attrs.get("password")
+        if self.instance is None and not password:
+            raise serializers.ValidationError(
+                {"password": "La contrasena es obligatoria al crear un usuario."}
+            )
+        if password:
+            usuario_temporal = User(
+                username=username or "",
+                email=email or "",
+            )
+            try:
+                validate_password(password, user=usuario_temporal)
+            except DjangoValidationError as exc:
+                raise serializers.ValidationError({"password": exc.messages}) from exc
+
+        numero_identidad = attrs.get(
+            "numero_identidad",
+            getattr(self.instance, "numero_identidad", ""),
+        )
+        if empresa and numero_identidad:
+            repetido = PerfilUsuario.objects.filter(
+                empresa=empresa,
+                numero_identidad=numero_identidad,
+            )
+            if self.instance:
+                repetido = repetido.exclude(pk=self.instance.pk)
+            if repetido.exists():
+                raise serializers.ValidationError(
+                    {
+                        "numero_identidad": (
+                            "Esta identidad ya esta registrada en la empresa."
+                        )
+                    }
+                )
+
+        return attrs
+
+    def _roles_permitidos_para_actor(self, actor):
+        perfil = actor.perfil
+        if perfil.es_administrador_maestro:
+            return [
+                PerfilUsuario.Rol.ADMINISTRADOR_EMPRESA,
+                PerfilUsuario.Rol.GERENTE,
+                PerfilUsuario.Rol.COMPRADOR,
+            ]
+        if perfil.es_administrador_empresa:
+            return [PerfilUsuario.Rol.GERENTE, PerfilUsuario.Rol.COMPRADOR]
+        if perfil.es_gerente:
+            return [PerfilUsuario.Rol.COMPRADOR]
+        return []
+
+    @transaction.atomic
+    def create(self, validated_data):
+        usuario_datos = validated_data.pop("usuario")
+        password = validated_data.pop("password")
+        empresas_permitidas = validated_data.pop("empresas_permitidas", [])
+        activo = validated_data.get("activo", True)
+        correo_verificado = validated_data.get("correo_verificado", False)
+        usuario = User.objects.create_user(
+            password=password,
+            is_active=activo and correo_verificado,
+            **usuario_datos,
+        )
+        perfil = usuario.perfil
+        for campo, valor in validated_data.items():
+            setattr(perfil, campo, valor)
+        perfil.full_clean()
+        perfil.save()
+        perfil.empresas_permitidas.set(empresas_permitidas)
+        return perfil
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        usuario_datos = validated_data.pop("usuario", {})
+        password = validated_data.pop("password", None)
+        empresas_permitidas = validated_data.pop("empresas_permitidas", None)
+        usuario = instance.usuario
+
+        for campo, valor in usuario_datos.items():
+            setattr(usuario, campo, valor)
+        for campo, valor in validated_data.items():
+            setattr(instance, campo, valor)
+
+        usuario.is_active = instance.activo and instance.correo_verificado
+        if password:
+            usuario.set_password(password)
+        usuario.save()
+        instance.full_clean()
+        instance.save()
+        if empresas_permitidas is not None:
+            instance.empresas_permitidas.set(empresas_permitidas)
+        if password or not usuario.is_active:
+            revocar_sesiones_usuario(usuario)
+        return instance
 
 
 class LoginJWTSerializer(serializers.Serializer):
@@ -94,6 +332,9 @@ class LoginJWTSerializer(serializers.Serializer):
 
         if perfil and not perfil.activo:
             raise AuthenticationFailed("El perfil del usuario esta inactivo.")
+
+        if perfil and not perfil.correo_verificado:
+            raise AuthenticationFailed("Debes verificar tu correo antes de ingresar.")
 
         refresh = RefreshToken.for_user(user)
         return {

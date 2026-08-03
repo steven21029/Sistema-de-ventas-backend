@@ -1,5 +1,7 @@
 from rest_framework.permissions import BasePermission
 
+from empresas.contexto import empresas_administrables
+
 
 class IsPagoOwnerOrEmpresaStaff(BasePermission):
     message = "No tienes permiso para consultar este pago."
@@ -16,7 +18,7 @@ class IsPagoOwnerOrEmpresaStaff(BasePermission):
         if not perfil or not perfil.activo:
             return False
         if perfil.es_administrador_maestro:
-            return True
+            return empresas_administrables(user).filter(pk=obj.empresa_id).exists()
         if not perfil.empresa_id or obj.empresa_id != perfil.empresa_id:
             return False
         if perfil.es_administrador_empresa or perfil.es_gerente:

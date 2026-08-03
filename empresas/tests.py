@@ -1,10 +1,11 @@
 from decimal import Decimal
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import Empresa, SucursalEmpresa
+from .models import Empresa, ItemMenuEmpresa, SobreNosotrosEmpresa, SucursalEmpresa
 
 
 class EmpresaActualAPITests(APITestCase):
@@ -25,7 +26,7 @@ class EmpresaActualAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["slug"], self.empresa.slug)
         self.assertEqual(response.data["subdominio"], "analiza")
-        self.assertEqual(len(response.data["menu"]), 7)
+        self.assertEqual(len(response.data["menu"]), 8)
 
     def test_resuelve_empresa_por_dominio_personalizado(self):
         response = self.client.get(
@@ -77,7 +78,71 @@ class EmpresaActualAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("Productos", textos)
         self.assertNotIn("Sucursales", textos)
-        self.assertEqual(rutas["examenes"], "/productos")
+        self.assertEqual(rutas["examenes"], "/examenes")
+
+    def test_empresa_nueva_recibe_solo_modulos_oficiales_y_sobre_nosotros(self):
+        claves = set(self.empresa.items_menu.values_list("clave", flat=True))
+
+        self.assertEqual(
+            claves,
+            {
+                "inicio",
+                "examenes",
+                "perfiles",
+                "servicios",
+                "promociones",
+                "sucursales",
+                "contacto",
+                "sobre_nosotros",
+            },
+        )
+        self.assertTrue(
+            SobreNosotrosEmpresa.objects.filter(empresa=self.empresa).exists()
+        )
+
+    def test_modelo_rechaza_item_de_menu_no_oficial(self):
+        with self.assertRaises(DjangoValidationError):
+            ItemMenuEmpresa.objects.create(
+                empresa=self.empresa,
+                clave="pagina-libre",
+                texto="Pagina libre",
+                ruta="/pagina-libre",
+            )
+
+    def test_api_publica_devuelve_plantilla_sobre_nosotros(self):
+        contenido = self.empresa.sobre_nosotros
+        contenido.titulo = "Acerca de Analiza"
+        contenido.introduccion = "Laboratorio clinico hondureno."
+        contenido.mision = "Cuidar la salud con resultados confiables."
+        contenido.vision = "Ser un laboratorio de referencia nacional."
+        contenido.valores = "Calidad\nEtica\nServicio"
+        contenido.imagen_url = "https://example.com/sobre-analiza.jpg"
+        contenido.save()
+
+        response = self.client.get(
+            reverse("empresas-sobre-nosotros"),
+            {"empresa_slug": self.empresa.slug},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["titulo"], "Acerca de Analiza")
+        self.assertEqual(response.data["valores_lista"], ["Calidad", "Etica", "Servicio"])
+        self.assertEqual(
+            response.data["imagen_final"],
+            "https://example.com/sobre-analiza.jpg",
+        )
+        self.assertNotIn("id", response.data)
+        self.assertNotIn("empresa", response.data)
+
+    def test_sobre_nosotros_inactivo_en_menu_no_es_publico(self):
+        self.empresa.items_menu.filter(clave="sobre_nosotros").update(activo=False)
+
+        response = self.client.get(
+            reverse("empresas-sobre-nosotros"),
+            {"empresa_slug": self.empresa.slug},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_menu_endpoint_resuelve_por_host(self):
         response = self.client.get(
@@ -195,6 +260,56 @@ class EmpresaActualAPITests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertFalse(response.data["productos_con_imagen"])
+
+    def test_empresa_publica_devuelve_una_sola_configuracion_de_redes_sociales(self):
+        self.empresa.instagram_url = "https://www.instagram.com/analiza"
+        self.empresa.whatsapp_url = "https://wa.me/50499999999"
+        self.empresa.facebook_url = "https://www.facebook.com/analiza"
+        self.empresa.tiktok_url = "https://www.tiktok.com/@analiza"
+        self.empresa.save()
+
+        response = self.client.get(
+            reverse("empresas-actual"),
+            {"slug": self.empresa.slug},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data["redes_sociales"],
+            {
+                "instagram_url": "https://www.instagram.com/analiza",
+                "whatsapp_url": "https://wa.me/50499999999",
+                "facebook_url": "https://www.facebook.com/analiza",
+                "tiktok_url": "https://www.tiktok.com/@analiza",
+            },
+        )
+        self.assertNotIn("instagram_url", response.data)
+        self.assertNotIn("whatsapp_url", response.data)
+
+    def test_redes_sociales_publicas_estan_aisladas_por_empresa(self):
+        self.empresa.instagram_url = "https://www.instagram.com/analiza"
+        self.empresa.save()
+        otra = Empresa.objects.create(
+            nombre="Otra empresa",
+            slug="otra-empresa",
+            subdominio="otra-empresa",
+        )
+
+        response = self.client.get(
+            reverse("empresas-publica"),
+            {"slug": otra.slug},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data["redes_sociales"],
+            {
+                "instagram_url": "",
+                "whatsapp_url": "",
+                "facebook_url": "",
+                "tiktok_url": "",
+            },
+        )
 
     def test_sucursales_aceptan_coordenadas_largas(self):
         latitud = Decimal("14.083697123456789")

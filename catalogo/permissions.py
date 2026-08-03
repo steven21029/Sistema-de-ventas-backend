@@ -24,6 +24,7 @@ class IsCatalogoManagerOrReadOnly(BasePermission):
             and perfil.rol
             in [
                 PerfilUsuario.Rol.ADMINISTRADOR_MAESTRO,
+                PerfilUsuario.Rol.ADMINISTRADOR_EMPRESA,
                 PerfilUsuario.Rol.GERENTE,
             ]
         )

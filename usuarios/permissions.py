@@ -1,5 +1,30 @@
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 
+from .models import PerfilUsuario
+
+
+class IsAdministrativeUser(BasePermission):
+    message = "No tienes acceso al panel administrativo."
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        if user.is_superuser:
+            return True
+
+        perfil = getattr(user, "perfil", None)
+        return bool(
+            perfil
+            and perfil.activo
+            and perfil.rol
+            in [
+                PerfilUsuario.Rol.ADMINISTRADOR_MAESTRO,
+                PerfilUsuario.Rol.ADMINISTRADOR_EMPRESA,
+                PerfilUsuario.Rol.GERENTE,
+            ]
+        )
+
 
 class IsSuperUserOrReadOwnProfile(BasePermission):
     message = "Solo el superusuario puede administrar perfiles de usuario."

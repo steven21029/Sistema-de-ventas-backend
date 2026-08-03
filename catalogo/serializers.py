@@ -1,7 +1,8 @@
+from django.db import transaction
 from django.utils.text import slugify
 from rest_framework import serializers
 
-from .models import Categoria, Familia, PaqueteCatalogo, Producto
+from .models import Categoria, Familia, PaqueteCatalogo, PaqueteProducto, Producto
 
 
 class ImagenFinalMixin:
@@ -33,6 +34,7 @@ class ImagenFinalMixin:
 class FamiliaSerializer(serializers.ModelSerializer):
     empresa_nombre = serializers.CharField(source="empresa.nombre", read_only=True)
     imagen_final = serializers.SerializerMethodField()
+    orden = serializers.IntegerField(min_value=1, required=False)
 
     class Meta:
         model = Familia
@@ -54,7 +56,6 @@ class FamiliaSerializer(serializers.ModelSerializer):
             "id",
             "empresa_nombre",
             "imagen_final",
-            "orden",
             "fecha_creacion",
             "fecha_actualizacion",
         ]
@@ -76,6 +77,7 @@ class FamiliaSerializer(serializers.ModelSerializer):
 class CategoriaSerializer(ImagenFinalMixin, serializers.ModelSerializer):
     empresa_nombre = serializers.CharField(source="empresa.nombre", read_only=True)
     familia_nombre = serializers.CharField(source="familia.nombre", read_only=True)
+    orden = serializers.IntegerField(min_value=1, required=False)
 
     class Meta:
         model = Categoria
@@ -100,12 +102,14 @@ class CategoriaSerializer(ImagenFinalMixin, serializers.ModelSerializer):
             "empresa_nombre",
             "familia_nombre",
             "imagen_final",
-            "orden",
             "fecha_creacion",
             "fecha_actualizacion",
         ]
 
     def validate(self, attrs):
+        empresa_contexto = self.context.get("empresa")
+        if empresa_contexto:
+            attrs["empresa"] = empresa_contexto
         empresa = attrs.get("empresa") or getattr(self.instance, "empresa", None)
         familia = attrs.get("familia") or getattr(self.instance, "familia", None)
 
@@ -131,10 +135,16 @@ class ProductoSerializer(serializers.ModelSerializer):
     inventario_bajo = serializers.BooleanField(read_only=True)
     estado_inventario = serializers.CharField(read_only=True)
     imagen_final = serializers.SerializerMethodField()
+    orden = serializers.IntegerField(
+        source="orden_destacado",
+        min_value=0,
+        required=False,
+    )
 
     class Meta:
         model = Producto
         fields = [
+            "id",
             "empresa",
             "empresa_nombre",
             "familia",
@@ -155,6 +165,7 @@ class ProductoSerializer(serializers.ModelSerializer):
             "existencia",
             "existencia_minima",
             "orden_destacado",
+            "orden",
             "controla_inventario",
             "agotado",
             "inventario_bajo",
@@ -164,6 +175,7 @@ class ProductoSerializer(serializers.ModelSerializer):
             "fecha_actualizacion",
         ]
         read_only_fields = [
+            "id",
             "empresa_nombre",
             "familia_nombre",
             "categoria_nombre",
@@ -181,6 +193,9 @@ class ProductoSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, attrs):
+        empresa_contexto = self.context.get("empresa")
+        if empresa_contexto:
+            attrs["empresa"] = empresa_contexto
         empresa = attrs.get("empresa") or getattr(self.instance, "empresa", None)
         familia = attrs.get("familia") or getattr(self.instance, "familia", None)
         categoria = attrs.get("categoria") or getattr(self.instance, "categoria", None)
@@ -265,6 +280,154 @@ class ProductoSerializer(serializers.ModelSerializer):
             data["imagen_principal"] = None
             data["imagen_url"] = ""
         return data
+
+
+class PaqueteProductoAdminSerializer(serializers.Serializer):
+    producto_id = serializers.IntegerField(min_value=1)
+    cantidad = serializers.IntegerField(min_value=1, default=1)
+    orden = serializers.IntegerField(min_value=1, required=False)
+
+
+class PaqueteCatalogoAdminSerializer(ImagenFinalMixin, serializers.ModelSerializer):
+    empresa = serializers.PrimaryKeyRelatedField(read_only=True)
+    tipo_nombre = serializers.CharField(source="get_tipo_display", read_only=True)
+    precio = serializers.DecimalField(
+        source="precio_paquete",
+        max_digits=12,
+        decimal_places=2,
+    )
+    productos = PaqueteProductoAdminSerializer(many=True, write_only=True)
+    productos_detalle = serializers.SerializerMethodField()
+    imagen_final = serializers.SerializerMethodField()
+    orden = serializers.IntegerField(min_value=1, required=False)
+
+    class Meta:
+        model = PaqueteCatalogo
+        fields = [
+            "id",
+            "empresa",
+            "tipo",
+            "tipo_nombre",
+            "codigo",
+            "nombre",
+            "descripcion",
+            "precio_normal",
+            "precio",
+            "porcentaje_descuento",
+            "imagen",
+            "imagen_url",
+            "imagen_final",
+            "destacado",
+            "activo",
+            "orden",
+            "productos",
+            "productos_detalle",
+            "fecha_creacion",
+            "fecha_actualizacion",
+        ]
+        read_only_fields = [
+            "id",
+            "empresa",
+            "tipo_nombre",
+            "imagen_final",
+            "productos_detalle",
+            "fecha_creacion",
+            "fecha_actualizacion",
+        ]
+
+    def get_productos_detalle(self, obj):
+        return [
+            {
+                "producto_id": item.producto_id,
+                "codigo": item.producto.codigo_venta,
+                "nombre": item.producto.nombre,
+                "cantidad": item.cantidad,
+                "orden": item.orden,
+            }
+            for item in obj.items_productos.select_related("producto").all()
+        ]
+
+    def validate(self, attrs):
+        empresa = self.context.get("empresa") or getattr(
+            self.instance,
+            "empresa",
+            None,
+        )
+        productos = attrs.get("productos")
+        activo = attrs.get("activo", getattr(self.instance, "activo", True))
+        if productos is None and self.instance:
+            productos = [
+                {
+                    "producto_id": item.producto_id,
+                    "cantidad": item.cantidad,
+                    "orden": item.orden,
+                }
+                for item in self.instance.items_productos.all()
+            ]
+        productos = productos or []
+
+        ids = [item["producto_id"] for item in productos]
+        if len(ids) != len(set(ids)):
+            raise serializers.ValidationError(
+                {"productos": "No puedes repetir un producto dentro del paquete."}
+            )
+        if activo and not productos:
+            raise serializers.ValidationError(
+                {"productos": "Un paquete activo debe incluir al menos un producto."}
+            )
+
+        productos_db = {
+            producto.id: producto
+            for producto in Producto.objects.filter(id__in=ids)
+        }
+        faltantes = [producto_id for producto_id in ids if producto_id not in productos_db]
+        if faltantes:
+            raise serializers.ValidationError(
+                {"productos": f"No existen los productos: {faltantes}."}
+            )
+        if empresa and any(
+            producto.empresa_id != empresa.id for producto in productos_db.values()
+        ):
+            raise serializers.ValidationError(
+                {"productos": "Todos los productos deben pertenecer a la misma empresa."}
+            )
+
+        attrs["productos"] = productos
+        return attrs
+
+    @transaction.atomic
+    def create(self, validated_data):
+        productos = validated_data.pop("productos")
+        paquete = PaqueteCatalogo.objects.create(
+            empresa=self.context["empresa"],
+            **validated_data,
+        )
+        self._reemplazar_productos(paquete, productos)
+        return paquete
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        productos = validated_data.pop("productos", None)
+        for campo, valor in validated_data.items():
+            setattr(instance, campo, valor)
+        instance.save()
+        if productos is not None:
+            self._reemplazar_productos(instance, productos)
+        return instance
+
+    def _reemplazar_productos(self, paquete, productos):
+        paquete.items_productos.all().delete()
+        PaqueteProducto.objects.bulk_create(
+            [
+                PaqueteProducto(
+                    paquete=paquete,
+                    producto_id=item["producto_id"],
+                    cantidad=item["cantidad"],
+                    orden=item.get("orden") or indice,
+                )
+                for indice, item in enumerate(productos, start=1)
+            ]
+        )
 
 
 class ProductoPaginaPublicaSerializer(ImagenFinalMixin, serializers.ModelSerializer):
@@ -363,6 +526,7 @@ class ComboDestacadoPublicoSerializer(ImagenFinalMixin, serializers.ModelSeriali
                 "codigo_barra": item.producto.codigo_barra,
                 "tipo_item": item.producto.tipo_item,
                 "nombre": item.producto.nombre,
+                "cantidad": item.cantidad,
             }
             for item in items
         ]
@@ -395,13 +559,16 @@ class PerfilPublicoSerializer(ImagenFinalMixin, serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_productos(self, obj):
-        productos = [
-            item.producto
-            for item in obj.items_productos.select_related("producto").filter(
-                producto__activo=True
-            )
+        items = obj.items_productos.select_related("producto").filter(
+            producto__activo=True
+        )
+        return [
+            {
+                **ProductoPaquetePublicoSerializer(item.producto).data,
+                "cantidad": item.cantidad,
+            }
+            for item in items
         ]
-        return ProductoPaquetePublicoSerializer(productos, many=True).data
 
 
 class CategoriaServicioPublicoSerializer(ImagenFinalMixin, serializers.ModelSerializer):

@@ -7,6 +7,7 @@ from .views import (
     LoginJWTView,
     LogoutJWTView,
     PerfilUsuarioViewSet,
+    UsuarioAdministrativoViewSet,
     RefreshJWTView,
     ReenviarVerificacionCorreoView,
     RegistroCompradorView,
@@ -15,6 +16,11 @@ from .views import (
 )
 
 router = DefaultRouter()
+router.register(
+    "usuarios/administracion",
+    UsuarioAdministrativoViewSet,
+    basename="usuarios-administracion",
+)
 router.register("usuarios/perfiles", PerfilUsuarioViewSet, basename="usuarios-perfiles")
 
 urlpatterns = [

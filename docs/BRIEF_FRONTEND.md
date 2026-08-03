@@ -1,5 +1,10 @@
 # Brief para iniciar el frontend - Sistema web de ventas en linea
 
+> Actualizacion del 3 de agosto de 2026: para implementar el panel React usar
+> como contrato principal `docs/API_PANEL_ADMINISTRATIVO.md`. Ese documento
+> reemplaza cualquier seccion antigua de este brief que marque como pendientes
+> las APIs administrativas, los descuentos o la base neutral de pagos.
+
 Fecha de preparacion: 2026-07-22
 
 Este documento resume lo necesario para abrir una nueva conversacion y comenzar el frontend React. El backend queda pausado por ahora en este proyecto.
@@ -516,7 +521,31 @@ Uso:
 - `modo_inventario`;
 - `modo_inventario_nombre`;
 - `permite_productos_fisicos`;
-- `permite_servicios`.
+- `permite_servicios`;
+- `redes_sociales`.
+
+Las redes se cargan una sola vez desde la configuracion publica de empresa:
+
+```json
+{
+  "redes_sociales": {
+    "instagram_url": "https://www.instagram.com/analiza",
+    "whatsapp_url": "https://wa.me/50499999999",
+    "facebook_url": "https://www.facebook.com/analiza",
+    "tiktok_url": "https://www.tiktok.com/@analiza"
+  }
+}
+```
+
+Reglas para frontend:
+
+- No consultar Contacto ni Sobre nosotros para obtener las redes.
+- Reutilizar `empresa.redes_sociales` debajo del nombre de la empresa en
+  Contacto y al final de Sobre nosotros.
+- Mostrar solamente los iconos cuya URL no este vacia.
+- Abrir los enlaces externos en otra pestana con `noopener noreferrer`.
+- Instagram, WhatsApp, Facebook y TikTok son opciones fijas; no se crean redes
+  genericas.
 
 Modos posibles:
 
@@ -623,7 +652,10 @@ Reglas para frontend:
 - Ordenar por `orden` si el frontend necesita ordenar, aunque el backend ya lo devuelve ordenado.
 - Si un item no viene en la respuesta, no debe mostrarse.
 - No dejar nombres fijos como "Examenes" o "Servicios" en el componente.
-- Si `abre_en_nueva_pestana = true`, abrir con target externo.
+- No usar Servicios ni otra pagina como respaldo para rutas desconocidas.
+- `clave`, `ruta` y `abre_en_nueva_pestana` son fijos y no se editan.
+- El administrador solo cambia `texto`, `orden` y `activo`.
+- No existe creacion ni eliminacion de items del menu.
 
 El menu predeterminado actual es:
 
@@ -635,9 +667,56 @@ Servicios
 Promociones
 Sucursales
 Contacto
+Sobre nosotros
 ```
 
 Cada empresa puede cambiar esos textos desde el backend/admin.
+
+### 10.1 Plantilla fija de Sobre nosotros
+
+Ruta oficial del frontend:
+
+```text
+/sobre-nosotros
+```
+
+Endpoint publico:
+
+```text
+GET /api/empresas/sobre-nosotros/?empresa_slug=Analiza
+```
+
+Respuesta:
+
+```json
+{
+  "titulo": "Sobre Analiza",
+  "introduccion": "",
+  "historia": "",
+  "mision": "",
+  "vision": "",
+  "valores_lista": ["Calidad", "Etica", "Servicio"],
+  "compromiso": "",
+  "imagen_final": null
+}
+```
+
+Reglas:
+
+- Crear un unico componente React para esta plantilla.
+- Ocultar las secciones cuyo texto este vacio.
+- Mostrar los valores usando `valores_lista`.
+- Usar `imagen_final` para archivo local o futura URL de R2.
+- Si la API responde `404`, el modulo esta desactivado para esa empresa.
+- No reutilizar la pagina Servicios para esta ruta.
+- No crear un sistema de paginas genericas.
+
+Endpoint administrativo:
+
+```text
+GET /api/empresas/mi-sobre-nosotros/
+PATCH /api/empresas/mi-sobre-nosotros/
+```
 
 ## 11. Banner promocional implementado
 
@@ -1337,6 +1416,8 @@ Se puede iniciar el frontend con este orden:
 - No agregar citas medicas.
 - No duplicar acceso a "Mi cuenta".
 - No dejar nombres fijos en el menu principal; usar el menu que devuelve el backend.
+- Cargar las redes una sola vez desde la configuracion publica de empresa y
+  reutilizarlas en Contacto y Sobre nosotros.
 - No usar banners como listado de promociones; la pagina Promociones usa `promociones/ofertas/`.
 - No mostrar id interno del producto al cliente.
 - Para inventario interno, usar `codigo_barra` para ajustar existencias.

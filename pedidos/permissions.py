@@ -1,5 +1,6 @@
 from rest_framework.permissions import BasePermission
 
+from empresas.contexto import empresas_administrables
 from usuarios.models import PerfilUsuario
 
 
@@ -15,14 +16,19 @@ class IsPedidoOwnerOrEmpresaManager(BasePermission):
             return True
 
         perfil = getattr(user, "perfil", None)
-        if not perfil or not perfil.activo or not perfil.empresa_id:
+        if not perfil or not perfil.activo:
             return False
 
         empresa_id, usuario_id = self._resolver_empresa_usuario(obj)
+        if perfil.es_administrador_maestro:
+            return empresas_administrables(user).filter(pk=empresa_id).exists()
+
+        if not perfil.empresa_id:
+            return False
         if empresa_id != perfil.empresa_id:
             return False
 
-        if perfil.es_gerente:
+        if perfil.es_administrador_empresa or perfil.es_gerente:
             return True
 
         return usuario_id == user.id

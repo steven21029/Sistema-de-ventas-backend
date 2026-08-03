@@ -880,3 +880,288 @@ Seguridad:
 - Estas credenciales son exclusivamente para desarrollo local.
 - Deben cambiarse antes de publicar el sistema o permitir acceso desde internet.
 - No se crearon migraciones ni se modificaron archivos de codigo.
+
+## 2026-08-03 - APIs completas para el panel administrativo React
+
+Estado: implementado, migrado, documentado y verificado.
+
+Objetivo:
+
+- Preparar el backend del panel administrativo sin modificar el frontend.
+- Mantener las APIs publicas actuales de la tienda.
+- Aplicar el aislamiento multiempresa en el servidor y no confiar en IDs de
+  empresa recibidos desde React.
+- Ejecutar el trabajo en ocho fases consecutivas, verificando cada modulo antes
+  de avanzar al siguiente.
+
+Contexto multiempresa:
+
+- Se agrego middleware para resolver la empresa mediante dominio, subdominio,
+  `X-Frontend-Host` o `empresa_slug` durante desarrollo local.
+- Se agrego `GET /api/empresas/contexto-administrativo/` para devolver usuario,
+  perfil, empresa actual, empresas disponibles y permisos.
+- Se agrego `GET/PATCH /api/empresas/mi-empresa/` para configuracion visual y
+  comercial de la empresa actual.
+- `PerfilUsuario` ahora tiene `empresas_permitidas` para limitar el alcance del
+  administrador maestro.
+- Administrador de empresa y gerente quedan forzados a su empresa aunque el
+  JSON intente enviar otra.
+- Las solicitudes explicitas hacia una empresa no permitida responden `403`.
+
+Empresa, menu y sucursales:
+
+- Se creo CRUD administrativo de menu en `/api/empresas/items-menu/`.
+- Clave y orden del menu son unicos dentro de cada empresa.
+- Se amplio `/api/empresas/sucursales/` con CRUD autenticado, busqueda, orden,
+  paginacion e inclusion opcional de inactivas.
+- La consulta publica de sucursales conserva su lista sin paginar y solo
+  devuelve sucursales activas.
+- Branding, colores, logo, imagen general de sucursales, datos de contacto,
+  envios, impuesto e imagenes de productos se pueden modificar desde
+  `mi-empresa`.
+- Slug, dominios, modo de inventario y activacion de empresa permanecen bajo
+  control del superusuario.
+
+Catalogo y paquetes:
+
+- El permiso de catalogo ahora reconoce `administrador_empresa`.
+- Familias, categorias y productos tienen CRUD administrativo paginado, filtros
+  por empresa, busqueda, orden e inclusion de inactivos.
+- El serializador administrativo de producto devuelve su `id` interno.
+- `existencia` permanece de solo lectura y solo cambia mediante inventario.
+- Se agrego CRUD `/api/catalogo/paquetes/` para perfiles y combos.
+- Cada componente del paquete recibe `producto_id`, `cantidad` y `orden`.
+- La cantidad del componente participa en validacion del carrito, disponibilidad
+  y descuento de inventario.
+- Paquetes activos no pueden quedar vacios ni mezclar productos de empresas.
+- Las eliminaciones protegidas por historial responden `409`.
+
+Promociones:
+
+- Banners, ofertas y descuentos continúan como tres recursos independientes.
+- Los CRUD de `/api/promociones/banners/`, `/api/promociones/ofertas/` y
+  `/api/promociones/descuentos/` quedaron aislados por empresas permitidas.
+- Se agregaron busqueda, orden, paginacion opcional e inclusion de inactivos.
+- Las ofertas reciben `productos_ids` para uno o varios productos segun su tipo.
+- Todas las relaciones se validan contra la empresa actual.
+
+Usuarios y sesiones:
+
+- Se agrego CRUD sin eliminacion en `/api/usuarios/administracion/`.
+- Superusuario crea administradores maestros y cualquier rol empresarial.
+- Administrador maestro gestiona roles de sus empresas permitidas.
+- Administrador de empresa gestiona gerentes y compradores.
+- Gerente gestiona compradores solo cuando tiene
+  `puede_crear_usuarios=true`.
+- Comprador no tiene acceso al panel.
+- Se agregaron filtros por texto, rol, estado, empresa y orden.
+- La contrasena nunca aparece en las respuestas.
+- Las acciones `bloquear` y `desbloquear` cambian tanto el perfil como el usuario
+  Django.
+- Bloquear, desactivar o cambiar contrasena revoca todos los refresh tokens.
+- Crear sin `correo_verificado=true` deja la cuenta inactiva.
+- El login rechaza perfiles con correo sin verificar.
+
+Contactos, pedidos y pagos:
+
+- Contactos permite creacion publica y bandeja administrativa aislada por
+  empresa.
+- En un mensaje administrativo solo se puede modificar `estado`; nombre,
+  contacto y contenido quedan como historial.
+- Pedidos y detalles siguen siendo de solo lectura y ahora admiten filtros por
+  estado, cliente, busqueda, fechas y orden.
+- Administrador de empresa y gerente pueden consultar todos los pedidos de su
+  empresa; compradores solo los propios.
+- Pagos ahora devuelve empresa y cliente para la bandeja administrativa.
+- Se agregaron filtros por estado, proveedor, cliente, referencia, fechas y
+  orden.
+- Pedidos y pagos conservan su inmutabilidad; los estados de pago solo cambian
+  mediante el flujo controlado y webhook firmado.
+
+Paginacion y errores:
+
+- Se agrego paginacion administrativa de 20 registros y maximo 100 mediante
+  `tamano_pagina`.
+- Promociones, contactos, pedidos y pagos aceptan `paginar=true` para conservar
+  compatibilidad con respuestas anteriores.
+- Los rangos de fecha usan `fecha_desde` y `fecha_hasta` en formato
+  `AAAA-MM-DD`.
+- Se estandarizo `409 Conflict` cuando una eliminacion esta bloqueada por
+  historial relacionado.
+
+Migraciones:
+
+- `usuarios.0006_perfilusuario_empresas_permitidas`.
+- `catalogo.0006_paqueteproducto_cantidad`.
+- Ambas quedaron aplicadas en la base local.
+
+Documentacion para frontend:
+
+- Se creo `docs/API_PANEL_ADMINISTRATIVO.md` como contrato oficial del panel
+  React.
+- Incluye autenticacion, contexto de empresa, matriz de roles, endpoints,
+  filtros, paginacion, imagenes, errores y reglas de eliminacion.
+- `docs/BRIEF_FRONTEND.md` ahora enlaza este contrato para reemplazar secciones
+  antiguas que marcaban estas APIs como pendientes.
+
+Verificacion final:
+
+- `python manage.py check`: sin problemas.
+- `python manage.py makemigrations --check --dry-run`: sin cambios pendientes.
+- `catalogo.0006` y `usuarios.0006`: aplicadas.
+- `python manage.py test`: 134 pruebas aprobadas.
+- `git diff --check`: sin errores de formato.
+- Aviso no bloqueante: la carpeta generada `staticfiles` aun no existe.
+
+Fuera de alcance de este cambio:
+
+- No se modifico el proyecto frontend.
+- No se conecto Supabase.
+- No se integro una pasarela real ni credenciales de produccion.
+
+## 2026-08-03 - Menu de modulos oficiales y plantilla Sobre nosotros
+
+Estado: implementado, migrado, documentado y verificado.
+
+Decision funcional:
+
+- Se descarto la creacion de paginas y rutas genericas.
+- Todas las empresas usan el mismo conjunto de modulos oficiales.
+- Cada empresa solo cambia el texto visible, el orden y el estado activo de
+  cada modulo.
+- Las paginas funcionales conservan plantillas conocidas por el frontend.
+
+Menu oficial:
+
+- `inicio` usa `/`.
+- `examenes` usa `/examenes`.
+- `perfiles` usa `/perfiles`.
+- `servicios` usa `/servicios`.
+- `promociones` usa `/promociones`.
+- `sucursales` usa `/sucursales`.
+- `contacto` usa `/contacto`.
+- `sobre_nosotros` usa `/sobre-nosotros`.
+
+Restricciones:
+
+- Toda empresa nueva recibe automaticamente los ocho modulos.
+- `clave`, `ruta` y `abre_en_nueva_pestana` son inmutables.
+- `POST` y `DELETE` de `/api/empresas/items-menu/` ya no estan disponibles.
+- La API y Django Admin solo permiten cambiar `texto`, `orden` y `activo`.
+- No se permiten dos modulos con el mismo orden dentro de una empresa.
+- La base de datos rechaza claves que no pertenezcan al menu oficial.
+- En Django Admin se retiraron las opciones de agregar y eliminar items.
+
+Conversion de datos locales:
+
+- El item `Sobre_nosotros` de Analiza se convirtio a `sobre_nosotros`.
+- Su ruta cambio de `/sobrenosotros` a `/sobre-nosotros`.
+- Se conservaron su texto, orden y estado activo.
+- Los modulos oficiales faltantes se completaron para las empresas existentes.
+- Los items libres que no correspondian a una plantilla oficial se retiraron.
+- Los ordenes duplicados heredados se normalizaron conservando primero el
+  modulo mas antiguo y moviendo el duplicado al primer numero libre.
+- En Analiza, `Servicios` conservo el orden 2 y `Examenes` quedo en el orden 4.
+
+Plantilla Sobre nosotros:
+
+- Se creo un registro `SobreNosotrosEmpresa` uno a uno con cada empresa.
+- Los campos fijos son titulo, introduccion, historia, mision, vision, valores,
+  compromiso, imagen e imagen URL.
+- `valores_lista` convierte las lineas no vacias de `valores` en una lista para
+  el frontend.
+- `imagen_final` conserva compatibilidad con archivos locales y futuras URLs de
+  R2.
+- Las fichas se crean automaticamente para empresas nuevas y mediante migracion
+  para empresas existentes.
+
+APIs:
+
+- Publica: `GET /api/empresas/sobre-nosotros/?empresa_slug=Analiza`.
+- Administrativa: `GET/PATCH /api/empresas/mi-sobre-nosotros/`.
+- La API publica no expone IDs internos ni empresa.
+- Si `sobre_nosotros` esta desactivado en el menu, la consulta publica responde
+  `404`.
+- Administrador maestro, administrador de empresa y gerente respetan el mismo
+  aislamiento multiempresa del resto del panel.
+- Compradores no pueden modificar este contenido.
+
+Frontend:
+
+- La ruta oficial que debe implementar React es `/sobre-nosotros`.
+- Debe existir un solo componente fijo para todas las empresas.
+- Las secciones vacias pueden ocultarse.
+- Servicios no debe usarse como respaldo para esta ruta ni para rutas
+  desconocidas.
+- Se actualizaron `docs/API_PANEL_ADMINISTRATIVO.md` y
+  `docs/BRIEF_FRONTEND.md` con el contrato nuevo.
+
+Migracion:
+
+- `empresas.0014_sobrenosotrosempresa_alter_itemmenuempresa_clave_and_more`.
+- `empresas.0015_normalizar_orden_menu_oficial`.
+- Ambas quedaron aplicadas correctamente en la base local.
+
+Verificacion:
+
+- `python manage.py check`: sin problemas.
+- `python manage.py makemigrations --check --dry-run`: sin cambios pendientes.
+- `python manage.py test empresas`: 39 pruebas aprobadas.
+- `python manage.py test`: 143 pruebas aprobadas.
+- `git diff --check`: sin errores de formato.
+
+## 2026-08-03 - Contenido institucional de Analiza
+
+Fuente:
+
+- `Presentacion Analiza-Clientes Corporativos (1).pdf`.
+
+Datos cargados en `SobreNosotrosEmpresa` para la empresa con slug `Analiza`:
+
+- Introduccion con la presencia regional y atencion mediante sucursales en
+  Honduras.
+- Mision institucional.
+- Vision de liderazgo regional para el ano 2030.
+- Valores: Calidad, Innovacion, Servicio y Tecnologia.
+- Compromiso con proyeccion social, cuidado del medio ambiente, manejo de
+  residuos bioinfecciosos y capacitacion del equipo.
+- `historia` permanece vacia porque el documento no incluye una historia
+  empresarial identificable.
+- No se asigno una imagen: las imagenes del documento forman parte de las
+  diapositivas y no se utilizaron como recortes para la pagina web.
+
+Alcance:
+
+- No se modificaron modelos, migraciones, serializers, vistas ni rutas.
+- La API publica existente respondio `200` con el contenido mediante
+  `GET /api/empresas/sobre-nosotros/?empresa_slug=Analiza`.
+
+## 2026-08-03 - Redes sociales por empresa
+
+Configuracion:
+
+- Se agregaron a `Empresa` las URLs opcionales `instagram_url`,
+  `whatsapp_url`, `facebook_url` y `tiktok_url`.
+- Los enlaces deben usar HTTPS y pertenecer al dominio oficial de la red.
+- Django Admin muestra los cuatro campos dentro de `Redes sociales`.
+- `GET/PATCH /api/empresas/mi-empresa/` permite consultar y actualizar los
+  enlaces de la empresa administrada.
+- Los enlaces de Analiza permanecen vacios hasta recibir sus URLs oficiales.
+
+Contrato publico unico:
+
+- `GET /api/empresas/actual/?host=...` y su respaldo
+  `GET /api/empresas/publica/?slug=Analiza` devuelven el objeto
+  `redes_sociales`.
+- No se crearon endpoints adicionales.
+- Contacto y Sobre nosotros no duplican las redes en sus respuestas.
+- El frontend debe cargar la configuracion de empresa una vez y reutilizarla
+  debajo del nombre en Contacto y al final de Sobre nosotros.
+- Una URL vacia indica que el icono correspondiente no debe mostrarse.
+
+Migracion y pruebas:
+
+- Se creo y aplico
+  `empresas.0016_empresa_facebook_url_empresa_instagram_url_and_more`.
+- `python manage.py test empresas`: 47 pruebas aprobadas.
+- `python manage.py test`: 151 pruebas aprobadas.

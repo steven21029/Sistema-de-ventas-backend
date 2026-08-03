@@ -10,6 +10,9 @@ from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 
 from catalogo.models import PaqueteCatalogo, Producto
+from config.api import FiltroRangoFechasMixin, PaginacionAdministrativaOpcionalMixin
+from empresas.contexto import empresas_administrables, obtener_empresa_administrable
+from usuarios.models import PerfilUsuario
 from .models import Carrito, DetallePedido, ItemCarrito, Pedido, Prefactura, TarifaEntrega
 from .permissions import IsPedidoOwnerOrEmpresaManager, IsTarifaEntregaAdmin
 from .serializers import (
@@ -288,11 +291,14 @@ class CarritoViewSet(EmpresaUsuarioMixin, viewsets.ModelViewSet):
 
         def agregar_componentes(producto_item, paquete_item, cantidad):
             componentes = (
-                [producto_item]
+                [(producto_item, 1)]
                 if producto_item
-                else list(paquete_item.productos.all())
+                else [
+                    (item.producto, item.cantidad)
+                    for item in paquete_item.items_productos.select_related("producto")
+                ]
             )
-            for componente in componentes:
+            for componente, cantidad_por_paquete in componentes:
                 if not componente.controla_inventario:
                     continue
                 if componente.pk not in requeridos:
@@ -300,7 +306,9 @@ class CarritoViewSet(EmpresaUsuarioMixin, viewsets.ModelViewSet):
                         "producto": componente,
                         "cantidad": 0,
                     }
-                requeridos[componente.pk]["cantidad"] += cantidad
+                requeridos[componente.pk]["cantidad"] += (
+                    cantidad * cantidad_por_paquete
+                )
 
         for item in items:
             if item_actual and item.pk == item_actual.pk:
@@ -450,7 +458,12 @@ class ItemCarritoViewSet(viewsets.ModelViewSet):
         return queryset.filter(carrito__empresa=perfil.empresa, carrito__usuario=self.request.user)
 
 
-class PedidoViewSet(EmpresaUsuarioMixin, viewsets.ReadOnlyModelViewSet):
+class PedidoViewSet(
+    PaginacionAdministrativaOpcionalMixin,
+    FiltroRangoFechasMixin,
+    EmpresaUsuarioMixin,
+    viewsets.ReadOnlyModelViewSet,
+):
     serializer_class = PedidoSerializer
     permission_classes = [IsPedidoOwnerOrEmpresaManager]
 
@@ -465,14 +478,70 @@ class PedidoViewSet(EmpresaUsuarioMixin, viewsets.ReadOnlyModelViewSet):
             "detalles__componentes__producto",
         )
 
-        if self.request.user.is_superuser:
-            return queryset
+        user = self.request.user
+        empresa_slug = self.request.query_params.get("empresa_slug", "").strip()
+        if user.is_superuser:
+            if empresa_slug:
+                queryset = queryset.filter(empresa__slug__iexact=empresa_slug)
+        else:
+            perfil = getattr(user, "perfil", None)
+            if not perfil or not perfil.activo:
+                return queryset.none()
+            if perfil.es_administrador_maestro:
+                queryset = queryset.filter(empresa__in=empresas_administrables(user))
+                if empresa_slug:
+                    obtener_empresa_administrable(self.request)
+                    queryset = queryset.filter(empresa__slug__iexact=empresa_slug)
+            elif perfil.rol in [
+                PerfilUsuario.Rol.ADMINISTRADOR_EMPRESA,
+                PerfilUsuario.Rol.GERENTE,
+            ] and perfil.empresa_id:
+                obtener_empresa_administrable(self.request)
+                queryset = queryset.filter(empresa=perfil.empresa)
+            elif perfil.empresa_id:
+                queryset = queryset.filter(empresa=perfil.empresa, usuario=user)
+            else:
+                return queryset.none()
 
-        empresa = self.get_empresa_usuario()
-        if self.request.user.perfil.es_gerente:
-            return queryset.filter(empresa=empresa)
+        estado = (
+            self.request.query_params.get("estado_pago", "").strip()
+            or self.request.query_params.get("estado", "").strip()
+        )
+        if estado:
+            queryset = queryset.filter(estado_pago=estado)
 
-        return queryset.filter(empresa=empresa, usuario=self.request.user)
+        cliente = self.request.query_params.get("cliente", "").strip()
+        if cliente:
+            queryset = queryset.filter(
+                Q(usuario__username__icontains=cliente)
+                | Q(usuario__email__icontains=cliente)
+                | Q(usuario__first_name__icontains=cliente)
+                | Q(usuario__last_name__icontains=cliente)
+                | Q(nombre_recibe__icontains=cliente)
+                | Q(telefono_recibe__icontains=cliente)
+            )
+
+        buscar = self.request.query_params.get("buscar", "").strip()
+        if buscar:
+            queryset = queryset.filter(
+                Q(numero__icontains=buscar)
+                | Q(nombre_recibe__icontains=buscar)
+                | Q(telefono_recibe__icontains=buscar)
+                | Q(usuario__email__icontains=buscar)
+                | Q(observaciones__icontains=buscar)
+            )
+
+        queryset = self.filtrar_rango_fechas(queryset)
+        orden = self.request.query_params.get("orden", "").strip()
+        ordenes = {
+            "fecha": ("fecha_creacion", "id"),
+            "-fecha": ("-fecha_creacion", "-id"),
+            "total": ("total", "id"),
+            "-total": ("-total", "id"),
+            "numero": ("numero",),
+            "-numero": ("-numero",),
+        }
+        return queryset.order_by(*ordenes.get(orden, ("-fecha_creacion", "-id")))
 
     @decorators.action(detail=True, methods=["get"], url_path="prefactura")
     def prefactura(self, request, pk=None):
@@ -488,7 +557,11 @@ class PedidoViewSet(EmpresaUsuarioMixin, viewsets.ReadOnlyModelViewSet):
         return response.Response(serializer.data)
 
 
-class DetallePedidoViewSet(viewsets.ReadOnlyModelViewSet):
+class DetallePedidoViewSet(
+    PaginacionAdministrativaOpcionalMixin,
+    FiltroRangoFechasMixin,
+    viewsets.ReadOnlyModelViewSet,
+):
     serializer_class = DetallePedidoSerializer
     permission_classes = [IsPedidoOwnerOrEmpresaManager]
 
@@ -501,17 +574,51 @@ class DetallePedidoViewSet(viewsets.ReadOnlyModelViewSet):
             "paquete",
         ).prefetch_related("componentes__producto")
 
-        if self.request.user.is_superuser:
-            return queryset
+        user = self.request.user
+        empresa_slug = self.request.query_params.get("empresa_slug", "").strip()
+        if user.is_superuser:
+            if empresa_slug:
+                queryset = queryset.filter(pedido__empresa__slug__iexact=empresa_slug)
+        else:
+            perfil = getattr(user, "perfil", None)
+            if not perfil or not perfil.activo:
+                return queryset.none()
+            if perfil.es_administrador_maestro:
+                queryset = queryset.filter(
+                    pedido__empresa__in=empresas_administrables(user)
+                )
+                if empresa_slug:
+                    obtener_empresa_administrable(self.request)
+                    queryset = queryset.filter(
+                        pedido__empresa__slug__iexact=empresa_slug
+                    )
+            elif perfil.rol in [
+                PerfilUsuario.Rol.ADMINISTRADOR_EMPRESA,
+                PerfilUsuario.Rol.GERENTE,
+            ] and perfil.empresa_id:
+                obtener_empresa_administrable(self.request)
+                queryset = queryset.filter(pedido__empresa=perfil.empresa)
+            elif perfil.empresa_id:
+                queryset = queryset.filter(
+                    pedido__empresa=perfil.empresa,
+                    pedido__usuario=user,
+                )
+            else:
+                return queryset.none()
 
-        perfil = getattr(self.request.user, "perfil", None)
-        if not perfil or not perfil.empresa_id:
-            return queryset.none()
-
-        if perfil.es_gerente:
-            return queryset.filter(pedido__empresa=perfil.empresa)
-
-        return queryset.filter(pedido__empresa=perfil.empresa, pedido__usuario=self.request.user)
+        pedido_numero = self.request.query_params.get("pedido", "").strip()
+        if pedido_numero:
+            queryset = queryset.filter(pedido__numero__icontains=pedido_numero)
+        buscar = self.request.query_params.get("buscar", "").strip()
+        if buscar:
+            queryset = queryset.filter(
+                Q(nombre_articulo__icontains=buscar)
+                | Q(codigo_articulo__icontains=buscar)
+                | Q(codigo_interno__icontains=buscar)
+                | Q(codigo_barra__icontains=buscar)
+            )
+        queryset = self.filtrar_rango_fechas(queryset, campo="pedido__fecha_creacion")
+        return queryset.order_by("-pedido__fecha_creacion", "id")
 
 
 class TarifaEntregaViewSet(viewsets.ModelViewSet):

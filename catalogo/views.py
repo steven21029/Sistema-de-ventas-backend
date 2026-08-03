@@ -5,9 +5,13 @@ from django.utils.text import slugify
 from rest_framework import generics, viewsets
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.permissions import AllowAny
-from rest_framework.permissions import SAFE_METHODS
+from rest_framework.permissions import SAFE_METHODS, IsAuthenticated
 
 from empresas.models import Empresa
+from empresas.contexto import empresas_administrables, obtener_empresa_administrable
+from config.api import EliminacionProtegidaMixin
+from config.pagination import PaginacionAdministrativa
+from usuarios.models import PerfilUsuario
 from .models import Categoria, Familia, PaqueteCatalogo, Producto
 from .permissions import IsCatalogoManagerOrReadOnly
 from .serializers import (
@@ -15,6 +19,7 @@ from .serializers import (
     ComboDestacadoPublicoSerializer,
     FamiliaSerializer,
     PerfilPublicoSerializer,
+    PaqueteCatalogoAdminSerializer,
     ProductoPaginaPublicaSerializer,
     ProductoSerializer,
     ServicioDetallePublicoSerializer,
@@ -23,16 +28,65 @@ from .serializers import (
 
 
 class EmpresaQuerysetMixin:
+    pagination_class = PaginacionAdministrativa
+
+    def es_usuario_administrativo(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return False
+        if user.is_superuser:
+            return True
+        perfil = getattr(user, "perfil", None)
+        return bool(
+            perfil
+            and perfil.activo
+            and perfil.rol
+            in [
+                PerfilUsuario.Rol.ADMINISTRADOR_MAESTRO,
+                PerfilUsuario.Rol.ADMINISTRADOR_EMPRESA,
+                PerfilUsuario.Rol.GERENTE,
+            ]
+        )
+
+    def incluir_inactivos(self):
+        return self.request.query_params.get(
+            "incluir_inactivos",
+            "",
+        ).strip().lower() in ["true", "1", "si", "yes"]
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        if (
+            self.request.method not in SAFE_METHODS
+            and self.es_usuario_administrativo()
+            and not self.request.user.is_superuser
+        ):
+            context["empresa"] = obtener_empresa_administrable(self.request)
+        return context
+
     def filtrar_por_empresa(self, queryset):
         user = self.request.user
         empresa_slug = self.request.query_params.get("empresa_slug", "").strip()
 
-        if self.request.method in SAFE_METHODS and empresa_slug:
+        if self.request.method in SAFE_METHODS and empresa_slug and not self.es_usuario_administrativo():
             queryset = queryset.filter(empresa__slug__iexact=empresa_slug, empresa__activa=True)
             queryset = self.filtrar_catalogo_publico(queryset)
             return self.aplicar_filtros_catalogo(queryset)
 
-        if user.is_authenticated and user.is_superuser:
+        if self.es_usuario_administrativo():
+            if user.is_superuser:
+                if empresa_slug:
+                    queryset = queryset.filter(empresa__slug__iexact=empresa_slug)
+            else:
+                queryset = queryset.filter(
+                    empresa__in=empresas_administrables(user),
+                )
+                if empresa_slug:
+                    empresa = obtener_empresa_administrable(self.request)
+                    queryset = queryset.filter(empresa=empresa)
+
+            if not self.incluir_inactivos():
+                queryset = self.filtrar_catalogo_publico(queryset)
             return self.aplicar_filtros_catalogo(queryset)
 
         perfil = getattr(user, "perfil", None) if user.is_authenticated else None
@@ -164,10 +218,22 @@ class EmpresaQuerysetMixin:
             serializer.save()
             return
 
-        serializer.save(empresa=user.perfil.empresa)
+        serializer.save(empresa=obtener_empresa_administrable(self.request))
+
+    def actualizar_empresa_si_corresponde(self, serializer):
+        user = self.request.user
+        if user.is_superuser:
+            serializer.save()
+            return
+        serializer.save(empresa=obtener_empresa_administrable(self.request))
+
+    def paginate_queryset(self, queryset):
+        if not self.es_usuario_administrativo():
+            return None
+        return super().paginate_queryset(queryset)
 
 
-class FamiliaViewSet(EmpresaQuerysetMixin, viewsets.ModelViewSet):
+class FamiliaViewSet(EliminacionProtegidaMixin, EmpresaQuerysetMixin, viewsets.ModelViewSet):
     serializer_class = FamiliaSerializer
     permission_classes = [IsCatalogoManagerOrReadOnly]
 
@@ -178,8 +244,11 @@ class FamiliaViewSet(EmpresaQuerysetMixin, viewsets.ModelViewSet):
     def perform_create(self, serializer):
         self.asignar_empresa_si_corresponde(serializer)
 
+    def perform_update(self, serializer):
+        self.actualizar_empresa_si_corresponde(serializer)
 
-class CategoriaViewSet(EmpresaQuerysetMixin, viewsets.ModelViewSet):
+
+class CategoriaViewSet(EliminacionProtegidaMixin, EmpresaQuerysetMixin, viewsets.ModelViewSet):
     serializer_class = CategoriaSerializer
     permission_classes = [IsCatalogoManagerOrReadOnly]
 
@@ -190,8 +259,11 @@ class CategoriaViewSet(EmpresaQuerysetMixin, viewsets.ModelViewSet):
     def perform_create(self, serializer):
         self.asignar_empresa_si_corresponde(serializer)
 
+    def perform_update(self, serializer):
+        self.actualizar_empresa_si_corresponde(serializer)
 
-class ProductoViewSet(EmpresaQuerysetMixin, viewsets.ModelViewSet):
+
+class ProductoViewSet(EliminacionProtegidaMixin, EmpresaQuerysetMixin, viewsets.ModelViewSet):
     serializer_class = ProductoSerializer
     permission_classes = [IsCatalogoManagerOrReadOnly]
 
@@ -201,6 +273,58 @@ class ProductoViewSet(EmpresaQuerysetMixin, viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         self.asignar_empresa_si_corresponde(serializer)
+
+    def perform_update(self, serializer):
+        self.actualizar_empresa_si_corresponde(serializer)
+
+
+class PaqueteCatalogoViewSet(EliminacionProtegidaMixin, viewsets.ModelViewSet):
+    serializer_class = PaqueteCatalogoAdminSerializer
+    permission_classes = [IsAuthenticated, IsCatalogoManagerOrReadOnly]
+    pagination_class = PaginacionAdministrativa
+
+    def get_empresa(self):
+        if not hasattr(self, "_empresa_administrada"):
+            self._empresa_administrada = obtener_empresa_administrable(self.request)
+        return self._empresa_administrada
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["empresa"] = self.get_empresa()
+        return context
+
+    def get_queryset(self):
+        queryset = PaqueteCatalogo.objects.filter(
+            empresa=self.get_empresa(),
+        ).prefetch_related("items_productos__producto")
+        incluir_inactivos = self.request.query_params.get(
+            "incluir_inactivos",
+            "",
+        ).strip().lower() in ["true", "1", "si", "yes"]
+        if not incluir_inactivos:
+            queryset = queryset.filter(activo=True)
+
+        tipo = self.request.query_params.get("tipo", "").strip()
+        if tipo:
+            queryset = queryset.filter(tipo=tipo)
+        buscar = self.request.query_params.get("buscar", "").strip()
+        if buscar:
+            queryset = queryset.filter(
+                Q(codigo__icontains=buscar)
+                | Q(nombre__icontains=buscar)
+                | Q(descripcion__icontains=buscar)
+                | Q(productos__nombre__icontains=buscar)
+            ).distinct()
+        orden = self.request.query_params.get("orden", "").strip()
+        ordenes = {
+            "orden": ("orden", "nombre"),
+            "-orden": ("-orden", "nombre"),
+            "nombre": ("nombre",),
+            "-nombre": ("-nombre",),
+            "precio": ("precio_paquete", "nombre"),
+            "-precio": ("-precio_paquete", "nombre"),
+        }
+        return queryset.order_by(*ordenes.get(orden, ("orden", "nombre")))
 
 
 class CatalogoPublicoEmpresaMixin:

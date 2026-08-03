@@ -135,7 +135,10 @@ class ItemCarritoSerializer(serializers.ModelSerializer):
                             )
                         }
                     )
-                if articulo.controla_inventario and cantidad > articulo.existencia:
+                if (
+                    articulo.controla_inventario
+                    and cantidad * componente.cantidad > articulo.existencia
+                ):
                     raise serializers.ValidationError(
                         {
                             "cantidad": (
@@ -556,7 +559,10 @@ class CalcularCarritoEntradaSerializer(serializers.Serializer):
                 componentes = [(linea["producto"], linea["cantidad"])]
             else:
                 componentes = [
-                    (componente.producto, linea["cantidad"])
+                    (
+                        componente.producto,
+                        linea["cantidad"] * componente.cantidad,
+                    )
                     for componente in linea["paquete"].items_productos.all()
                 ]
 

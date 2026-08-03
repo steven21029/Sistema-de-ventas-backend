@@ -3,6 +3,8 @@ from rest_framework import mixins, status, viewsets
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
+from config.api import FiltroRangoFechasMixin, PaginacionAdministrativaOpcionalMixin
+from empresas.contexto import empresas_administrables, obtener_empresa_administrable
 from usuarios.models import PerfilUsuario
 from .models import MensajeContacto
 from .permissions import IsMensajeContactoAdmin
@@ -10,6 +12,8 @@ from .serializers import MensajeContactoAdminSerializer, MensajeContactoCreateSe
 
 
 class MensajeContactoViewSet(
+    PaginacionAdministrativaOpcionalMixin,
+    FiltroRangoFechasMixin,
     mixins.CreateModelMixin,
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
@@ -44,11 +48,15 @@ class MensajeContactoViewSet(
                 return queryset.none()
 
             if perfil.es_administrador_maestro:
-                queryset = self._filtrar_empresa(queryset, empresa_slug)
+                queryset = queryset.filter(empresa__in=empresas_administrables(user))
+                if empresa_slug:
+                    obtener_empresa_administrable(self.request)
+                    queryset = self._filtrar_empresa(queryset, empresa_slug)
             elif perfil.rol in [
                 PerfilUsuario.Rol.ADMINISTRADOR_EMPRESA,
                 PerfilUsuario.Rol.GERENTE,
             ] and perfil.empresa_id:
+                obtener_empresa_administrable(self.request)
                 queryset = queryset.filter(empresa=perfil.empresa)
             else:
                 return queryset.none()
@@ -62,7 +70,21 @@ class MensajeContactoViewSet(
                 | Q(mensaje__icontains=buscar)
             )
 
-        return queryset
+        estado = self.request.query_params.get("estado", "").strip()
+        if estado:
+            queryset = queryset.filter(estado=estado)
+
+        queryset = self.filtrar_rango_fechas(queryset)
+        orden = self.request.query_params.get("orden", "").strip()
+        ordenes = {
+            "fecha": ("fecha_creacion", "id"),
+            "-fecha": ("-fecha_creacion", "-id"),
+            "nombre": ("nombre", "id"),
+            "-nombre": ("-nombre", "id"),
+            "estado": ("estado", "-fecha_creacion"),
+            "-estado": ("-estado", "-fecha_creacion"),
+        }
+        return queryset.order_by(*ordenes.get(orden, ("-fecha_creacion", "-id")))
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)

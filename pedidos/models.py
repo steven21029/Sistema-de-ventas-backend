@@ -179,7 +179,7 @@ class ItemCarrito(models.Model):
                 producto = componente.producto
                 if (
                     producto.controla_inventario
-                    and self.cantidad > producto.existencia
+                    and self.cantidad * componente.cantidad > producto.existencia
                 ):
                     raise ValidationError(
                         {
@@ -652,7 +652,9 @@ class Pedido(models.Model):
                                     )
                                 }
                             )
-                        componentes.append((producto, item.cantidad))
+                        componentes.append(
+                            (producto, item.cantidad * componente.cantidad)
+                        )
 
                 for producto, cantidad in componentes:
                     if not producto.controla_inventario:
@@ -718,6 +720,7 @@ class Pedido(models.Model):
                         DetallePedidoComponente.objects.create(
                             detalle=detalle,
                             producto=componente.producto,
+                            cantidad_por_unidad=componente.cantidad,
                         )
 
             carrito.activo = False

@@ -5,13 +5,23 @@ from .models import Pago
 
 class PagoSerializer(serializers.ModelSerializer):
     pedido_numero = serializers.CharField(source="pedido.numero", read_only=True)
+    empresa_nombre = serializers.CharField(source="empresa.nombre", read_only=True)
+    empresa_slug = serializers.CharField(source="empresa.slug", read_only=True)
+    usuario_email = serializers.EmailField(source="usuario.email", read_only=True)
     estado_nombre = serializers.CharField(source="get_estado_display", read_only=True)
 
     class Meta:
         model = Pago
         fields = [
+            "id",
             "referencia",
+            "pedido",
             "pedido_numero",
+            "empresa",
+            "empresa_nombre",
+            "empresa_slug",
+            "usuario",
+            "usuario_email",
             "proveedor",
             "identificador_externo",
             "monto",

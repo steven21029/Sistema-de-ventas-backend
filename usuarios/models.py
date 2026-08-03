@@ -35,6 +35,15 @@ class PerfilUsuario(models.Model):
         blank=True,
         related_name="perfiles_usuario",
     )
+    empresas_permitidas = models.ManyToManyField(
+        Empresa,
+        blank=True,
+        related_name="administradores_maestros_permitidos",
+        help_text=(
+            "Empresas que puede administrar un administrador maestro. "
+            "Los superusuarios no requieren esta asignacion."
+        ),
+    )
     rol = models.CharField(
         max_length=30,
         choices=Rol.choices,

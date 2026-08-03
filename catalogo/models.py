@@ -477,8 +477,12 @@ class PaqueteCatalogo(models.Model):
 
     @property
     def agotado(self):
-        productos = self.productos.all()
-        return productos.exists() and any(producto.agotado for producto in productos)
+        items = self.items_productos.select_related("producto").all()
+        return items.exists() and any(
+            item.producto.controla_inventario
+            and item.producto.existencia < item.cantidad
+            for item in items
+        )
 
     def clean(self):
         super().clean()
@@ -511,6 +515,10 @@ class PaqueteProducto(models.Model):
         Producto,
         on_delete=models.PROTECT,
         related_name="items_paquetes",
+    )
+    cantidad = models.PositiveIntegerField(
+        default=1,
+        validators=[MinValueValidator(1)],
     )
     orden = models.PositiveIntegerField(default=0)
 
