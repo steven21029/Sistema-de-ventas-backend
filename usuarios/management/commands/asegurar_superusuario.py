@@ -1,10 +1,9 @@
-import os
-
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from decouple import config
 
 from usuarios.models import PerfilUsuario
 
@@ -20,7 +19,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         valores = {
-            nombre: os.environ.get(nombre, "").strip()
+            nombre: config(nombre, default="").strip()
             for nombre in self.VARIABLES
         }
         faltantes = [nombre for nombre, valor in valores.items() if not valor]

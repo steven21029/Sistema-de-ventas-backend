@@ -1193,3 +1193,37 @@ Verificacion:
 - `python manage.py test usuarios.tests_comandos`: 4 pruebas aprobadas.
 - `python manage.py test`: 155 pruebas aprobadas.
 - Se agrego `docs/DESPLIEGUE_RENDER.md` con la configuracion completa.
+
+## 2026-08-04 - Configuracion centralizada en entorno
+
+Objetivo:
+
+- Evitar valores ambientales duplicados dentro de `config/settings.py`.
+- Usar los mismos nombres desde `.env` en desarrollo y desde Environment en
+  Render.
+
+Cambios:
+
+- `SECRET_KEY`, `DJANGO_DEBUG`, hosts, CORS, base de datos, JWT, correo y pagos
+  ahora se leen mediante `python-decouple` sin valores concretos de respaldo en
+  `settings.py`.
+- Se agrego `CORS_ALLOW_CREDENTIALS` a la configuracion externa.
+- `DATABASE_URL` ahora se lee con `python-decouple` y se procesa con
+  `dj-database-url`, por lo que funciona tanto desde `.env` como desde Render.
+- El `.env` local se completo con todos los nombres requeridos y conserva
+  SQLite, correo por consola y pagos simulados para desarrollo.
+- `.env.example` contiene el mismo contrato sin credenciales reales.
+- `asegurar_superusuario` usa `python-decouple`, permitiendo leer un `.env`
+  local o variables del proceso en Render.
+- `STATICFILES_DIRS` incluye `static/` solamente cuando la carpeta existe, por
+  lo que Render deja de reportar `staticfiles.W004`.
+- `docs/DESPLIEGUE_RENDER.md` incluye el bloque completo requerido por Render.
+
+Verificacion inicial:
+
+- `python manage.py check`: sin problemas ni advertencias de staticfiles.
+- Django cargo SQLite, CORS, JWT, correo de consola y pagos simulados desde el
+  `.env` local.
+- `python manage.py test usuarios.tests_comandos`: 4 pruebas aprobadas.
+- `python manage.py test`: 155 pruebas aprobadas.
+- `python manage.py makemigrations --check --dry-run`: sin cambios pendientes.

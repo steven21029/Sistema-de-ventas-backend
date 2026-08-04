@@ -20,8 +20,8 @@ from decouple import config
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-def config_list(name, default=""):
-    value = config(name, default=default)
+def config_list(name):
+    value = config(name)
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
@@ -29,19 +29,16 @@ def config_list(name, default=""):
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config(
-    "SECRET_KEY",
-    default="django-insecure-local-dev-key-change-before-production",
-)
+SECRET_KEY = config("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config("DJANGO_DEBUG", default=True, cast=bool)
+DEBUG = config("DJANGO_DEBUG", cast=bool)
 
-ALLOWED_HOSTS = config_list("ALLOWED_HOSTS", "localhost,127.0.0.1,.localhost,.test")
+ALLOWED_HOSTS = config_list("ALLOWED_HOSTS")
 CSRF_TRUSTED_ORIGINS = config_list("CSRF_TRUSTED_ORIGINS")
 CORS_ALLOWED_ORIGINS = config_list("CORS_ALLOWED_ORIGINS")
 CORS_ALLOWED_ORIGIN_REGEXES = config_list("CORS_ALLOWED_ORIGIN_REGEXES")
-CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_CREDENTIALS = config("CORS_ALLOW_CREDENTIALS", cast=bool)
 
 
 # Application definition
@@ -104,11 +101,11 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DEFAULT_DATABASE_URL = f"sqlite:///{BASE_DIR / 'db.sqlite3'}"
+DATABASE_URL = config("DATABASE_URL")
 
 DATABASES = {
-    'default': dj_database_url.config(
-        default=DEFAULT_DATABASE_URL,
+    'default': dj_database_url.parse(
+        DATABASE_URL,
         conn_max_age=600,
     )
 }
@@ -150,7 +147,8 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_DIRS = [BASE_DIR / 'static']
+STATIC_DIR = BASE_DIR / 'static'
+STATICFILES_DIRS = [STATIC_DIR] if STATIC_DIR.is_dir() else []
 
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
@@ -181,10 +179,10 @@ REST_FRAMEWORK = {
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(
-        minutes=config('JWT_ACCESS_TOKEN_MINUTES', default=15, cast=int)
+        minutes=config('JWT_ACCESS_TOKEN_MINUTES', cast=int)
     ),
     'REFRESH_TOKEN_LIFETIME': timedelta(
-        hours=config('JWT_SESSION_MAX_HOURS', default=5, cast=int)
+        hours=config('JWT_SESSION_MAX_HOURS', cast=int)
     ),
     'ROTATE_REFRESH_TOKENS': False,
     'AUTH_HEADER_TYPES': ('Bearer',),
@@ -195,40 +193,33 @@ JWT_SESSION_MAX_SECONDS = int(
 )
 JWT_REFRESH_COOKIE_NAME = config(
     'JWT_REFRESH_COOKIE_NAME',
-    default='ventas_refresh',
 )
 JWT_REFRESH_COOKIE_SECURE = config(
     'JWT_REFRESH_COOKIE_SECURE',
-    default=not DEBUG,
     cast=bool,
 )
 JWT_REFRESH_COOKIE_SAMESITE = config(
     'JWT_REFRESH_COOKIE_SAMESITE',
-    default='Strict',
 )
 JWT_REFRESH_COOKIE_PATH = '/api/usuarios/token/'
 
 EMAIL_BACKEND = config(
     'EMAIL_BACKEND',
-    default='django.core.mail.backends.console.EmailBackend',
 )
-EMAIL_HOST = config('EMAIL_HOST', default='smtp-relay.brevo.com')
-EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
-EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
-EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
-EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+EMAIL_HOST = config('EMAIL_HOST')
+EMAIL_PORT = config('EMAIL_PORT', cast=int)
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', cast=bool)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = config(
     'DEFAULT_FROM_EMAIL',
-    default='Sistema de Ventas <no-reply@example.com>',
 )
 
 PAGOS_PROVEEDOR_DEFAULT = config(
     'PAGOS_PROVEEDOR_DEFAULT',
-    default='simulado',
 )
 PAGOS_WEBHOOK_SECRET = config(
     'PAGOS_WEBHOOK_SECRET',
-    default='',
 )
 
 # Default primary key field type
