@@ -21,6 +21,15 @@ from django.urls import include, path
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('api/v1/', include('empresas.urls')),
+    path('api/v1/', include('usuarios.urls')),
+    path('api/v1/', include('catalogo.urls')),
+    path('api/v1/', include('inventario.urls')),
+    path('api/v1/', include('pedidos.urls')),
+    path('api/v1/', include('pagos.urls')),
+    path('api/v1/', include('favoritos.urls')),
+    path('api/v1/', include('promociones.urls')),
+    path('api/v1/', include('contacto.urls')),
     path('api/', include('empresas.urls')),
     path('api/', include('usuarios.urls')),
     path('api/', include('catalogo.urls')),
@@ -32,5 +41,5 @@ urlpatterns = [
     path('api/', include('contacto.urls')),
 ]
 
-if settings.DEBUG:
+if settings.DEBUG and not settings.R2_STORAGE_ENABLED:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

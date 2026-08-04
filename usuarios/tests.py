@@ -40,6 +40,7 @@ class AutenticacionJWTTests(TestCase):
 
         cookie = respuesta.cookies[settings.JWT_REFRESH_COOKIE_NAME]
         self.assertTrue(cookie["httponly"])
+        self.assertEqual(cookie["path"], "/api/")
         self.assertEqual(
             cookie["samesite"],
             settings.JWT_REFRESH_COOKIE_SAMESITE,
@@ -69,6 +70,21 @@ class AutenticacionJWTTests(TestCase):
         self.assertEqual(respuesta.status_code, 200)
         self.assertIn("access", respuesta.data)
         self.assertNotIn("refresh", respuesta.data)
+
+    def test_refresh_acepta_ruta_versionada(self):
+        login = self.iniciar_sesion()
+        self.client.cookies[settings.JWT_REFRESH_COOKIE_NAME] = (
+            login.cookies[settings.JWT_REFRESH_COOKIE_NAME].value
+        )
+
+        respuesta = self.client.post(
+            "/api/v1/usuarios/token/refresh/",
+            {},
+            format="json",
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertIn("access", respuesta.data)
 
     def test_access_renovado_no_supera_fin_de_sesion(self):
         refresh = RefreshToken.for_user(self.usuario)

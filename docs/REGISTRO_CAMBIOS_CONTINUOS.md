@@ -1220,8 +1220,9 @@ Cambios:
 - Se agrego `CORS_ALLOW_CREDENTIALS` a la configuracion externa.
 - `DATABASE_URL` ahora se lee con `python-decouple` y se procesa con
   `dj-database-url`, por lo que funciona tanto desde `.env` como desde Render.
-- El `.env` local se completo con todos los nombres requeridos y conserva
-  SQLite, correo por consola y pagos simulados para desarrollo.
+- El `.env` local se completo con todos los nombres requeridos. La base se
+  configuro inicialmente con SQLite y despues se cambio a Supabase PostgreSQL;
+  el correo por consola y los pagos simulados se conservan para desarrollo.
 - `.env.example` contiene el mismo contrato sin credenciales reales.
 - `asegurar_superusuario` usa `python-decouple`, permitiendo leer un `.env`
   local o variables del proceso en Render.
@@ -1232,8 +1233,103 @@ Cambios:
 Verificacion inicial:
 
 - `python manage.py check`: sin problemas ni advertencias de staticfiles.
-- Django cargo SQLite, CORS, JWT, correo de consola y pagos simulados desde el
-  `.env` local.
+- La configuracion se valido inicialmente con SQLite, CORS, JWT, correo de
+  consola y pagos simulados desde el `.env` local.
 - `python manage.py test usuarios.tests_comandos`: 4 pruebas aprobadas.
 - `python manage.py test`: 155 pruebas aprobadas.
 - `python manage.py makemigrations --check --dry-run`: sin cambios pendientes.
+
+## 2026-08-04 - Base local conectada a Supabase PostgreSQL
+
+Conexion:
+
+- El desarrollo local ahora usa Supabase PostgreSQL mediante `DATABASE_URL`.
+- Se utiliza el Session pooler por IPv4, puerto `5432` y conexion SSL.
+- La contrasena se codifico para URL sin mostrarla ni guardarla en Git.
+- La cadena completa existe solamente en `.env`, que continua ignorado por
+  `.gitignore`.
+- `db.sqlite3` se conserva intacta como origen para trasladar posteriormente
+  los datos locales de Analiza.
+
+Creacion del esquema:
+
+- Se ejecuto `python manage.py migrate --noinput` contra Supabase.
+- Se aplicaron todas las migraciones de Django y de las aplicaciones del
+  proyecto.
+- Supabase contiene 41 tablas publicas creadas por Django.
+- Todavia no se importaron empresas, catalogo, usuarios ni otros datos desde
+  SQLite.
+
+Verificacion:
+
+- La autenticacion y una consulta de solo lectura a PostgreSQL respondieron
+  correctamente.
+- `python manage.py migrate --check`: sin migraciones pendientes.
+- `python manage.py check`: sin problemas detectados.
+
+## 2026-08-04 - Compatibilidad de rutas API versionadas
+
+Motivo:
+
+- El frontend desplegado consulta rutas bajo `/api/v1/`, mientras el backend
+  exponia solamente el prefijo `/api/`.
+
+Cambios:
+
+- Todos los modulos del backend aceptan ahora ambos prefijos: `/api/` y
+  `/api/v1/`.
+- Las rutas existentes se conservaron para no romper integraciones previas.
+- `reverse()` continua generando las rutas originales bajo `/api/`.
+- Se agregaron pruebas para la empresa actual y la renovacion del token JWT
+  mediante el prefijo versionado.
+
+Verificacion:
+
+- `python manage.py test config`: 3 pruebas aprobadas.
+- `python manage.py test`: 158 pruebas aprobadas usando SQLite de pruebas, sin
+  alterar Supabase.
+
+## 2026-08-04 - Preparacion de Cloudflare R2 para imagenes
+
+Dependencias:
+
+- Se agregaron `django-storages`, `boto3` y sus dependencias fijadas.
+- R2 se integra mediante su API compatible con S3.
+
+Configuracion:
+
+- `R2_STORAGE_ENABLED` permite alternar entre `media/` local y R2.
+- Las credenciales, bucket, endpoint, URL publica y region se leen desde el
+  entorno y no se guardan en Git.
+- Los `ImageField` usan R2 cuando esta habilitado, bajo el prefijo `media/`.
+- Los archivos repetidos no sobrescriben los existentes.
+- Las URLs publicas no llevan firma temporal y WhiteNoise conserva la gestion
+  de archivos estaticos.
+- Se creo `docs/CONFIGURACION_CLOUDFLARE_R2.md` con el procedimiento local y
+  de Render.
+
+Compatibilidad JWT:
+
+- La cookie de renovacion ahora usa la ruta `/api/`, permitiendo enviarla tanto
+  a `/api/usuarios/token/` como a `/api/v1/usuarios/token/`.
+- Se agrego una prueba de renovacion por la ruta versionada.
+
+Migracion acordada:
+
+- Solo se trasladara Analiza desde SQLite a Supabase y R2.
+- La empresa `prueba` y todos sus registros quedan excluidos.
+
+Verificacion inicial:
+
+- `pip check`: dependencias consistentes.
+- `python manage.py check`: correcto con R2 deshabilitado.
+- `python manage.py check`: correcto con R2 habilitado y configuracion ficticia.
+- Ocho pruebas de configuracion de rutas y autenticacion JWT aprobadas.
+- `python manage.py test`: 159 pruebas aprobadas usando SQLite de pruebas.
+- `python manage.py makemigrations --check --dry-run`: sin cambios de modelos.
+- Se completo una prueba real con las credenciales locales de R2: Django subio
+  un objeto temporal, confirmo su existencia y genero su URL publica.
+- La URL publica respondio HTTP `200` y devolvio exactamente el contenido
+  almacenado.
+- El objeto temporal se elimino al finalizar y R2 confirmo que ya no existia.
+- Las credenciales permanecen solamente en `.env`, fuera de Git.

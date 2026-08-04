@@ -12,9 +12,11 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from datetime import timedelta
 from pathlib import Path
+from urllib.parse import urlparse
 
 import dj_database_url
 from decouple import config
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -155,6 +157,7 @@ STATICFILES_DIRS = [STATIC_DIR] if STATIC_DIR.is_dir() else []
 
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+R2_STORAGE_ENABLED = config('R2_STORAGE_ENABLED', default=False, cast=bool)
 
 STORAGES = {
     'default': {
@@ -164,6 +167,43 @@ STORAGES = {
         'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
     },
 }
+
+if R2_STORAGE_ENABLED:
+    r2_endpoint_url = config('R2_ENDPOINT_URL').rstrip('/')
+    r2_public_base_url = config('R2_PUBLIC_BASE_URL').rstrip('/')
+    r2_endpoint = urlparse(r2_endpoint_url)
+    r2_public_base = urlparse(r2_public_base_url)
+
+    if r2_endpoint.scheme != 'https' or not r2_endpoint.netloc:
+        raise ImproperlyConfigured(
+            'R2_ENDPOINT_URL debe ser una URL HTTPS completa.'
+        )
+    if (
+        r2_public_base.scheme != 'https'
+        or not r2_public_base.netloc
+        or r2_public_base.path not in ('', '/')
+    ):
+        raise ImproperlyConfigured(
+            'R2_PUBLIC_BASE_URL debe contener solo el dominio publico HTTPS.'
+        )
+
+    MEDIA_URL = f'{r2_public_base_url}/media/'
+    STORAGES['default'] = {
+        'BACKEND': 'storages.backends.s3.S3Storage',
+        'OPTIONS': {
+            'access_key': config('R2_ACCESS_KEY_ID'),
+            'secret_key': config('R2_SECRET_ACCESS_KEY'),
+            'bucket_name': config('R2_BUCKET_NAME'),
+            'endpoint_url': r2_endpoint_url,
+            'region_name': config('R2_REGION_NAME', default='auto'),
+            'custom_domain': r2_public_base.netloc,
+            'url_protocol': 'https:',
+            'location': 'media',
+            'default_acl': None,
+            'querystring_auth': False,
+            'file_overwrite': False,
+        },
+    }
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -204,7 +244,7 @@ JWT_REFRESH_COOKIE_SECURE = config(
 JWT_REFRESH_COOKIE_SAMESITE = config(
     'JWT_REFRESH_COOKIE_SAMESITE',
 )
-JWT_REFRESH_COOKIE_PATH = '/api/usuarios/token/'
+JWT_REFRESH_COOKIE_PATH = '/api/'
 
 EMAIL_BACKEND = config(
     'EMAIL_BACKEND',
