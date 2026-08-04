@@ -54,6 +54,16 @@ Verificacion:
 - `python manage.py test`: 32 pruebas completas aprobadas.
 - `python manage.py makemigrations --check --dry-run`: sin cambios pendientes.
 
+### Ajuste de variables opcionales en Render
+
+- Render puede omitir variables cuyo valor esta vacio.
+- `CORS_ALLOWED_ORIGIN_REGEXES` ahora produce una lista vacia cuando no existe;
+  no contiene URLs predeterminadas en `settings.py`.
+- `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` y `PAGOS_WEBHOOK_SECRET` tambien son
+  opcionales mientras Brevo y la pasarela real no esten activos.
+- Las variables de seguridad, dominios exactos, base de datos, JWT y
+  superusuario siguen siendo obligatorias.
+
 - Aviso no bloqueante: la carpeta generada `staticfiles` aun no existe.
 
 ## 2026-07-29 - Empresas con productos fisicos y servicios

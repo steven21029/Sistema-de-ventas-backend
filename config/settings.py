@@ -20,8 +20,8 @@ from decouple import config
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-def config_list(name):
-    value = config(name)
+def config_list(name, default=None):
+    value = config(name) if default is None else config(name, default=default)
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
@@ -37,7 +37,10 @@ DEBUG = config("DJANGO_DEBUG", cast=bool)
 ALLOWED_HOSTS = config_list("ALLOWED_HOSTS")
 CSRF_TRUSTED_ORIGINS = config_list("CSRF_TRUSTED_ORIGINS")
 CORS_ALLOWED_ORIGINS = config_list("CORS_ALLOWED_ORIGINS")
-CORS_ALLOWED_ORIGIN_REGEXES = config_list("CORS_ALLOWED_ORIGIN_REGEXES")
+CORS_ALLOWED_ORIGIN_REGEXES = config_list(
+    "CORS_ALLOWED_ORIGIN_REGEXES",
+    default="",
+)
 CORS_ALLOW_CREDENTIALS = config("CORS_ALLOW_CREDENTIALS", cast=bool)
 
 
@@ -209,8 +212,8 @@ EMAIL_BACKEND = config(
 EMAIL_HOST = config('EMAIL_HOST')
 EMAIL_PORT = config('EMAIL_PORT', cast=int)
 EMAIL_USE_TLS = config('EMAIL_USE_TLS', cast=bool)
-EMAIL_HOST_USER = config('EMAIL_HOST_USER')
-EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config(
     'DEFAULT_FROM_EMAIL',
 )
@@ -220,6 +223,7 @@ PAGOS_PROVEEDOR_DEFAULT = config(
 )
 PAGOS_WEBHOOK_SECRET = config(
     'PAGOS_WEBHOOK_SECRET',
+    default='',
 )
 
 # Default primary key field type
