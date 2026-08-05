@@ -115,6 +115,13 @@ DATABASES = {
     )
 }
 
+LEGACY_DATABASE_URL = config('LEGACY_DATABASE_URL', default='')
+if LEGACY_DATABASE_URL:
+    DATABASES['legacy'] = dj_database_url.parse(
+        LEGACY_DATABASE_URL,
+        conn_max_age=0,
+    )
+
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators

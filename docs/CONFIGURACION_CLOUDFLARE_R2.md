@@ -44,8 +44,26 @@ seguro donde se guardo al crear el token.
 
 ## Migracion inicial
 
-- Solo se trasladara la empresa Analiza y sus archivos relacionados.
-- La empresa `prueba` y todos sus registros quedan excluidos.
-- Primero se validara una subida y eliminacion temporal.
-- Despues se copiaran los archivos locales de Analiza conservando sus rutas.
-- Finalmente se importaran los registros de Analiza desde SQLite a Supabase.
+- Se traslado solamente la empresa Analiza y sus archivos relacionados.
+- La empresa `prueba`, los usuarios y los movimientos de prueba quedaron
+  excluidos.
+- Se copiaron 15 imagenes locales conservando sus rutas relativas.
+- Supabase recibio la configuracion de la empresa, menu, Sobre nosotros,
+  sucursales, catalogo, paquete y banners de Analiza.
+- La base `db.sqlite3` se conserva intacta como respaldo del origen.
+
+El importador puede ejecutarse nuevamente sin duplicar registros ni archivos:
+
+```powershell
+python manage.py migrar_analiza_supabase
+```
+
+Para revisar el alcance sin escribir en Supabase ni R2:
+
+```powershell
+python manage.py migrar_analiza_supabase --dry-run
+```
+
+El comando requiere `LEGACY_DATABASE_URL=sqlite:///db.sqlite3`, una base
+PostgreSQL en `DATABASE_URL` y R2 habilitado. La empresa `prueba` se rechaza de
+forma explicita aunque se intente seleccionar mediante `--source-slug`.

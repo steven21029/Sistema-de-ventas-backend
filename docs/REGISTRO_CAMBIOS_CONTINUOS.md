@@ -1333,3 +1333,53 @@ Verificacion inicial:
   almacenado.
 - El objeto temporal se elimino al finalizar y R2 confirmo que ya no existia.
 - Las credenciales permanecen solamente en `.env`, fuera de Git.
+
+## 2026-08-04 - Migracion de Analiza a Supabase y Cloudflare R2
+
+Alcance trasladado:
+
+- 1 empresa: Analiza Laboratorios Clinicos.
+- 8 elementos del menu.
+- 1 contenido de Sobre nosotros.
+- 2 sucursales.
+- 2 familias y 15 categorias.
+- 331 productos o servicios.
+- 1 paquete o perfil con 2 componentes.
+- 4 banners promocionales.
+- 15 imagenes relacionadas con la empresa y el catalogo.
+
+Exclusiones:
+
+- La empresa `prueba` no se copio y el importador la rechaza expresamente.
+- No se trasladaron usuarios, carritos, pedidos, pagos, favoritos, mensajes de
+  contacto ni otros movimientos creados para pruebas.
+- `db.sqlite3` permanece intacta como respaldo local del origen.
+
+Implementacion:
+
+- Se agrego la conexion opcional `LEGACY_DATABASE_URL` para consultar SQLite
+  como origen sin dejar de usar Supabase como base principal.
+- Se creo `python manage.py migrar_analiza_supabase`, con modo `--dry-run`.
+- El comando conserva las relaciones y rutas de imagen, reutiliza objetos
+  identicos de R2 y usa claves naturales para poder repetirse sin duplicados.
+- Las escrituras en Supabase se realizan dentro de una transaccion y las
+  subidas nuevas se eliminan si la importacion de datos falla.
+- La carga de los 331 productos usa una operacion masiva de PostgreSQL.
+- Se corrigio la conservacion exacta de ordenes con valor `0` frente a los
+  ordenes automaticos de los modelos de Django.
+
+Verificacion final:
+
+- Los campos y relaciones del origen y destino coinciden para empresa, menu,
+  Sobre nosotros, sucursales, familias, categorias, productos, paquete,
+  componentes y banners.
+- Supabase contiene solamente Analiza dentro de este traslado; `prueba` no
+  existe en el destino.
+- Las 15 URLs publicas de R2 respondieron HTTP `200` y sus hashes SHA-256
+  coincidieron con los archivos locales.
+- Las rutas versionadas de empresa actual, servicios, banners y Sobre nosotros
+  respondieron HTTP `200` usando los datos migrados.
+- `python manage.py check`: sin problemas.
+- `python manage.py makemigrations --check --dry-run`: sin cambios pendientes.
+- `python manage.py test`: 159 pruebas aprobadas contra SQLite temporal, sin
+  modificar Supabase ni R2.
