@@ -5,6 +5,19 @@ from rest_framework import serializers
 from .models import Categoria, Familia, PaqueteCatalogo, PaqueteProducto, Producto
 
 
+def obtener_items_paquete_prefetch(obj):
+    items = getattr(obj, "items_productos_prefetch", None)
+    if items is not None:
+        return items
+
+    return obj.items_productos.select_related(
+        "producto",
+        "producto__empresa",
+        "producto__familia",
+        "producto__categoria",
+    ).order_by("orden", "id")
+
+
 class ImagenFinalMixin:
     imagen_final = serializers.SerializerMethodField()
 
@@ -344,7 +357,7 @@ class PaqueteCatalogoAdminSerializer(ImagenFinalMixin, serializers.ModelSerializ
                 "cantidad": item.cantidad,
                 "orden": item.orden,
             }
-            for item in obj.items_productos.select_related("producto").all()
+            for item in obtener_items_paquete_prefetch(obj)
         ]
 
     def validate(self, attrs):
@@ -517,9 +530,6 @@ class ComboDestacadoPublicoSerializer(ImagenFinalMixin, serializers.ModelSeriali
         read_only_fields = fields
 
     def get_productos(self, obj):
-        items = obj.items_productos.select_related("producto").filter(
-            producto__activo=True
-        )
         return [
             {
                 "codigo": item.producto.codigo_venta,
@@ -528,7 +538,8 @@ class ComboDestacadoPublicoSerializer(ImagenFinalMixin, serializers.ModelSeriali
                 "nombre": item.producto.nombre,
                 "cantidad": item.cantidad,
             }
-            for item in items
+            for item in obtener_items_paquete_prefetch(obj)
+            if item.producto.activo
         ]
 
 
@@ -540,7 +551,7 @@ class PerfilPublicoSerializer(ImagenFinalMixin, serializers.ModelSerializer):
         read_only=True,
     )
     productos = serializers.SerializerMethodField()
-    agotado = serializers.BooleanField(read_only=True)
+    agotado = serializers.SerializerMethodField()
 
     class Meta:
         model = PaqueteCatalogo
@@ -559,16 +570,22 @@ class PerfilPublicoSerializer(ImagenFinalMixin, serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_productos(self, obj):
-        items = obj.items_productos.select_related("producto").filter(
-            producto__activo=True
-        )
         return [
             {
                 **ProductoPaquetePublicoSerializer(item.producto).data,
                 "cantidad": item.cantidad,
             }
-            for item in items
+            for item in obtener_items_paquete_prefetch(obj)
+            if item.producto.activo
         ]
+
+    def get_agotado(self, obj):
+        items = list(obtener_items_paquete_prefetch(obj))
+        return bool(items) and any(
+            item.producto.controla_inventario
+            and item.producto.existencia < item.cantidad
+            for item in items
+        )
 
 
 class CategoriaServicioPublicoSerializer(ImagenFinalMixin, serializers.ModelSerializer):

@@ -1,4 +1,6 @@
 .venv/
+.venv.incomplete/
+.python_packages/
 __pycache__/
 *.py[cod]
 *.sqlite3

@@ -12,7 +12,7 @@ from empresas.contexto import empresas_administrables, obtener_empresa_administr
 from config.api import EliminacionProtegidaMixin
 from config.pagination import PaginacionAdministrativa
 from usuarios.models import PerfilUsuario
-from .models import Categoria, Familia, PaqueteCatalogo, Producto
+from .models import Categoria, Familia, PaqueteCatalogo, PaqueteProducto, Producto
 from .permissions import IsCatalogoManagerOrReadOnly
 from .serializers import (
     CategoriaSerializer,
@@ -348,6 +348,19 @@ class CatalogoPublicoEmpresaMixin:
         return queryset
 
 
+def prefetch_items_paquete():
+    return Prefetch(
+        "items_productos",
+        queryset=PaqueteProducto.objects.select_related(
+            "producto",
+            "producto__empresa",
+            "producto__familia",
+            "producto__categoria",
+        ).order_by("orden", "id"),
+        to_attr="items_productos_prefetch",
+    )
+
+
 class ProductoPaginaPublicaMixin(CatalogoPublicoEmpresaMixin):
     serializer_class = ProductoPaginaPublicaSerializer
 
@@ -405,7 +418,9 @@ class CombosDestacadosListView(CatalogoPublicoEmpresaMixin, generics.ListAPIView
     serializer_class = ComboDestacadoPublicoSerializer
 
     def get_queryset(self):
-        queryset = PaqueteCatalogo.objects.prefetch_related("productos").filter(
+        queryset = PaqueteCatalogo.objects.prefetch_related(
+            prefetch_items_paquete(),
+        ).filter(
             empresa__slug__iexact=self.get_empresa_slug(),
             empresa__activa=True,
             tipo=PaqueteCatalogo.Tipo.COMBO,
@@ -428,7 +443,9 @@ class PerfilesListView(CatalogoPublicoEmpresaMixin, generics.ListAPIView):
     serializer_class = PerfilPublicoSerializer
 
     def get_queryset(self):
-        queryset = PaqueteCatalogo.objects.prefetch_related("productos").filter(
+        queryset = PaqueteCatalogo.objects.prefetch_related(
+            prefetch_items_paquete(),
+        ).filter(
             empresa__slug__iexact=self.get_empresa_slug(),
             empresa__activa=True,
             tipo=PaqueteCatalogo.Tipo.PERFIL,
@@ -509,7 +526,13 @@ class ServicioDetallePublicoView(CatalogoPublicoEmpresaMixin, generics.RetrieveA
                 }
             )
 
-        productos_activos = Producto.objects.filter(
+        productos_activos = Producto.objects.select_related(
+            "empresa",
+            "familia",
+            "categoria",
+        ).filter(
+            empresa__slug__iexact=empresa_slug,
+            empresa__activa=True,
             activo=True,
             familia__activa=True,
             categoria__activa=True,
