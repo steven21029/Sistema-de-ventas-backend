@@ -420,4 +420,990 @@ Comportamiento:
 - Tambien se ocultan los campos crudos de imagen en la respuesta administrativa
   de productos.
 - No se aceptan nuevas imagenes individuales mediante API, Django Admin,
-  importadores ni procesos internos mientras la opcion esta desactió^=¶‰žËkºwµçD•°Ñ•áÑ¼Ù¥Í¥‰±”°•°½É‘•¸ä•°•ÍÑ…‘¼…Ñ¥Ù¼‘”(€…‘„µ½‘Õ±¼¸(´1…ÌÁ…¥¹…Ì™Õ¹¥½¹…±•Ì½¹Í•ÉÙ…¸Á±…¹Ñ¥±±…Ì½¹½¥‘…ÌÁ½È•°™É½¹Ñ•¹¸()5•¹Ô½™¥¥…°è((´¥¹¥¥½€ÕÍ„€½€¸(´•á…µ•¹•Í€ÕÍ„€½•á…µ•¹•Í€¸(´Á•É™¥±•Í€ÕÍ„€½Á•É™¥±•Í€¸(´Í•ÉÙ¥¥½Í€ÕÍ„€½Í•ÉÙ¥¥½Í€¸(´ÁÉ½µ½¥½¹•Í€ÕÍ„€½ÁÉ½µ½¥½¹•Í€¸(´ÍÕÕÉÍ…±•Í€ÕÍ„€½ÍÕÕÉÍ…±•Í€¸(´½¹Ñ…Ñ½€ÕÍ„€½½¹Ñ…Ñ½€¸(´Í½‰É•}¹½Í½ÑÉ½Í€ÕÍ„€½Í½‰É”µ¹½Í½ÑÉ½Í€¸()I•ÍÑÉ¥¥½¹•Ìè((´Q½‘„•µÁÉ•Í„¹Õ•Ù„É•¥‰”…ÕÑ½µ…Ñ¥…µ•¹Ñ”±½Ì½¡¼µ½‘Õ±½Ì¸(´±…Ù•€°ÉÕÑ…€ä…‰É•}•¹}¹Õ•Ù…}Á•ÍÑ…¹…€Í½¸¥¹µÕÑ…‰±•Ì¸(´A=MQ€ä1Q€‘”€½…Á¤½•µÁÉ•Í…Ì½¥Ñ•µÌµµ•¹Ô½€å„¹¼•ÍÑ…¸‘¥ÍÁ½¹¥‰±•Ì¸(´1„A$ä©…¹¼‘µ¥¸Í½±¼Á•Éµ¥Ñ•¸…µ‰¥…ÈÑ•áÑ½€°½É‘•¹€ä…Ñ¥Ù½€¸(´9¼Í”Á•Éµ¥Ñ•¸‘½Ìµ½‘Õ±½Ì½¸•°µ¥Íµ¼½É‘•¸‘•¹ÑÉ¼‘”Õ¹„•µÁÉ•Í„¸(´1„‰…Í”‘”‘…Ñ½ÌÉ•¡…é„±…Ù•ÌÅÕ”¹¼Á•ÉÑ•¹•é…¸…°µ•¹Ô½™¥¥…°¸(´¸©…¹¼‘µ¥¸Í”É•Ñ¥É…É½¸±…Ì½Á¥½¹•Ì‘”…É•…Èä•±¥µ¥¹…È¥Ñ•µÌ¸()½¹Ù•ÉÍ¥½¸‘”‘…Ñ½Ì±½…±•Ìè((´°¥Ñ•´M½‰É•}¹½Í½ÑÉ½Í€‘”¹…±¥é„Í”½¹Ù¥ÉÑ¥¼„Í½‰É•}¹½Í½ÑÉ½Í€¸(´MÔÉÕÑ„…µ‰¥¼‘”€½Í½‰É•¹½Í½ÑÉ½Í€„€½Í½‰É”µ¹½Í½ÑÉ½Í€¸(´M”½¹Í•ÉÙ…É½¸ÍÔÑ•áÑ¼°½É‘•¸ä•ÍÑ…‘¼…Ñ¥Ù¼¸(´1½Ìµ½‘Õ±½Ì½™¥¥…±•Ì™…±Ñ…¹Ñ•ÌÍ”½µÁ±•Ñ…É½¸Á…É„±…Ì•µÁÉ•Í…Ì•á¥ÍÑ•¹Ñ•Ì¸(´1½Ì¥Ñ•µÌ±¥‰É•ÌÅÕ”¹¼½ÉÉ•ÍÁ½¹‘¥…¸„Õ¹„Á±…¹Ñ¥±±„½™¥¥…°Í”É•Ñ¥É…É½¸¸(´1½Ì½É‘•¹•Ì‘ÕÁ±¥…‘½Ì¡•É•‘…‘½ÌÍ”¹½Éµ…±¥é…É½¸½¹Í•ÉÙ…¹‘¼ÁÉ¥µ•É¼•°(€µ½‘Õ±¼µ…Ì…¹Ñ¥Õ¼äµ½Ù¥•¹‘¼•°‘ÕÁ±¥…‘¼…°ÁÉ¥µ•È¹Õµ•É¼±¥‰É”¸(´¸¹…±¥é„°M•ÉÙ¥¥½Í€½¹Í•ÉÙ¼•°½É‘•¸€Èäá…µ•¹•Í€ÅÕ•‘¼•¸•°½É‘•¸€Ð¸()A±…¹Ñ¥±±„M½‰É”¹½Í½ÑÉ½Ìè((´M”É•¼Õ¸É•¥ÍÑÉ¼M½‰É•9½Í½ÑÉ½ÍµÁÉ•Í…€Õ¹¼„Õ¹¼½¸…‘„•µÁÉ•Í„¸(´1½Ì…µÁ½Ì™¥©½ÌÍ½¸Ñ¥ÑÕ±¼°¥¹ÑÉ½‘Õ¥½¸°¡¥ÍÑ½É¥„°µ¥Í¥½¸°Ù¥Í¥½¸°Ù…±½É•Ì°(€½µÁÉ½µ¥Í¼°¥µ…•¸”¥µ…•¸UI0¸(´Ù…±½É•Í}±¥ÍÑ…€½¹Ù¥•ÉÑ”±…Ì±¥¹•…Ì¹¼Ù…¥…Ì‘”Ù…±½É•Í€•¸Õ¹„±¥ÍÑ„Á…É„(€•°™É½¹Ñ•¹¸(´¥µ…•¹}™¥¹…±€½¹Í•ÉÙ„½µÁ…Ñ¥‰¥±¥‘…½¸…É¡¥Ù½Ì±½…±•Ìä™ÕÑÕÉ…ÌUI1Ì‘”(€HÈ¸(´1…Ì™¥¡…ÌÍ”É•…¸…ÕÑ½µ…Ñ¥…µ•¹Ñ”Á…É„•µÁÉ•Í…Ì¹Õ•Ù…Ìäµ•‘¥…¹Ñ”µ¥É…¥½¸(€Á…É„•µÁÉ•Í…Ì•á¥ÍÑ•¹Ñ•Ì¸()A%Ìè((´AÕ‰±¥„èP€½…Á¤½•µÁÉ•Í…Ì½Í½‰É”µ¹½Í½ÑÉ½Ì¼ý•µÁÉ•Í…}Í±Õœõ¹…±¥é…€¸(´‘µ¥¹¥ÍÑÉ…Ñ¥Ù„èP½AQ €½…Á¤½•µÁÉ•Í…Ì½µ¤µÍ½‰É”µ¹½Í½ÑÉ½Ì½€¸(´1„A$ÁÕ‰±¥„¹¼•áÁ½¹”%Ì¥¹Ñ•É¹½Ì¹¤•µÁÉ•Í„¸(´M¤Í½‰É•}¹½Í½ÑÉ½Í€•ÍÑ„‘•Í…Ñ¥Ù…‘¼•¸•°µ•¹Ô°±„½¹ÍÕ±Ñ„ÁÕ‰±¥„É•ÍÁ½¹‘”(€€ÐÀÑ€¸(´‘µ¥¹¥ÍÑÉ…‘½Èµ…•ÍÑÉ¼°…‘µ¥¹¥ÍÑÉ…‘½È‘”•µÁÉ•Í„ä•É•¹Ñ”É•ÍÁ•Ñ…¸•°µ¥Íµ¼(€…¥Í±…µ¥•¹Ñ¼µÕ±Ñ¥•µÁÉ•Í„‘•°É•ÍÑ¼‘•°Á…¹•°¸(´½µÁÉ…‘½É•Ì¹¼ÁÕ•‘•¸µ½‘¥™¥…È•ÍÑ”½¹Ñ•¹¥‘¼¸()É½¹Ñ•¹è((´1„ÉÕÑ„½™¥¥…°ÅÕ”‘•‰”¥µÁ±•µ•¹Ñ…ÈI•…Ð•Ì€½Í½‰É”µ¹½Í½ÑÉ½Í€¸(´•‰”•á¥ÍÑ¥ÈÕ¸Í½±¼½µÁ½¹•¹Ñ”™¥©¼Á…É„Ñ½‘…Ì±…Ì•µÁÉ•Í…Ì¸(´1…ÌÍ•¥½¹•ÌÙ…¥…ÌÁÕ•‘•¸½Õ±Ñ…ÉÍ”¸(´M•ÉÙ¥¥½Ì¹¼‘•‰”ÕÍ…ÉÍ”½µ¼É•ÍÁ…±‘¼Á…É„•ÍÑ„ÉÕÑ„¹¤Á…É„ÉÕÑ…Ì(€‘•Í½¹½¥‘…Ì¸(´M”…ÑÕ…±¥é…É½¸‘½Ì½A%}A91}5%9%MQIQ%Y<¹µ‘€ä(€‘½Ì½	I%}I=9Q9¹µ‘€½¸•°½¹ÑÉ…Ñ¼¹Õ•Ù¼¸()5¥É…¥½¸è((´•µÁÉ•Í…Ì¸ÀÀÄÑ}Í½‰É•¹½Í½ÑÉ½Í•µÁÉ•Í…}…±Ñ•É}¥Ñ•µµ•¹Õ•µÁÉ•Í…}±…Ù•}…¹‘}µ½É•€¸(´•µÁÉ•Í…Ì¸ÀÀÄÕ}¹½Éµ…±¥é…É}½É‘•¹}µ•¹Õ}½™¥¥…±€¸(´µ‰…ÌÅÕ•‘…É½¸…Á±¥…‘…Ì½ÉÉ•Ñ…µ•¹Ñ”•¸±„‰…Í”±½…°¸()Y•É¥™¥…¥½¸è((´ÁåÑ¡½¸µ…¹…”¹Áä¡•­€èÍ¥¸ÁÉ½‰±•µ…Ì¸(´ÁåÑ¡½¸µ…¹…”¹Áäµ…­•µ¥É…Ñ¥½¹Ì€´µ¡•¬€´µ‘ÉäµÉÕ¹€èÍ¥¸…µ‰¥½ÌÁ•¹‘¥•¹Ñ•Ì¸(´ÁåÑ¡½¸µ…¹…”¹ÁäÑ•ÍÐ•µÁÉ•Í…Í€è€ÌäÁÉÕ•‰…Ì…ÁÉ½‰…‘…Ì¸(´ÁåÑ¡½¸µ…¹…”¹ÁäÑ•ÍÑ€è€ÄÐÌÁÉÕ•‰…Ì…ÁÉ½‰…‘…Ì¸(´¥Ð‘¥™˜€´µ¡•­€èÍ¥¸•ÉÉ½É•Ì‘”™½Éµ…Ñ¼¸((ŒŒ€ÈÀÈØ´Àà´ÀÌ€´½¹Ñ•¹¥‘¼¥¹ÍÑ¥ÑÕ¥½¹…°‘”¹…±¥é„()Õ•¹Ñ”è((´AÉ•Í•¹Ñ…¥½¸¹…±¥é„µ±¥•¹Ñ•Ì½ÉÁ½É…Ñ¥Ù½Ì€ Ä¤¹Á‘™€¸()…Ñ½Ì…É…‘½Ì•¸M½‰É•9½Í½ÑÉ½ÍµÁÉ•Í…€Á…É„±„•µÁÉ•Í„½¸Í±Õœ¹…±¥é…€è((´%¹ÑÉ½‘Õ¥½¸½¸±„ÁÉ•Í•¹¥„É•¥½¹…°ä…Ñ•¹¥½¸µ•‘¥…¹Ñ”ÍÕÕÉÍ…±•Ì•¸(€!½¹‘ÕÉ…Ì¸(´5¥Í¥½¸¥¹ÍÑ¥ÑÕ¥½¹…°¸(´Y¥Í¥½¸‘”±¥‘•É…é¼É•¥½¹…°Á…É„•°…¹¼€ÈÀÌÀ¸(´Y…±½É•Ìè…±¥‘…°%¹¹½Ù…¥½¸°M•ÉÙ¥¥¼äQ•¹½±½¥„¸(´½µÁÉ½µ¥Í¼½¸ÁÉ½å•¥½¸Í½¥…°°Õ¥‘…‘¼‘•°µ•‘¥¼…µ‰¥•¹Ñ”°µ…¹•©¼‘”(€É•Í¥‘Õ½Ì‰¥½¥¹™•¥½Í½Ìä…Á…¥Ñ…¥½¸‘•°•ÅÕ¥Á¼¸(´¡¥ÍÑ½É¥…€Á•Éµ…¹•”Ù…¥„Á½ÉÅÕ”•°‘½Õµ•¹Ñ¼¹¼¥¹±Õå”Õ¹„¡¥ÍÑ½É¥„(€•µÁÉ•Í…É¥…°¥‘•¹Ñ¥™¥…‰±”¸(´9¼Í”…Í¥¹¼Õ¹„¥µ…•¸è±…Ì¥µ…•¹•Ì‘•°‘½Õµ•¹Ñ¼™½Éµ…¸Á…ÉÑ”‘”±…Ì(€‘¥…Á½Í¥Ñ¥Ù…Ìä¹¼Í”ÕÑ¥±¥é…É½¸½µ¼É•½ÉÑ•ÌÁ…É„±„Á…¥¹„Ý•ˆ¸()±…¹”è((´9¼Í”µ½‘¥™¥…É½¸µ½‘•±½Ì°µ¥É…¥½¹•Ì°Í•É¥…±¥é•ÉÌ°Ù¥ÍÑ…Ì¹¤ÉÕÑ…Ì¸(´1„A$ÁÕ‰±¥„•á¥ÍÑ•¹Ñ”É•ÍÁ½¹‘¥¼€ÈÀÁ€½¸•°½¹Ñ•¹¥‘¼µ•‘¥…¹Ñ”(€P€½…Á¤½•µÁÉ•Í…Ì½Í½‰É”µ¹½Í½ÑÉ½Ì¼ý•µÁÉ•Í…}Í±Õœõ¹…±¥é…€¸((ŒŒ€ÈÀÈØ´Àà´ÀÌ€´I•‘•ÌÍ½¥…±•ÌÁ½È•µÁÉ•Í„()½¹™¥ÕÉ…¥½¸è((´M”…É•…É½¸„µÁÉ•Í…€±…ÌUI1Ì½Á¥½¹…±•Ì¥¹ÍÑ…É…µ}ÕÉ±€°(€Ý¡…ÑÍ…ÁÁ}ÕÉ±€°™…•‰½½­}ÕÉ±€äÑ¥­Ñ½­}ÕÉ±€¸(´1½Ì•¹±…•Ì‘•‰•¸ÕÍ…È!QQALäÁ•ÉÑ•¹••È…°‘½µ¥¹¥¼½™¥¥…°‘”±„É•¸(´©…¹¼‘µ¥¸µÕ•ÍÑÉ„±½ÌÕ…ÑÉ¼…µÁ½Ì‘•¹ÑÉ¼‘”I•‘•ÌÍ½¥…±•Í€¸(´P½AQ €½…Á¤½•µÁÉ•Í…Ì½µ¤µ•µÁÉ•Í„½€Á•Éµ¥Ñ”½¹ÍÕ±Ñ…Èä…ÑÕ…±¥é…È±½Ì(€•¹±…•Ì‘”±„•µÁÉ•Í„…‘µ¥¹¥ÍÑÉ…‘„¸(´1½Ì•¹±…•Ì‘”¹…±¥é„Á•Éµ…¹••¸Ù…¥½Ì¡…ÍÑ„É•¥‰¥ÈÍÕÌUI1Ì½™¥¥…±•Ì¸()½¹ÑÉ…Ñ¼ÁÕ‰±¥¼Õ¹¥¼è((´P€½…Á¤½•µÁÉ•Í…Ì½…ÑÕ…°¼ý¡½ÍÐô¸¸¹€äÍÔÉ•ÍÁ…±‘¼(€P€½…Á¤½•µÁÉ•Í…Ì½ÁÕ‰±¥„¼ýÍ±Õœõ¹…±¥é…€‘•ÙÕ•±Ù•¸•°½‰©•Ñ¼(€É•‘•Í}Í½¥…±•Í€¸(´9¼Í”É•…É½¸•¹‘Á½¥¹ÑÌ…‘¥¥½¹…±•Ì¸(´½¹Ñ…Ñ¼äM½‰É”¹½Í½ÑÉ½Ì¹¼‘ÕÁ±¥…¸±…ÌÉ•‘•Ì•¸ÍÕÌÉ•ÍÁÕ•ÍÑ…Ì¸(´°™É½¹Ñ•¹‘•‰”…É…È±„½¹™¥ÕÉ…¥½¸‘”•µÁÉ•Í„Õ¹„Ù•èäÉ•ÕÑ¥±¥é…É±„(€‘•‰…©¼‘•°¹½µ‰É”•¸½¹Ñ…Ñ¼ä…°™¥¹…°‘”M½‰É”¹½Í½ÑÉ½Ì¸(´U¹„UI0Ù…¥„¥¹‘¥„ÅÕ”•°¥½¹¼½ÉÉ•ÍÁ½¹‘¥•¹Ñ”¹¼‘•‰”µ½ÍÑÉ…ÉÍ”¸()5¥É…¥½¸äÁÉÕ•‰…Ìè((´M”É•¼ä…Á±¥¼(€•µÁÉ•Í…Ì¸ÀÀÄÙ}•µÁÉ•Í…}™…•‰½½­}ÕÉ±}•µÁÉ•Í…}¥¹ÍÑ…É…µ}ÕÉ±}…¹‘}µ½É•€¸(´ÁåÑ¡½¸µ…¹…”¹ÁäÑ•ÍÐ•µÁÉ•Í…Í€è€ÐÜÁÉÕ•‰…Ì…ÁÉ½‰…‘…Ì¸(´ÁåÑ¡½¸µ…¹…”¹ÁäÑ•ÍÑ€è€ÄÔÄÁÉÕ•‰…Ì…ÁÉ½‰…‘…Ì¸((ŒŒ€ÈÀÈØ´Àà´ÀÌ€´MÕÁ•ÉÕÍÕ…É¥¼…ÕÑ½µ…Ñ¥¼Á…É„I•¹‘•È()5½Ñ¥Ù¼è((´°Á±…¸…ÑÕ…°‘”I•¹‘•È¹¼Á•Éµ¥Ñ”ÕÍ…ÈM¡•±°ä±„‰…Í”‘•ÍÁ±•…‘„¥¹¥¥„(€Ù…¥„¸()%µÁ±•µ•¹Ñ…¥½¸è((´M”É•¼•°½µ…¹‘¼ÁåÑ¡½¸µ…¹…”¹Áä…Í•ÕÉ…É}ÍÕÁ•ÉÕÍÕ…É¥½€¸(´1•”)9=}MUAIUMI}UMI95€°)9=}MUAIUMI}5%1€ä(€)9=}MUAIUMI}AMM]=I€‘•Í‘”•°•¹Ñ½É¹¼¸(´É•„¼…ÑÕ…±¥é„•°µ¥Íµ¼ÕÍÕ…É¥¼‘”™½Éµ„¥‘•µÁ½Ñ•¹Ñ”°Í¥¸‘ÕÁ±¥…É±¼¸(´Í•ÕÉ„Á•Éµ¥Í½Ì‘”ÍÕÁ•ÉÕÍÕ…É¥¼°…•Í¼„©…¹¼‘µ¥¸°Á•É™¥°‘”(€…‘µ¥¹¥ÍÑÉ…‘½Èµ…•ÍÑÉ¼°½ÉÉ•¼Ù•É¥™¥…‘¼äÕÍÕ…É¥¼…Ñ¥Ù¼¸(´Y…±¥‘„±„½¹ÑÉ…Í•¹„½¸±…ÌÉ•±…Ì‘”Í•ÕÉ¥‘…‘”©…¹¼ä¹Õ¹„±„¥µÁÉ¥µ”(€•¸±½Ì±½Ì¸(´M”É•¼ÍÑ…ÉÐ¹Í¡€Á…É„•©•ÕÑ…Èµ¥É…¥½¹•Ì°…Í•ÕÉ…È•°ÍÕÁ•ÉÕÍÕ…É¥¼”(€¥¹¥¥…ÈÕ¹¥½É¸¸(´°MÑ…ÉÐ½µµ…¹‘”I•¹‘•È‘•‰”Í•È‰…Í ÍÑ…ÉÐ¹Í¡€¸(´1…ÌÉ•‘•¹¥…±•ÌÉ•…±•Ì¹¼Í”Õ…É‘…¸•¸¥Ð¹¤•¸±„‘½Õµ•¹Ñ…¥½¸¸()Y•É¥™¥…¥½¸è((´ÁåÑ¡½¸µ…¹…”¹ÁäÑ•ÍÐÕÍÕ…É¥½Ì¹Ñ•ÍÑÍ}½µ…¹‘½Í€è€ÐÁÉÕ•‰…Ì…ÁÉ½‰…‘…Ì¸(´ÁåÑ¡½¸µ…¹…”¹ÁäÑ•ÍÑ€è€ÄÔÔÁÉÕ•‰…Ì…ÁÉ½‰…‘…Ì¸(´M”…É•¼‘½Ì½MA1%U}I9H¹µ‘€½¸±„½¹™¥ÕÉ…¥½¸½µÁ±•Ñ„¸((ŒŒ€ÈÀÈØ´Àà´ÀÐ€´½¹™¥ÕÉ…¥½¸•¹ÑÉ…±¥é…‘„•¸•¹Ñ½É¹¼()=‰©•Ñ¥Ù¼è((´Ù¥Ñ…ÈÙ…±½É•Ì…µ‰¥•¹Ñ…±•Ì‘ÕÁ±¥…‘½Ì‘•¹ÑÉ¼‘”½¹™¥œ½Í•ÑÑ¥¹Ì¹Áå€¸(´UÍ…È±½Ìµ¥Íµ½Ì¹½µ‰É•Ì‘•Í‘”€¹•¹Ù€•¸‘•Í…ÉÉ½±±¼ä‘•Í‘”¹Ù¥É½¹µ•¹Ð•¸(€I•¹‘•È¸()…µ‰¥½Ìè((´MIQ}-e€°)9=}	U€°¡½ÍÑÌ°=IL°‰…Í”‘”‘…Ñ½Ì°)]P°½ÉÉ•¼äÁ…½Ì(€…¡½É„Í”±••¸µ•‘¥…¹Ñ”ÁåÑ¡½¸µ‘•½ÕÁ±•€Í¥¸Ù…±½É•Ì½¹É•Ñ½Ì‘”É•ÍÁ…±‘¼•¸(€Í•ÑÑ¥¹Ì¹Áå€¸(´M”…É•¼=IM}11=]}I9Q%1M€„±„½¹™¥ÕÉ…¥½¸•áÑ•É¹„¸(´Q	M}UI1€…¡½É„Í”±•”½¸ÁåÑ¡½¸µ‘•½ÕÁ±•€äÍ”ÁÉ½•Í„½¸(€‘¨µ‘…Ñ…‰…Í”µÕÉ±€°Á½È±¼ÅÕ”™Õ¹¥½¹„Ñ…¹Ñ¼‘•Í‘”€¹•¹Ù€½µ¼‘•Í‘”I•¹‘•È¸(´°€¹•¹Ù€±½…°Í”½µÁ±•Ñ¼½¸Ñ½‘½Ì±½Ì¹½µ‰É•ÌÉ•ÅÕ•É¥‘½Ì¸1„‰…Í”Í”(€½¹™¥ÕÉ¼¥¹¥¥…±µ•¹Ñ”½¸ME1¥Ñ”ä‘•ÍÁÕ•ÌÍ”…µ‰¥¼„MÕÁ…‰…Í”A½ÍÑÉ•ME0ì(€•°½ÉÉ•¼Á½È½¹Í½±„ä±½ÌÁ…½ÌÍ¥µÕ±…‘½ÌÍ”½¹Í•ÉÙ…¸Á…É„‘•Í…ÉÉ½±±¼¸(´€¹•¹Ø¹•á…µÁ±•€½¹Ñ¥•¹”•°µ¥Íµ¼½¹ÑÉ…Ñ¼Í¥¸É•‘•¹¥…±•ÌÉ•…±•Ì¸(´…Í•ÕÉ…É}ÍÕÁ•ÉÕÍÕ…É¥½€ÕÍ„ÁåÑ¡½¸µ‘•½ÕÁ±•€°Á•Éµ¥Ñ¥•¹‘¼±••ÈÕ¸€¹•¹Ù€(€±½…°¼Ù…É¥…‰±•Ì‘•°ÁÉ½•Í¼•¸I•¹‘•È¸(´MQQ%%1M}%IM€¥¹±Õå”ÍÑ…Ñ¥Œ½€Í½±…µ•¹Ñ”Õ…¹‘¼±„…ÉÁ•Ñ„•á¥ÍÑ”°Á½È(€±¼ÅÕ”I•¹‘•È‘•©„‘”É•Á½ÉÑ…ÈÍÑ…Ñ¥™¥±•Ì¹\ÀÀÑ€¸(´‘½Ì½MA1%U}I9H¹µ‘€¥¹±Õå”•°‰±½ÅÕ”½µÁ±•Ñ¼É•ÅÕ•É¥‘¼Á½ÈI•¹‘•È¸()Y•É¥™¥…¥½¸¥¹¥¥…°è((´ÁåÑ¡½¸µ…¹…”¹Áä¡•­€èÍ¥¸ÁÉ½‰±•µ…Ì¹¤…‘Ù•ÉÑ•¹¥…Ì‘”ÍÑ…Ñ¥™¥±•Ì¸(´1„½¹™¥ÕÉ…¥½¸Í”Ù…±¥‘¼¥¹¥¥…±µ•¹Ñ”½¸ME1¥Ñ”°=IL°)]P°½ÉÉ•¼‘”(€½¹Í½±„äÁ…½ÌÍ¥µÕ±…‘½Ì‘•Í‘”•°€¹•¹Ù€±½…°¸(´ÁåÑ¡½¸µ…¹…”¹ÁäÑ•ÍÐÕÍÕ…É¥½Ì¹Ñ•ÍÑÍ}½µ…¹‘½Í€è€ÐÁÉÕ•‰…Ì…ÁÉ½‰…‘…Ì¸(´ÁåÑ¡½¸µ…¹…”¹ÁäÑ•ÍÑ€è€ÄÔÔÁÉÕ•‰…Ì…ÁÉ½‰…‘…Ì¸(´ÁåÑ¡½¸µ…¹…”¹Áäµ…­•µ¥É…Ñ¥½¹Ì€´µ¡•¬€´µ‘ÉäµÉÕ¹€èÍ¥¸…µ‰¥½ÌÁ•¹‘¥•¹Ñ•Ì¸((ŒŒ€ÈÀÈØ´Àà´ÀÐ€´	…Í”±½…°½¹•Ñ…‘„„MÕÁ…‰…Í”A½ÍÑÉ•ME0()½¹•á¥½¸è((´°‘•Í…ÉÉ½±±¼±½…°…¡½É„ÕÍ„MÕÁ…‰…Í”A½ÍÑÉ•ME0µ•‘¥…¹Ñ”Q	M}UI1€¸(´M”ÕÑ¥±¥é„•°M•ÍÍ¥½¸Á½½±•ÈÁ½È%AØÐ°ÁÕ•ÉÑ¼€ÔÐÌÉ€ä½¹•á¥½¸MM0¸(´1„½¹ÑÉ…Í•¹„Í”½‘¥™¥¼Á…É„UI0Í¥¸µ½ÍÑÉ…É±„¹¤Õ…É‘…É±„•¸¥Ð¸(´1„…‘•¹„½µÁ±•Ñ„•á¥ÍÑ”Í½±…µ•¹Ñ”•¸€¹•¹Ù€°ÅÕ”½¹Ñ¥¹Õ„¥¹½É…‘¼Á½È(€€¹¥Ñ¥¹½É•€¸(´‘ˆ¹ÍÅ±¥Ñ”Í€Í”½¹Í•ÉÙ„¥¹Ñ…Ñ„½µ¼½É¥•¸Á…É„ÑÉ…Í±…‘…ÈÁ½ÍÑ•É¥½Éµ•¹Ñ”(€±½Ì‘…Ñ½Ì±½…±•Ì‘”¹…±¥é„¸()É•…¥½¸‘•°•ÍÅÕ•µ„è((´M”•©•ÕÑ¼ÁåÑ¡½¸µ…¹…”¹Áäµ¥É…Ñ”€´µ¹½¥¹ÁÕÑ€½¹ÑÉ„MÕÁ…‰…Í”¸(´M”…Á±¥…É½¸Ñ½‘…Ì±…Ìµ¥É…¥½¹•Ì‘”©…¹¼ä‘”±…Ì…Á±¥…¥½¹•Ì‘•°(€ÁÉ½å•Ñ¼¸(´MÕÁ…‰…Í”½¹Ñ¥•¹”€ÐÄÑ…‰±…ÌÁÕ‰±¥…ÌÉ•…‘…ÌÁ½È©…¹¼¸(´Q½‘…Ù¥„¹¼Í”¥µÁ½ÉÑ…É½¸•µÁÉ•Í…Ì°…Ñ…±½¼°ÕÍÕ…É¥½Ì¹¤½ÑÉ½Ì‘…Ñ½Ì‘•Í‘”(€ME1¥Ñ”¸()Y•É¥™¥…¥½¸è((´1„…ÕÑ•¹Ñ¥…¥½¸äÕ¹„½¹ÍÕ±Ñ„‘”Í½±¼±•ÑÕÉ„„A½ÍÑÉ•ME0É•ÍÁ½¹‘¥•É½¸(€½ÉÉ•Ñ…µ•¹Ñ”¸(´ÁåÑ¡½¸µ…¹…”¹Áäµ¥É…Ñ”€´µ¡•­€èÍ¥¸µ¥É…¥½¹•ÌÁ•¹‘¥•¹Ñ•Ì¸(´ÁåÑ¡½¸µ…¹…”¹Áä¡•­€èÍ¥¸ÁÉ½‰±•µ…Ì‘•Ñ•Ñ…‘½Ì¸((ŒŒ€ÈÀÈØ´Àà´ÀÐ€´½µÁ…Ñ¥‰¥±¥‘…‘”ÉÕÑ…ÌA$Ù•ÉÍ¥½¹…‘…Ì()5½Ñ¥Ù¼è((´°™É½¹Ñ•¹‘•ÍÁ±•…‘¼½¹ÍÕ±Ñ„ÉÕÑ…Ì‰…©¼€½…Á¤½ØÄ½€°µ¥•¹ÑÉ…Ì•°‰…­•¹(€•áÁ½¹¥„Í½±…µ•¹Ñ”•°ÁÉ•™¥©¼€½…Á¤½€¸()…µ‰¥½Ìè((´Q½‘½Ì±½Ìµ½‘Õ±½Ì‘•°‰…­•¹…•ÁÑ…¸…¡½É„…µ‰½ÌÁÉ•™¥©½Ìè€½…Á¤½€ä(€€½…Á¤½ØÄ½€¸(´1…ÌÉÕÑ…Ì•á¥ÍÑ•¹Ñ•ÌÍ”½¹Í•ÉÙ…É½¸Á…É„¹¼É½µÁ•È¥¹Ñ•É…¥½¹•ÌÁÉ•Ù¥…Ì¸(´É•Ù•ÉÍ” ¥€½¹Ñ¥¹Õ„•¹•É…¹‘¼±…ÌÉÕÑ…Ì½É¥¥¹…±•Ì‰…©¼€½…Á¤½€¸(´M”…É•…É½¸ÁÉÕ•‰…ÌÁ…É„±„•µÁÉ•Í„…ÑÕ…°ä±„É•¹½Ù…¥½¸‘•°Ñ½­•¸)]P(€µ•‘¥…¹Ñ”•°ÁÉ•™¥©¼Ù•ÉÍ¥½¹…‘¼¸()Y•É¥™¥…¥½¸è((´ÁåÑ¡½¸µ…¹…”¹ÁäÑ•ÍÐ½¹™¥€è€ÌÁÉÕ•‰…Ì…ÁÉ½‰…‘…Ì¸(´ÁåÑ¡½¸µ…¹…”¹ÁäÑ•ÍÑ€è€ÄÔàÁÉÕ•‰…Ì…ÁÉ½‰…‘…ÌÕÍ…¹‘¼ME1¥Ñ”‘”ÁÉÕ•‰…Ì°Í¥¸(€…±Ñ•É…ÈMÕÁ…‰…Í”¸((ŒŒ€ÈÀÈØ´Àà´ÀÐ€´AÉ•Á…É…¥½¸‘”±½Õ‘™±…É”HÈÁ…É„¥µ…•¹•Ì()•Á•¹‘•¹¥…Ìè((´M”…É•…É½¸‘©…¹¼µÍÑ½É…•Í€°‰½Ñ¼Í€äÍÕÌ‘•Á•¹‘•¹¥…Ì™¥©…‘…Ì¸(´HÈÍ”¥¹Ñ•É„µ•‘¥…¹Ñ”ÍÔA$½µÁ…Ñ¥‰±”½¸LÌ¸()½¹™¥ÕÉ…¥½¸è((´HÉ}MQ=I}9	1€Á•Éµ¥Ñ”…±Ñ•É¹…È•¹ÑÉ”µ•‘¥„½€±½…°äHÈ¸(´1…ÌÉ•‘•¹¥…±•Ì°‰Õ­•Ð°•¹‘Á½¥¹Ð°UI0ÁÕ‰±¥„äÉ•¥½¸Í”±••¸‘•Í‘”•°(€•¹Ñ½É¹¼ä¹¼Í”Õ…É‘…¸•¸¥Ð¸(´1½Ì%µ…•¥•±‘€ÕÍ…¸HÈÕ…¹‘¼•ÍÑ„¡…‰¥±¥Ñ…‘¼°‰…©¼•°ÁÉ•™¥©¼µ•‘¥„½€¸(´1½Ì…É¡¥Ù½ÌÉ•Á•Ñ¥‘½Ì¹¼Í½‰É•ÍÉ¥‰•¸±½Ì•á¥ÍÑ•¹Ñ•Ì¸(´1…ÌUI1ÌÁÕ‰±¥…Ì¹¼±±•Ù…¸™¥Éµ„Ñ•µÁ½É…°ä]¡¥Ñ•9½¥Í”½¹Í•ÉÙ„±„•ÍÑ¥½¸(€‘”…É¡¥Ù½Ì•ÍÑ…Ñ¥½Ì¸(´M”É•¼‘½Ì½=9%UI%=9}1=U1I}HÈ¹µ‘€½¸•°ÁÉ½•‘¥µ¥•¹Ñ¼±½…°ä(€‘”I•¹‘•È¸()½µÁ…Ñ¥‰¥±¥‘…)]Pè((´1„½½­¥”‘”É•¹½Ù…¥½¸…¡½É„ÕÍ„±„ÉÕÑ„€½…Á¤½€°Á•Éµ¥Ñ¥•¹‘¼•¹Ù¥…É±„Ñ…¹Ñ¼(€„€½…Á¤½ÕÍÕ…É¥½Ì½Ñ½­•¸½€½µ¼„€½…Á¤½ØÄ½ÕÍÕ…É¥½Ì½Ñ½­•¸½€¸(´M”…É•¼Õ¹„ÁÉÕ•‰„‘”É•¹½Ù…¥½¸Á½È±„ÉÕÑ„Ù•ÉÍ¥½¹…‘„¸()5¥É…¥½¸…½É‘…‘„è((´M½±¼Í”ÑÉ…Í±…‘…É„¹…±¥é„‘•Í‘”ME1¥Ñ”„MÕÁ…‰…Í”äHÈ¸(´1„•µÁÉ•Í„ÁÉÕ•‰…€äÑ½‘½ÌÍÕÌÉ•¥ÍÑÉ½ÌÅÕ•‘…¸•á±Õ¥‘½Ì¸()Y•É¥™¥…¥½¸¥¹¥¥…°è((´Á¥À¡•­€è‘•Á•¹‘•¹¥…Ì½¹Í¥ÍÑ•¹Ñ•Ì¸(´ÁåÑ¡½¸µ…¹…”¹Áä¡•­€è½ÉÉ•Ñ¼½¸HÈ‘•Í¡…‰¥±¥Ñ…‘¼¸(´ÁåÑ¡½¸µ…¹…”¹Áä¡•­€è½ÉÉ•Ñ¼½¸HÈ¡…‰¥±¥Ñ…‘¼ä½¹™¥ÕÉ…¥½¸™¥Ñ¥¥„¸(´=¡¼ÁÉÕ•‰…Ì‘”½¹™¥ÕÉ…¥½¸‘”ÉÕÑ…Ìä…ÕÑ•¹Ñ¥…¥½¸)]P…ÁÉ½‰…‘…Ì¸(´ÁåÑ¡½¸µ…¹…”¹ÁäÑ•ÍÑ€è€ÄÔäÁÉÕ•‰…Ì…ÁÉ½‰…‘…ÌÕÍ…¹‘¼ME1¥Ñ”‘”ÁÉÕ•‰…Ì¸(´ÁåÑ¡½¸µ…¹…”¹Áäµ…­•µ¥É…Ñ¥½¹Ì€´µ¡•¬€´µ‘ÉäµÉÕ¹€èÍ¥¸…µ‰¥½Ì‘”µ½‘•±½Ì¸(´M”½µÁ±•Ñ¼Õ¹„ÁÉÕ•‰„É•…°½¸±…ÌÉ•‘•¹¥…±•Ì±½…±•Ì‘”HÈè©…¹¼ÍÕ‰¥¼(€Õ¸½‰©•Ñ¼Ñ•µÁ½É…°°½¹™¥Éµ¼ÍÔ•á¥ÍÑ•¹¥„ä•¹•É¼ÍÔUI0ÁÕ‰±¥„¸(´1„UI0ÁÕ‰±¥„É•ÍÁ½¹‘¥¼!QQ@€ÈÀÁ€ä‘•Ù½±Ù¥¼•á…Ñ…µ•¹Ñ”•°½¹Ñ•¹¥‘¼(€…±µ…•¹…‘¼¸(´°½‰©•Ñ¼Ñ•µÁ½É…°Í”•±¥µ¥¹¼…°™¥¹…±¥é…ÈäHÈ½¹™¥Éµ¼ÅÕ”å„¹¼•á¥ÍÑ¥„¸(´1…ÌÉ•‘•¹¥…±•ÌÁ•Éµ…¹••¸Í½±…µ•¹Ñ”•¸€¹•¹Ù€°™Õ•É„‘”¥Ð¸((ŒŒ€ÈÀÈØ´Àà´ÀÐ€´5¥É…¥½¸‘”¹…±¥é„„MÕÁ…‰…Í”ä±½Õ‘™±…É”HÈ()±…¹”ÑÉ…Í±…‘…‘¼è((´€Ä•µÁÉ•Í„è¹…±¥é„1…‰½É…Ñ½É¥½Ì±¥¹¥½Ì¸(´€à•±•µ•¹Ñ½Ì‘•°µ•¹Ô¸(´€Ä½¹Ñ•¹¥‘¼‘”M½‰É”¹½Í½ÑÉ½Ì¸(´€ÈÍÕÕÉÍ…±•Ì¸(´€È™…µ¥±¥…Ìä€ÄÔ…Ñ•½É¥…Ì¸(´€ÌÌÄÁÉ½‘ÕÑ½Ì¼Í•ÉÙ¥¥½Ì¸(´€ÄÁ…ÅÕ•Ñ”¼Á•É™¥°½¸€È½µÁ½¹•¹Ñ•Ì¸(´€Ð‰…¹¹•ÉÌÁÉ½µ½¥½¹…±•Ì¸(´€ÄÔ¥µ…•¹•ÌÉ•±…¥½¹…‘…Ì½¸±„•µÁÉ•Í„ä•°…Ñ…±½¼¸()á±ÕÍ¥½¹•Ìè((´1„•µÁÉ•Í„ÁÉÕ•‰…€¹¼Í”½Á¥¼ä•°¥µÁ½ÉÑ…‘½È±„É•¡…é„•áÁÉ•Í…µ•¹Ñ”¸(´9¼Í”ÑÉ…Í±…‘…É½¸ÕÍÕ…É¥½Ì°…ÉÉ¥Ñ½Ì°Á•‘¥‘½Ì°Á…½Ì°™…Ù½É¥Ñ½Ì°µ•¹Í…©•Ì‘”(€½¹Ñ…Ñ¼¹¤½ÑÉ½Ìµ½Ù¥µ¥•¹Ñ½ÌÉ•…‘½ÌÁ…É„ÁÉÕ•‰…Ì¸(´‘ˆ¹ÍÅ±¥Ñ”Í€Á•Éµ…¹•”¥¹Ñ…Ñ„½µ¼É•ÍÁ…±‘¼±½…°‘•°½É¥•¸¸()%µÁ±•µ•¹Ñ…¥½¸è((´M”…É•¼±„½¹•á¥½¸½Á¥½¹…°1e}Q	M}UI1€Á…É„½¹ÍÕ±Ñ…ÈME1¥Ñ”(€½µ¼½É¥•¸Í¥¸‘•©…È‘”ÕÍ…ÈMÕÁ…‰…Í”½µ¼‰…Í”ÁÉ¥¹¥Á…°¸(´M”É•¼ÁåÑ¡½¸µ…¹…”¹Áäµ¥É…É}…¹…±¥é…}ÍÕÁ…‰…Í•€°½¸µ½‘¼€´µ‘ÉäµÉÕ¹€¸(´°½µ…¹‘¼½¹Í•ÉÙ„±…ÌÉ•±…¥½¹•ÌäÉÕÑ…Ì‘”¥µ…•¸°É•ÕÑ¥±¥é„½‰©•Ñ½Ì(€¥‘•¹Ñ¥½Ì‘”HÈäÕÍ„±…Ù•Ì¹…ÑÕÉ…±•ÌÁ…É„Á½‘•ÈÉ•Á•Ñ¥ÉÍ”Í¥¸‘ÕÁ±¥…‘½Ì¸(´1…Ì•ÍÉ¥ÑÕÉ…Ì•¸MÕÁ…‰…Í”Í”É•…±¥é…¸‘•¹ÑÉ¼‘”Õ¹„ÑÉ…¹Í…¥½¸ä±…Ì(€ÍÕ‰¥‘…Ì¹Õ•Ù…ÌÍ”•±¥µ¥¹…¸Í¤±„¥µÁ½ÉÑ…¥½¸‘”‘…Ñ½Ì™…±±„¸(´1„…É„‘”±½Ì€ÌÌÄÁÉ½‘ÕÑ½ÌÕÍ„Õ¹„½Á•É…¥½¸µ…Í¥Ù„‘”A½ÍÑÉ•ME0¸(´M”½ÉÉ¥¥¼±„½¹Í•ÉÙ…¥½¸•á…Ñ„‘”½É‘•¹•Ì½¸Ù…±½È€Á€™É•¹Ñ”„±½Ì(€½É‘•¹•Ì…ÕÑ½µ…Ñ¥½Ì‘”±½Ìµ½‘•±½Ì‘”©…¹¼¸()Y•É¥™¥…¥½¸™¥¹…°è((´1½Ì…µÁ½ÌäÉ•±…¥½¹•Ì‘•°½É¥•¸ä‘•ÍÑ¥¹¼½¥¹¥‘•¸Á…É„•µÁÉ•Í„°µ•¹Ô°(€M½‰É”¹½Í½ÑÉ½Ì°ÍÕÕÉÍ…±•Ì°™…µ¥±¥…Ì°…Ñ•½É¥…Ì°ÁÉ½‘ÕÑ½Ì°Á…ÅÕ•Ñ”°(€½µÁ½¹•¹Ñ•Ìä‰…¹¹•ÉÌ¸(´MÕÁ…‰…Í”½¹Ñ¥•¹”Í½±…µ•¹Ñ”¹…±¥é„‘•¹ÑÉ¼‘”•ÍÑ”ÑÉ…Í±…‘¼ìÁÉÕ•‰…€¹¼(€•á¥ÍÑ”•¸•°‘•ÍÑ¥¹¼¸(´1…Ì€ÄÔUI1ÌÁÕ‰±¥…Ì‘”HÈÉ•ÍÁ½¹‘¥•É½¸!QQ@€ÈÀÁ€äÍÕÌ¡…Í¡•ÌM!´ÈÔØ(€½¥¹¥‘¥•É½¸½¸±½Ì…É¡¥Ù½Ì±½…±•Ì¸(´1…ÌÉÕÑ…ÌÙ•ÉÍ¥½¹…‘…Ì‘”•µÁÉ•Í„…ÑÕ…°°Í•ÉÙ¥¥½Ì°‰…¹¹•ÉÌäM½‰É”¹½Í½ÑÉ½Ì(€É•ÍÁ½¹‘¥•É½¸!QQ@€ÈÀÁ€ÕÍ…¹‘¼±½Ì‘…Ñ½Ìµ¥É…‘½Ì¸(´ÁåÑ¡½¸µ…¹…”¹Áä¡•­€èÍ¥¸ÁÉ½‰±•µ…Ì¸(´ÁåÑ¡½¸µ…¹…”¹Áäµ…­•µ¥É…Ñ¥½¹Ì€´µ¡•¬€´µ‘ÉäµÉÕ¹€èÍ¥¸…µ‰¥½ÌÁ•¹‘¥•¹Ñ•Ì¸(´ÁåÑ¡½¸µ…¹…”¹ÁäÑ•ÍÑ€è€ÄÔäÁÉÕ•‰…Ì…ÁÉ½‰…‘…Ì½¹ÑÉ„ME1¥Ñ”Ñ•µÁ½É…°°Í¥¸(€µ½‘¥™¥…ÈMÕÁ…‰…Í”¹¤HÈ¸((ŒŒ€ÈÀÈØ´Àà´ÀØ€´1¥‰•É…¥½¸‘”½¹•á¥½¹•Ì‘•°Á½½°‘”MÕÁ…‰…Í”()5½Ñ¥Ù¼è((´°M•ÍÍ¥½¸Á½½±•È…±…¹é¼ÍÔ±¥µ¥Ñ”‘”€ÄÔ±¥•¹Ñ•Ì‘ÕÉ…¹Ñ”±…ÌÁÉÕ•‰…Ì(€±½…±•Ìä‰±½ÅÕ•¼½Á•É…¥½¹•Ì‘•°…ÉÉ¥Ñ¼½¸5a=99MMM%=9€¸(´©…¹¼½¹Í•ÉÙ…‰„…‘„½¹•á¥½¸¡…ÍÑ„€ØÀÀÍ•Õ¹‘½Ìµ•‘¥…¹Ñ”(€=99}5a}€¸()…µ‰¥½Ìè((´Q	M}=99}5a}€Í”½¹™¥ÕÉ„‘•Í‘”•°•¹Ñ½É¹¼äÕÍ„€Á€Á½È‘•™•Ñ¼¸(´…‘„Í½±¥¥ÑÕ¥•ÉÉ„ÍÔ½¹•á¥½¸…°Ñ•Éµ¥¹…È°•Ù¥Ñ…¹‘¼…ÕµÕ±…È½¹•á¥½¹•Ì(€½¥½Í…Ì•¸•°Á½½°½µÁ…ÉÑ¥‘¼¸(´€¹•¹Ø¹•á…µÁ±•€ä±„Õ¥„‘”I•¹‘•È‘½Õµ•¹Ñ…¸•°Ù…±½ÈÉ•½µ•¹‘…‘¼¸()%µÁ…Ñ¼Á…É„•°™É½¹Ñ•¹è((´1…Ì½Á•É…¥½¹•Ì…ÕÑ•¹Ñ¥…‘…Ì‘•°…ÉÉ¥Ñ¼‘•©…¸‘”½µÁ•Ñ¥È½¸½¹•á¥½¹•Ì(€É•Ñ•¹¥‘…ÌÁ½ÈÍ½±¥¥ÑÕ‘•Ì…¹Ñ•É¥½É•Ì¸()Y•É¥™¥…¥½¸è((´©…¹¼…É¼=99}5a}ôÁ€‘•Í‘”±„½¹™¥ÕÉ…¥½¸±½…°¸(´ÁåÑ¡½¸µ…¹…”¹Áä¡•­€èÍ¥¸ÁÉ½‰±•µ…Ì¸(´1„½¹ÍÕ±Ñ„‘”•µÁÉ•Í„µ•‘¥…¹Ñ”•°ÁÉ½áä±½…°‘”Y¥Ñ”É•ÍÁ½¹‘¥¼!QQ@€ÈÀÁ€¸(
+  importadores ni procesos internos mientras la opcion esta desactivada.
+- Las imagenes antiguas no se borran al desactivar la configuracion; quedan
+  ocultas y pueden recuperarse si la empresa vuelve a activarla.
+- Los perfiles y combos conservan sus propias imagenes porque representan una
+  oferta agrupada, no un producto simple.
+
+Imagenes de clasificacion:
+
+- `Familia` conserva `imagen`, `imagen_url` e `imagen_final`.
+- Se agregaron `imagen`, `imagen_url` e `imagen_final` a `Categoria`.
+- La URL externa tiene prioridad sobre el archivo local.
+- Las APIs publicas de servicios incluyen `imagen_final` tanto para la familia
+  como para cada categoria.
+
+Uso esperado en frontend:
+
+- Consultar `productos_con_imagen` desde `/api/empresas/actual/`.
+- Si es verdadero, mostrar `imagen_final` de cada producto.
+- Si es falso, no reservar espacio de imagen en la tarjeta del producto.
+- En las pantallas de familias y categorias, usar siempre su propio
+  `imagen_final` cuando exista.
+- No reutilizar automaticamente la imagen de categoria en cada uno de los
+  cientos de productos; la presencia visual se mantiene en los niveles de
+  familia y categoria.
+
+Migraciones:
+
+- `catalogo.0005_categoria_imagen_categoria_imagen_url`
+- `empresas.0013_empresa_productos_con_imagen`
+
+Verificacion:
+
+- Las dos migraciones se aplicaron correctamente.
+- La base local confirma `Analiza.productos_con_imagen = False`.
+- `python manage.py check`: sin problemas.
+- `python manage.py makemigrations --check --dry-run`: sin cambios pendientes.
+- `python manage.py test empresas catalogo`: 24 pruebas aprobadas.
+- `python manage.py test`: 53 pruebas completas aprobadas.
+
+## 2026-07-30 - Descripciones breves del catalogo de examenes
+
+Estado: implementado, cargado y verificado.
+
+Alcance:
+
+- Se agrego una descripcion informativa a cada uno de los 328 examenes
+  importados del archivo de Analiza.
+- Cada descripcion contiene exactamente seis palabras.
+- La relacion se guarda por `codigo_barra`, evitando depender de nombres que
+  puedan escribirse de formas diferentes.
+- Los productos manuales `barrer` y `prueba` no se modificaron porque no
+  pertenecen al archivo importado.
+- La API publica de examenes ya entrega el texto mediante el campo
+  `descripcion` existente.
+
+Implementacion:
+
+- Catalogo auditable:
+  `catalogo/datos/descripciones_examenes.py`.
+- Comando reproducible:
+  `python manage.py agregar_descripciones_examenes`.
+- Simulacion sin escritura:
+  `python manage.py agregar_descripciones_examenes --dry-run`.
+- El comando exige exactamente 328 entradas.
+- El comando falla antes de escribir si falta algun codigo o si una
+  descripcion no contiene seis palabras.
+- La actualizacion se ejecuta dentro de una transaccion y es idempotente.
+
+Fuentes medicas de referencia:
+
+- MedlinePlus en espanol, directorio de pruebas de laboratorio:
+  `https://medlineplus.gov/spanish/pruebas-de-laboratorio/`.
+- CDC, directorio y conceptos de pruebas para enfermedades infecciosas:
+  `https://cdc.gov/infectious-diseases-labs/php/test-directory/`.
+- Mayo Clinic Laboratories, catalogo interpretativo de pruebas:
+  `https://www.mayocliniclabs.com/test-catalog/`.
+- NIDDK, pruebas diagnosticas de la tiroides:
+  `https://www.niddk.nih.gov/health-information/informacion-de-la-salud/pruebas-diagnosticas/pruebas-tiroides`.
+- American Thyroid Association, pruebas de funcion tiroidea:
+  `https://www.thyroid.org/las-pruebas-de-funcion-tiroidea/`.
+
+Consideracion clinica:
+
+- Los textos describen de forma general para que sirve cada prueba y no
+  sustituyen una indicacion, interpretacion o diagnostico medico.
+- Antes de publicarlos como contenido clinico definitivo conviene que el
+  director tecnico del laboratorio confirme que cada descripcion coincide con
+  la metodologia y el alcance exacto ofrecido por Analiza.
+
+Verificacion:
+
+- Primera simulacion: 328 examenes por actualizar.
+- Carga real: 328 descripciones actualizadas.
+- Segunda simulacion: 0 por actualizar y 328 sin cambios.
+- Base local: 328 descripciones con exactamente seis palabras.
+- API publica verificada con `Hemograma Completo`.
+- `python manage.py check`: sin problemas.
+- `python manage.py makemigrations --check --dry-run`: sin cambios pendientes.
+- `python manage.py test catalogo`: 12 pruebas aprobadas.
+- `python manage.py test`: 54 pruebas completas aprobadas.
+
+## 2026-07-30 - Favoritos persistentes para todo el catalogo
+
+Estado: implementado, migrado y verificado por modulo.
+
+Alcance:
+
+- Cada favorito continua perteneciendo a una empresa y un usuario autenticado.
+- Ahora puede apuntar a un producto, servicio, examen, perfil o combo.
+- Los favoritos permanecen en la base de datos y vuelven a mostrarse cuando el
+  cliente inicia sesion desde otro momento o dispositivo.
+- Los favoritos de cada cliente se mantienen separados.
+
+Integridad de datos:
+
+- `producto` ahora es opcional.
+- Se agrego `paquete` como referencia opcional a `PaqueteCatalogo`.
+- Una restriccion exige que exactamente uno de esos campos tenga valor.
+- Existen restricciones independientes para impedir duplicados de productos y
+  de perfiles/combos por empresa y usuario.
+- Los registros de favoritos existentes se conservan durante la migracion.
+
+API:
+
+- Listar: `GET /api/favoritos/?empresa_slug=Analiza`.
+- Agregar: `POST /api/favoritos/`.
+- Eliminar: `DELETE /api/favoritos/{id}/`.
+- El payload usa `codigo` y `tipo_articulo`.
+- `tipo_articulo` acepta `producto`, `perfil` o `combo`.
+- Si el tipo se omite y el codigo coincide con mas de un tipo, la API exige
+  indicarlo para evitar guardar el articulo equivocado.
+
+Respuesta unificada:
+
+- `articulo_codigo`.
+- `articulo_nombre`.
+- `articulo_descripcion`.
+- `articulo_imagen_final`.
+- `articulo_precio`.
+- `articulo_agotado`.
+- `articulo_familia`.
+- `articulo_categoria`.
+- Los campos anteriores `producto_*` se mantienen temporalmente para no romper
+  integraciones existentes.
+
+Imagenes:
+
+- Los productos y examenes respetan `productos_con_imagen`.
+- Cuando la empresa desactiva imagenes individuales, Favoritos devuelve
+  `articulo_imagen_final: null` para esos productos.
+- Los perfiles y combos conservan su imagen independiente.
+
+Migracion:
+
+- `favoritos.0002_favorito_paquete_alter_favorito_producto_and_more`
+
+Verificacion:
+
+- La migracion se aplico correctamente en la base local.
+- `python manage.py test favoritos`: 6 pruebas aprobadas.
+- `python manage.py makemigrations --check --dry-run`: sin cambios pendientes.
+- `python manage.py test`: 59 pruebas completas aprobadas.
+
+## 2026-07-30 - Carrito persistente con perfiles y combos
+
+Estado: implementado, migrado y verificado.
+
+Alcance:
+
+- El carrito guardado en la base de datos ahora acepta productos fisicos,
+  servicios, examenes, perfiles y combos.
+- Cada item apunta exactamente a un producto o a un `PaqueteCatalogo`.
+- Los articulos permanecen en `mi-carrito` entre sesiones del cliente.
+- Agregar nuevamente el mismo articulo aumenta su cantidad sin crear
+  duplicados.
+
+API:
+
+- Nueva ruta recomendada:
+  `POST /api/pedidos/carritos/{id}/agregar-articulo/`.
+- La ruta `agregar-producto` se conserva temporalmente como alias compatible.
+- El payload usa `codigo`, `tipo_articulo` y `cantidad`.
+- `tipo_articulo` acepta `producto`, `perfil` o `combo`.
+- El calculador publico tambien acepta `tipo_articulo` en cada linea.
+- Si un codigo coincide entre tipos y no se especifica el tipo, la solicitud se
+  rechaza para evitar ambiguedad.
+
+Respuesta de items:
+
+- `tipo_articulo`.
+- `articulo_nombre`.
+- `codigo`.
+- `codigo_interno`.
+- `codigo_barra`.
+- `tipo_item`.
+- `controla_inventario`.
+- `agotado`.
+- `imagen_final`.
+- `cantidad`.
+- `precio_unitario`.
+- `subtotal`.
+- Se mantienen nombres anteriores como `producto_nombre` e
+  `imagen_principal` durante la transicion del frontend.
+
+Seguridad:
+
+- El endpoint directo de items valida el propietario del carrito al crear y
+  tambien al intentar mover un item.
+- Un comprador no puede escribir en el carrito de otro usuario, aunque ambos
+  pertenezcan a la misma empresa.
+- Los carritos, productos, perfiles, combos y componentes inactivos se
+  rechazan antes de guardar.
+
+Precios y descuentos:
+
+- Productos y servicios simples usan su precio actual.
+- Perfiles y combos usan `precio_paquete`.
+- `mi-carrito` sincroniza el precio persistido cuando cambia el precio actual.
+- Los descuentos promocionales siguen aplicandose solamente a productos
+  simples.
+- Perfiles y combos conservan su precio independiente y descuento cero.
+
+Inventario:
+
+- Los servicios no controlan existencia.
+- Cada perfil o combo valida sus componentes fisicos.
+- La validacion suma cantidades cuando varios paquetes comparten un producto.
+- El calculador publico y el carrito persistente aplican la misma regla.
+- Al pagar se agrupan las salidas del mismo producto para evitar descuentos
+  parciales o duplicados.
+
+Fotografia historica del pedido:
+
+- `DetallePedido` ahora puede apuntar a producto o paquete.
+- Se agregaron `tipo_articulo`, `codigo_articulo` y `nombre_articulo`.
+- Se creo `DetallePedidoComponente` para fotografiar los productos incluidos
+  en perfiles y combos.
+- Si la composicion del paquete cambia despues de comprar, el pedido conserva
+  los componentes originales.
+- El inventario se descuenta usando esa fotografia historica.
+- La respuesta de pedido y la prefactura incluyen `componentes`.
+- Los detalles de pedidos existentes se completan automaticamente durante la
+  migracion.
+
+Migracion:
+
+- `pedidos.0011_detallepedidocomponente_alter_itemcarrito_options_and_more`
+
+Verificacion:
+
+- La migracion se aplico correctamente en la base local.
+- `python manage.py test pedidos`: 13 pruebas aprobadas.
+- `python manage.py check`: sin problemas.
+- `python manage.py makemigrations --check --dry-run`: sin cambios pendientes.
+- `python manage.py test`: 65 pruebas completas aprobadas.
+
+## 2026-07-30 - Limpieza del flujo de carrito y pedidos
+
+Codigo simplificado:
+
+- `AgregarProductoCarritoSerializer` se renombro internamente a
+  `AgregarArticuloCarritoSerializer`, porque procesa productos, perfiles y
+  combos.
+- Las opciones validas de `tipo_articulo` se centralizaron para no mantener
+  dos listas iguales.
+- Se retiro la validacion individual de existencia del calculador publico,
+  porque la validacion acumulada posterior cubre cada linea y tambien los
+  productos compartidos entre paquetes.
+- El calculador publico ahora rechaza perfiles o combos que contengan un
+  componente inactivo, igual que el carrito persistente y la generacion del
+  pedido.
+
+Compatibilidad conservada intencionalmente:
+
+- `agregar-producto` continua como alias temporal de `agregar-articulo`.
+- `codigo_barra` continua como entrada alternativa temporal de `codigo`.
+- `producto_nombre`, `imagen_principal` y `producto_nombre_actual` permanecen
+  en las respuestas mientras el frontend termina de adoptar los nombres
+  genericos.
+- Estos elementos no son codigo muerto: forman parte del contrato anterior
+  documentado para el frontend y retirarlos ahora podria romper una
+  integracion pendiente.
+
+Auditoria:
+
+- No se encontraron imports, clases nuevas, rutas internas ni metodos del
+  flujo actualizado sin referencias.
+- Los archivos de `pedidos` compilan correctamente.
+- `python manage.py test pedidos`: 14 pruebas aprobadas.
+- `python manage.py test`: 66 pruebas completas aprobadas.
+- `python manage.py check`: sin problemas.
+- `python manage.py makemigrations --check --dry-run`: sin cambios pendientes.
+
+## 2026-07-31 - Retiro del contrato antiguo del carrito
+
+El frontend termino la migracion al carrito unificado. Desde esta fecha queda
+un solo contrato oficial para productos, servicios, examenes, perfiles y
+combos.
+
+Elementos retirados:
+
+- Ruta `POST /api/pedidos/carritos/{id}/agregar-producto/`.
+- Entrada alternativa `codigo_barra` al agregar un articulo. Ahora el payload
+  exige `codigo`.
+- Campo duplicado `producto_nombre` en los items del carrito.
+- Campo duplicado `imagen_principal` en los items del carrito.
+- Campo duplicado `producto_nombre_actual` en los detalles del pedido.
+
+Contrato vigente:
+
+- Ruta `POST /api/pedidos/carritos/{id}/agregar-articulo/`.
+- Entrada con `codigo`, `tipo_articulo` y `cantidad`.
+- Items con `articulo_nombre` e `imagen_final`.
+- Detalles de pedido con `nombre_articulo` como valor historico.
+
+Alcance:
+
+- `codigo_barra` permanece como dato de salida para productos que tengan
+  codigo de barras; solo se retiro como nombre alternativo del payload.
+- `imagen_principal` permanece en el modelo y las APIs del catalogo; solo se
+  retiro su duplicado en la respuesta del carrito.
+- Las notas anteriores sobre compatibilidad quedan conservadas unicamente
+  como historial y ya no describen el contrato vigente.
+
+Verificacion:
+
+- La ruta antigua responde `404 Not Found`.
+- El payload con solo `codigo_barra` responde `400 Bad Request` y exige
+  `codigo`.
+- Las respuestas del carrito ya no contienen `producto_nombre` ni
+  `imagen_principal`.
+- Los detalles del pedido ya no contienen `producto_nombre_actual`.
+- `python manage.py test pedidos`: 16 pruebas aprobadas.
+- `python manage.py test`: 68 pruebas completas aprobadas.
+- `python manage.py check`: sin problemas.
+- `python manage.py makemigrations --check --dry-run`: sin cambios pendientes.
+
+## 2026-07-31 - Fotografia comercial inmutable del checkout
+
+La fotografia del pedido ya no es solamente una copia inicial. Desde este
+cambio tambien queda protegida contra modificaciones posteriores.
+
+Datos congelados:
+
+- Empresa, cliente y carrito de origen.
+- Numero y tipo de entrega.
+- Destinatario, telefono y direccion.
+- Subtotal, descuento, impuesto, tarifa de envio y total.
+- Moneda y observaciones.
+- Tipo, codigo, nombre, precio y cantidad de cada articulo.
+- Promocion aplicada y valores finales de cada linea.
+- Componentes incluidos originalmente en perfiles y combos.
+
+Reglas:
+
+- Cambiar productos, paquetes, impuestos o tarifas no altera pedidos creados.
+- Al marcar como pagado no se recalcula la tarifa ni el total.
+- Pago, descuento de inventario y creacion de prefactura se ejecutan dentro de
+  una misma transaccion.
+- Un pedido pagado no puede volver a pendiente.
+- Pedido, detalles y componentes no pueden eliminarse como registros
+  ordinarios.
+- Las APIs `pedidos/pedidos` y `pedidos/detalles` son de solo lectura.
+- En Django Admin los datos comerciales son de solo lectura y unicamente se
+  permite cambiar `estado_pago`.
+- `articulo_nombre_actual` se retiro de la respuesta. El frontend debe usar
+  `nombre_articulo`, que representa el valor historico comprado.
+
+Verificacion:
+
+- `python manage.py test pedidos`: 19 pruebas aprobadas.
+- `python manage.py test`: 71 pruebas completas aprobadas.
+- `python manage.py check`: sin problemas.
+- `python manage.py makemigrations --check --dry-run`: sin cambios pendientes.
+
+## 2026-07-31 - Base neutral de pagos y webhooks
+
+Se creo la app independiente `pagos` para conectar una pasarela sin acoplarla
+al carrito ni a los modelos comerciales del pedido.
+
+Modelos:
+
+- `Pago` conserva pedido, empresa, cliente, referencia UUID, proveedor, monto,
+  moneda, estado, identificador externo y fechas.
+- `EventoWebhookPago` registra el identificador del evento, hash del payload,
+  resultado y estado de procesamiento sin guardar datos sensibles.
+
+API:
+
+- `POST /api/pagos/iniciar/` crea o recupera el intento pendiente.
+- `GET /api/pagos/` lista los pagos visibles para el usuario o personal de la
+  empresa.
+- `GET /api/pagos/{referencia}/` consulta un intento por su referencia publica.
+- `POST /api/pagos/webhooks/{proveedor}/` recibe resultados firmados del
+  proveedor.
+
+Seguridad e integridad:
+
+- El frontend solo envia `pedido_id`; monto y moneda siempre salen del pedido.
+- Un cliente no puede iniciar ni consultar pagos de otro cliente.
+- Solo existe un pago pendiente por pedido.
+- Los eventos repetidos con el mismo contenido son idempotentes.
+- Reutilizar `evento_id` con otro contenido se rechaza.
+- La firma se valida con HMAC SHA-256 y comparacion de tiempo constante.
+- Un pago solo cambia de estado mediante un webhook verificado.
+- La aprobacion, el cambio del pedido, el inventario y la prefactura se
+  procesan de forma atomica.
+- Pagos confirmados y eventos se conservan como auditoria.
+- No se almacenan datos de tarjeta, CVV ni credenciales bancarias.
+
+Configuracion agregada:
+
+- `PAGOS_PROVEEDOR_DEFAULT`
+- `PAGOS_WEBHOOK_SECRET`
+
+Estado de integracion:
+
+- La base neutral y el proveedor local `simulado` estan preparados.
+- Todavia no existe un cobro real ni una URL de redireccion.
+- Al elegir la pasarela se implementara su adaptador de inicio, firma y
+  traduccion de estados.
+
+Migracion:
+
+- `pagos.0001_initial`
+
+Verificacion:
+
+- `python manage.py test pagos`: 7 pruebas aprobadas.
+- `python manage.py test pagos pedidos`: 26 pruebas aprobadas.
+- `python manage.py test`: 78 pruebas completas aprobadas.
+- `python manage.py check`: sin problemas.
+- `python manage.py makemigrations --check --dry-run`: sin cambios pendientes.
+- `pagos.0001_initial`: aplicada correctamente en la base local.
+
+## 2026-07-31 - Cuentas locales para pruebas de roles
+
+Se prepararon dos cuentas en la base local. Sus correos y contrasenas no se
+versionan y deben configurarse de forma segura en cada entorno.
+
+Superadministrador:
+
+- Usuario de Django Admin: `admin`
+- Rol: `administrador_maestro`
+- Empresa fija: ninguna
+- Cuenta activa y verificada.
+
+Comprador de Analiza:
+
+- Usuario: `compras`
+- Rol: `comprador`
+- Empresa: `Analiza`
+- Cuenta activa y verificada.
+
+Decision multiempresa:
+
+- La supercuenta utilizara una sola identidad para administrar cualquier empresa.
+- La empresa activa se determinara mediante dominio, subdominio o slug.
+- La cuenta compradora permanece vinculada exclusivamente con Analiza.
+- Antes del frontend administrativo se debe centralizar el contexto de empresa
+  en las APIs.
+
+Seguridad:
+
+- Estas credenciales son exclusivamente para desarrollo local.
+- Deben cambiarse antes de publicar el sistema o permitir acceso desde internet.
+- No se crearon migraciones ni se modificaron archivos de codigo.
+
+## 2026-08-03 - APIs completas para el panel administrativo React
+
+Estado: implementado, migrado, documentado y verificado.
+
+Objetivo:
+
+- Preparar el backend del panel administrativo sin modificar el frontend.
+- Mantener las APIs publicas actuales de la tienda.
+- Aplicar el aislamiento multiempresa en el servidor y no confiar en IDs de
+  empresa recibidos desde React.
+- Ejecutar el trabajo en ocho fases consecutivas, verificando cada modulo antes
+  de avanzar al siguiente.
+
+Contexto multiempresa:
+
+- Se agrego middleware para resolver la empresa mediante dominio, subdominio,
+  `X-Frontend-Host` o `empresa_slug` durante desarrollo local.
+- Se agrego `GET /api/empresas/contexto-administrativo/` para devolver usuario,
+  perfil, empresa actual, empresas disponibles y permisos.
+- Se agrego `GET/PATCH /api/empresas/mi-empresa/` para configuracion visual y
+  comercial de la empresa actual.
+- `PerfilUsuario` ahora tiene `empresas_permitidas` para limitar el alcance del
+  administrador maestro.
+- Administrador de empresa y gerente quedan forzados a su empresa aunque el
+  JSON intente enviar otra.
+- Las solicitudes explicitas hacia una empresa no permitida responden `403`.
+
+Empresa, menu y sucursales:
+
+- Se creo CRUD administrativo de menu en `/api/empresas/items-menu/`.
+- Clave y orden del menu son unicos dentro de cada empresa.
+- Se amplio `/api/empresas/sucursales/` con CRUD autenticado, busqueda, orden,
+  paginacion e inclusion opcional de inactivas.
+- La consulta publica de sucursales conserva su lista sin paginar y solo
+  devuelve sucursales activas.
+- Branding, colores, logo, imagen general de sucursales, datos de contacto,
+  envios, impuesto e imagenes de productos se pueden modificar desde
+  `mi-empresa`.
+- Slug, dominios, modo de inventario y activacion de empresa permanecen bajo
+  control del superusuario.
+
+Catalogo y paquetes:
+
+- El permiso de catalogo ahora reconoce `administrador_empresa`.
+- Familias, categorias y productos tienen CRUD administrativo paginado, filtros
+  por empresa, busqueda, orden e inclusion de inactivos.
+- El serializador administrativo de producto devuelve su `id` interno.
+- `existencia` permanece de solo lectura y solo cambia mediante inventario.
+- Se agrego CRUD `/api/catalogo/paquetes/` para perfiles y combos.
+- Cada componente del paquete recibe `producto_id`, `cantidad` y `orden`.
+- La cantidad del componente participa en validacion del carrito, disponibilidad
+  y descuento de inventario.
+- Paquetes activos no pueden quedar vacios ni mezclar productos de empresas.
+- Las eliminaciones protegidas por historial responden `409`.
+
+Promociones:
+
+- Banners, ofertas y descuentos continÃºan como tres recursos independientes.
+- Los CRUD de `/api/promociones/banners/`, `/api/promociones/ofertas/` y
+  `/api/promociones/descuentos/` quedaron aislados por empresas permitidas.
+- Se agregaron busqueda, orden, paginacion opcional e inclusion de inactivos.
+- Las ofertas reciben `productos_ids` para uno o varios productos segun su tipo.
+- Todas las relaciones se validan contra la empresa actual.
+
+Usuarios y sesiones:
+
+- Se agrego CRUD sin eliminacion en `/api/usuarios/administracion/`.
+- Superusuario crea administradores maestros y cualquier rol empresarial.
+- Administrador maestro gestiona roles de sus empresas permitidas.
+- Administrador de empresa gestiona gerentes y compradores.
+- Gerente gestiona compradores solo cuando tiene
+  `puede_crear_usuarios=true`.
+- Comprador no tiene acceso al panel.
+- Se agregaron filtros por texto, rol, estado, empresa y orden.
+- La contrasena nunca aparece en las respuestas.
+- Las acciones `bloquear` y `desbloquear` cambian tanto el perfil como el usuario
+  Django.
+- Bloquear, desactivar o cambiar contrasena revoca todos los refresh tokens.
+- Crear sin `correo_verificado=true` deja la cuenta inactiva.
+- El login rechaza perfiles con correo sin verificar.
+
+Contactos, pedidos y pagos:
+
+- Contactos permite creacion publica y bandeja administrativa aislada por
+  empresa.
+- En un mensaje administrativo solo se puede modificar `estado`; nombre,
+  contacto y contenido quedan como historial.
+- Pedidos y detalles siguen siendo de solo lectura y ahora admiten filtros por
+  estado, cliente, busqueda, fechas y orden.
+- Administrador de empresa y gerente pueden consultar todos los pedidos de su
+  empresa; compradores solo los propios.
+- Pagos ahora devuelve empresa y cliente para la bandeja administrativa.
+- Se agregaron filtros por estado, proveedor, cliente, referencia, fechas y
+  orden.
+- Pedidos y pagos conservan su inmutabilidad; los estados de pago solo cambian
+  mediante el flujo controlado y webhook firmado.
+
+Paginacion y errores:
+
+- Se agrego paginacion administrativa de 20 registros y maximo 100 mediante
+  `tamano_pagina`.
+- Promociones, contactos, pedidos y pagos aceptan `paginar=true` para conservar
+  compatibilidad con respuestas anteriores.
+- Los rangos de fecha usan `fecha_desde` y `fecha_hasta` en formato
+  `AAAA-MM-DD`.
+- Se estandarizo `409 Conflict` cuando una eliminacion esta bloqueada por
+  historial relacionado.
+
+Migraciones:
+
+- `usuarios.0006_perfilusuario_empresas_permitidas`.
+- `catalogo.0006_paqueteproducto_cantidad`.
+- Ambas quedaron aplicadas en la base local.
+
+Documentacion para frontend:
+
+- Se creo `docs/API_PANEL_ADMINISTRATIVO.md` como contrato oficial del panel
+  React.
+- Incluye autenticacion, contexto de empresa, matriz de roles, endpoints,
+  filtros, paginacion, imagenes, errores y reglas de eliminacion.
+- `docs/BRIEF_FRONTEND.md` ahora enlaza este contrato para reemplazar secciones
+  antiguas que marcaban estas APIs como pendientes.
+
+Verificacion final:
+
+- `python manage.py check`: sin problemas.
+- `python manage.py makemigrations --check --dry-run`: sin cambios pendientes.
+- `catalogo.0006` y `usuarios.0006`: aplicadas.
+- `python manage.py test`: 134 pruebas aprobadas.
+- `git diff --check`: sin errores de formato.
+- Aviso no bloqueante: la carpeta generada `staticfiles` aun no existe.
+
+Fuera de alcance de este cambio:
+
+- No se modifico el proyecto frontend.
+- No se conecto Supabase.
+- No se integro una pasarela real ni credenciales de produccion.
+
+## 2026-08-03 - Menu de modulos oficiales y plantilla Sobre nosotros
+
+Estado: implementado, migrado, documentado y verificado.
+
+Decision funcional:
+
+- Se descarto la creacion de paginas y rutas genericas.
+- Todas las empresas usan el mismo conjunto de modulos oficiales.
+- Cada empresa solo cambia el texto visible, el orden y el estado activo de
+  cada modulo.
+- Las paginas funcionales conservan plantillas conocidas por el frontend.
+
+Menu oficial:
+
+- `inicio` usa `/`.
+- `examenes` usa `/examenes`.
+- `perfiles` usa `/perfiles`.
+- `servicios` usa `/servicios`.
+- `promociones` usa `/promociones`.
+- `sucursales` usa `/sucursales`.
+- `contacto` usa `/contacto`.
+- `sobre_nosotros` usa `/sobre-nosotros`.
+
+Restricciones:
+
+- Toda empresa nueva recibe automaticamente los ocho modulos.
+- `clave`, `ruta` y `abre_en_nueva_pestana` son inmutables.
+- `POST` y `DELETE` de `/api/empresas/items-menu/` ya no estan disponibles.
+- La API y Django Admin solo permiten cambiar `texto`, `orden` y `activo`.
+- No se permiten dos modulos con el mismo orden dentro de una empresa.
+- La base de datos rechaza claves que no pertenezcan al menu oficial.
+- En Django Admin se retiraron las opciones de agregar y eliminar items.
+
+Conversion de datos locales:
+
+- El item `Sobre_nosotros` de Analiza se convirtio a `sobre_nosotros`.
+- Su ruta cambio de `/sobrenosotros` a `/sobre-nosotros`.
+- Se conservaron su texto, orden y estado activo.
+- Los modulos oficiales faltantes se completaron para las empresas existentes.
+- Los items libres que no correspondian a una plantilla oficial se retiraron.
+- Los ordenes duplicados heredados se normalizaron conservando primero el
+  modulo mas antiguo y moviendo el duplicado al primer numero libre.
+- En Analiza, `Servicios` conservo el orden 2 y `Examenes` quedo en el orden 4.
+
+Plantilla Sobre nosotros:
+
+- Se creo un registro `SobreNosotrosEmpresa` uno a uno con cada empresa.
+- Los campos fijos son titulo, introduccion, historia, mision, vision, valores,
+  compromiso, imagen e imagen URL.
+- `valores_lista` convierte las lineas no vacias de `valores` en una lista para
+  el frontend.
+- `imagen_final` conserva compatibilidad con archivos locales y futuras URLs de
+  R2.
+- Las fichas se crean automaticamente para empresas nuevas y mediante migracion
+  para empresas existentes.
+
+APIs:
+
+- Publica: `GET /api/empresas/sobre-nosotros/?empresa_slug=Analiza`.
+- Administrativa: `GET/PATCH /api/empresas/mi-sobre-nosotros/`.
+- La API publica no expone IDs internos ni empresa.
+- Si `sobre_nosotros` esta desactivado en el menu, la consulta publica responde
+  `404`.
+- Administrador maestro, administrador de empresa y gerente respetan el mismo
+  aislamiento multiempresa del resto del panel.
+- Compradores no pueden modificar este contenido.
+
+Frontend:
+
+- La ruta oficial que debe implementar React es `/sobre-nosotros`.
+- Debe existir un solo componente fijo para todas las empresas.
+- Las secciones vacias pueden ocultarse.
+- Servicios no debe usarse como respaldo para esta ruta ni para rutas
+  desconocidas.
+- Se actualizaron `docs/API_PANEL_ADMINISTRATIVO.md` y
+  `docs/BRIEF_FRONTEND.md` con el contrato nuevo.
+
+Migracion:
+
+- `empresas.0014_sobrenosotrosempresa_alter_itemmenuempresa_clave_and_more`.
+- `empresas.0015_normalizar_orden_menu_oficial`.
+- Ambas quedaron aplicadas correctamente en la base local.
+
+Verificacion:
+
+- `python manage.py check`: sin problemas.
+- `python manage.py makemigrations --check --dry-run`: sin cambios pendientes.
+- `python manage.py test empresas`: 39 pruebas aprobadas.
+- `python manage.py test`: 143 pruebas aprobadas.
+- `git diff --check`: sin errores de formato.
+
+## 2026-08-03 - Contenido institucional de Analiza
+
+Fuente:
+
+- `Presentacion Analiza-Clientes Corporativos (1).pdf`.
+
+Datos cargados en `SobreNosotrosEmpresa` para la empresa con slug `Analiza`:
+
+- Introduccion con la presencia regional y atencion mediante sucursales en
+  Honduras.
+- Mision institucional.
+- Vision de liderazgo regional para el ano 2030.
+- Valores: Calidad, Innovacion, Servicio y Tecnologia.
+- Compromiso con proyeccion social, cuidado del medio ambiente, manejo de
+  residuos bioinfecciosos y capacitacion del equipo.
+- `historia` permanece vacia porque el documento no incluye una historia
+  empresarial identificable.
+- No se asigno una imagen: las imagenes del documento forman parte de las
+  diapositivas y no se utilizaron como recortes para la pagina web.
+
+Alcance:
+
+- No se modificaron modelos, migraciones, serializers, vistas ni rutas.
+- La API publica existente respondio `200` con el contenido mediante
+  `GET /api/empresas/sobre-nosotros/?empresa_slug=Analiza`.
+
+## 2026-08-03 - Redes sociales por empresa
+
+Configuracion:
+
+- Se agregaron a `Empresa` las URLs opcionales `instagram_url`,
+  `whatsapp_url`, `facebook_url` y `tiktok_url`.
+- Los enlaces deben usar HTTPS y pertenecer al dominio oficial de la red.
+- Django Admin muestra los cuatro campos dentro de `Redes sociales`.
+- `GET/PATCH /api/empresas/mi-empresa/` permite consultar y actualizar los
+  enlaces de la empresa administrada.
+- Los enlaces de Analiza permanecen vacios hasta recibir sus URLs oficiales.
+
+Contrato publico unico:
+
+- `GET /api/empresas/actual/?host=...` y su respaldo
+  `GET /api/empresas/publica/?slug=Analiza` devuelven el objeto
+  `redes_sociales`.
+- No se crearon endpoints adicionales.
+- Contacto y Sobre nosotros no duplican las redes en sus respuestas.
+- El frontend debe cargar la configuracion de empresa una vez y reutilizarla
+  debajo del nombre en Contacto y al final de Sobre nosotros.
+- Una URL vacia indica que el icono correspondiente no debe mostrarse.
+
+Migracion y pruebas:
+
+- Se creo y aplico
+  `empresas.0016_empresa_facebook_url_empresa_instagram_url_and_more`.
+- `python manage.py test empresas`: 47 pruebas aprobadas.
+- `python manage.py test`: 151 pruebas aprobadas.
+
+## 2026-08-03 - Superusuario automatico para Render
+
+Motivo:
+
+- El plan actual de Render no permite usar Shell y la base desplegada inicia
+  vacia.
+
+Implementacion:
+
+- Se creo el comando `python manage.py asegurar_superusuario`.
+- Lee `DJANGO_SUPERUSER_USERNAME`, `DJANGO_SUPERUSER_EMAIL` y
+  `DJANGO_SUPERUSER_PASSWORD` desde el entorno.
+- Crea o actualiza el mismo usuario de forma idempotente, sin duplicarlo.
+- Asegura permisos de superusuario, acceso a Django Admin, perfil de
+  administrador maestro, correo verificado y usuario activo.
+- Valida la contrasena con las reglas de seguridad de Django y nunca la imprime
+  en los logs.
+- Se creo `start.sh` para ejecutar migraciones, asegurar el superusuario e
+  iniciar Gunicorn.
+- El Start Command de Render debe ser `bash start.sh`.
+- Las credenciales reales no se guardan en Git ni en la documentacion.
+
+Verificacion:
+
+- `python manage.py test usuarios.tests_comandos`: 4 pruebas aprobadas.
+- `python manage.py test`: 155 pruebas aprobadas.
+- Se agrego `docs/DESPLIEGUE_RENDER.md` con la configuracion completa.
+
+## 2026-08-04 - Configuracion centralizada en entorno
+
+Objetivo:
+
+- Evitar valores ambientales duplicados dentro de `config/settings.py`.
+- Usar los mismos nombres desde `.env` en desarrollo y desde Environment en
+  Render.
+
+Cambios:
+
+- `SECRET_KEY`, `DJANGO_DEBUG`, hosts, CORS, base de datos, JWT, correo y pagos
+  ahora se leen mediante `python-decouple` sin valores concretos de respaldo en
+  `settings.py`.
+- Se agrego `CORS_ALLOW_CREDENTIALS` a la configuracion externa.
+- `DATABASE_URL` ahora se lee con `python-decouple` y se procesa con
+  `dj-database-url`, por lo que funciona tanto desde `.env` como desde Render.
+- El `.env` local se completo con todos los nombres requeridos. La base se
+  configuro inicialmente con SQLite y despues se cambio a Supabase PostgreSQL;
+  el correo por consola y los pagos simulados se conservan para desarrollo.
+- `.env.example` contiene el mismo contrato sin credenciales reales.
+- `asegurar_superusuario` usa `python-decouple`, permitiendo leer un `.env`
+  local o variables del proceso en Render.
+- `STATICFILES_DIRS` incluye `static/` solamente cuando la carpeta existe, por
+  lo que Render deja de reportar `staticfiles.W004`.
+- `docs/DESPLIEGUE_RENDER.md` incluye el bloque completo requerido por Render.
+
+Verificacion inicial:
+
+- `python manage.py check`: sin problemas ni advertencias de staticfiles.
+- La configuracion se valido inicialmente con SQLite, CORS, JWT, correo de
+  consola y pagos simulados desde el `.env` local.
+- `python manage.py test usuarios.tests_comandos`: 4 pruebas aprobadas.
+- `python manage.py test`: 155 pruebas aprobadas.
+- `python manage.py makemigrations --check --dry-run`: sin cambios pendientes.
+
+## 2026-08-04 - Base local conectada a Supabase PostgreSQL
+
+Conexion:
+
+- El desarrollo local ahora usa Supabase PostgreSQL mediante `DATABASE_URL`.
+- Se utiliza el Session pooler por IPv4, puerto `5432` y conexion SSL.
+- La contrasena se codifico para URL sin mostrarla ni guardarla en Git.
+- La cadena completa existe solamente en `.env`, que continua ignorado por
+  `.gitignore`.
+- `db.sqlite3` se conserva intacta como origen para trasladar posteriormente
+  los datos locales de Analiza.
+
+Creacion del esquema:
+
+- Se ejecuto `python manage.py migrate --noinput` contra Supabase.
+- Se aplicaron todas las migraciones de Django y de las aplicaciones del
+  proyecto.
+- Supabase contiene 41 tablas publicas creadas por Django.
+- Todavia no se importaron empresas, catalogo, usuarios ni otros datos desde
+  SQLite.
+
+Verificacion:
+
+- La autenticacion y una consulta de solo lectura a PostgreSQL respondieron
+  correctamente.
+- `python manage.py migrate --check`: sin migraciones pendientes.
+- `python manage.py check`: sin problemas detectados.
+
+## 2026-08-04 - Compatibilidad de rutas API versionadas
+
+Motivo:
+
+- El frontend desplegado consulta rutas bajo `/api/v1/`, mientras el backend
+  exponia solamente el prefijo `/api/`.
+
+Cambios:
+
+- Todos los modulos del backend aceptan ahora ambos prefijos: `/api/` y
+  `/api/v1/`.
+- Las rutas existentes se conservaron para no romper integraciones previas.
+- `reverse()` continua generando las rutas originales bajo `/api/`.
+- Se agregaron pruebas para la empresa actual y la renovacion del token JWT
+  mediante el prefijo versionado.
+
+Verificacion:
+
+- `python manage.py test config`: 3 pruebas aprobadas.
+- `python manage.py test`: 158 pruebas aprobadas usando SQLite de pruebas, sin
+  alterar Supabase.
+
+## 2026-08-04 - Preparacion de Cloudflare R2 para imagenes
+
+Dependencias:
+
+- Se agregaron `django-storages`, `boto3` y sus dependencias fijadas.
+- R2 se integra mediante su API compatible con S3.
+
+Configuracion:
+
+- `R2_STORAGE_ENABLED` permite alternar entre `media/` local y R2.
+- Las credenciales, bucket, endpoint, URL publica y region se leen desde el
+  entorno y no se guardan en Git.
+- Los `ImageField` usan R2 cuando esta habilitado, bajo el prefijo `media/`.
+- Los archivos repetidos no sobrescriben los existentes.
+- Las URLs publicas no llevan firma temporal y WhiteNoise conserva la gestion
+  de archivos estaticos.
+- Se creo `docs/CONFIGURACION_CLOUDFLARE_R2.md` con el procedimiento local y
+  de Render.
+
+Compatibilidad JWT:
+
+- La cookie de renovacion ahora usa la ruta `/api/`, permitiendo enviarla tanto
+  a `/api/usuarios/token/` como a `/api/v1/usuarios/token/`.
+- Se agrego una prueba de renovacion por la ruta versionada.
+
+Migracion acordada:
+
+- Solo se trasladara Analiza desde SQLite a Supabase y R2.
+- La empresa `prueba` y todos sus registros quedan excluidos.
+
+Verificacion inicial:
+
+- `pip check`: dependencias consistentes.
+- `python manage.py check`: correcto con R2 deshabilitado.
+- `python manage.py check`: correcto con R2 habilitado y configuracion ficticia.
+- Ocho pruebas de configuracion de rutas y autenticacion JWT aprobadas.
+- `python manage.py test`: 159 pruebas aprobadas usando SQLite de pruebas.
+- `python manage.py makemigrations --check --dry-run`: sin cambios de modelos.
+- Se completo una prueba real con las credenciales locales de R2: Django subio
+  un objeto temporal, confirmo su existencia y genero su URL publica.
+- La URL publica respondio HTTP `200` y devolvio exactamente el contenido
+  almacenado.
+- El objeto temporal se elimino al finalizar y R2 confirmo que ya no existia.
+- Las credenciales permanecen solamente en `.env`, fuera de Git.
+
+## 2026-08-04 - Migracion de Analiza a Supabase y Cloudflare R2
+
+Alcance trasladado:
+
+- 1 empresa: Analiza Laboratorios Clinicos.
+- 8 elementos del menu.
+- 1 contenido de Sobre nosotros.
+- 2 sucursales.
+- 2 familias y 15 categorias.
+- 331 productos o servicios.
+- 1 paquete o perfil con 2 componentes.
+- 4 banners promocionales.
+- 15 imagenes relacionadas con la empresa y el catalogo.
+
+Exclusiones:
+
+- La empresa `prueba` no se copio y el importador la rechaza expresamente.
+- No se trasladaron usuarios, carritos, pedidos, pagos, favoritos, mensajes de
+  contacto ni otros movimientos creados para pruebas.
+- `db.sqlite3` permanece intacta como respaldo local del origen.
+
+Implementacion:
+
+- Se agrego la conexion opcional `LEGACY_DATABASE_URL` para consultar SQLite
+  como origen sin dejar de usar Supabase como base principal.
+- Se creo `python manage.py migrar_analiza_supabase`, con modo `--dry-run`.
+- El comando conserva las relaciones y rutas de imagen, reutiliza objetos
+  identicos de R2 y usa claves naturales para poder repetirse sin duplicados.
+- Las escrituras en Supabase se realizan dentro de una transaccion y las
+  subidas nuevas se eliminan si la importacion de datos falla.
+- La carga de los 331 productos usa una operacion masiva de PostgreSQL.
+- Se corrigio la conservacion exacta de ordenes con valor `0` frente a los
+  ordenes automaticos de los modelos de Django.
+
+Verificacion final:
+
+- Los campos y relaciones del origen y destino coinciden para empresa, menu,
+  Sobre nosotros, sucursales, familias, categorias, productos, paquete,
+  componentes y banners.
+- Supabase contiene solamente Analiza dentro de este traslado; `prueba` no
+  existe en el destino.
+- Las 15 URLs publicas de R2 respondieron HTTP `200` y sus hashes SHA-256
+  coincidieron con los archivos locales.
+- Las rutas versionadas de empresa actual, servicios, banners y Sobre nosotros
+  respondieron HTTP `200` usando los datos migrados.
+- `python manage.py check`: sin problemas.
+- `python manage.py makemigrations --check --dry-run`: sin cambios pendientes.
+- `python manage.py test`: 159 pruebas aprobadas contra SQLite temporal, sin
+  modificar Supabase ni R2.
+
+## 2026-08-06 - Liberacion de conexiones del pool de Supabase
+
+Motivo:
+
+- El Session pooler alcanzo su limite de 15 clientes durante las pruebas
+  locales y bloqueo operaciones del carrito con `EMAXCONNSESSION`.
+- Django conservaba cada conexion hasta 600 segundos mediante
+  `CONN_MAX_AGE`.
+
+Cambios:
+
+- `DATABASE_CONN_MAX_AGE` se configura desde el entorno y usa `0` por defecto.
+- Cada solicitud cierra su conexion al terminar, evitando acumular conexiones
+  ociosas en el pool compartido.
+- `.env.example` y la guia de Render documentan el valor recomendado.
+
+Impacto para el frontend:
+
+- Las operaciones autenticadas del carrito dejan de competir con conexiones
+  retenidas por solicitudes anteriores.
+
+Verificacion:
+
+- Django cargo `CONN_MAX_AGE=0` desde la configuracion local.
+- `python manage.py check`: sin problemas.
+- La consulta de empresa mediante el proxy local de Vite respondio HTTP `200`.
