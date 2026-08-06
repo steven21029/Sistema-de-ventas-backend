@@ -49,6 +49,7 @@ CORS_ALLOWED_ORIGINS=https://sistema-de-ventas-frontend-sandy.vercel.app
 CSRF_TRUSTED_ORIGINS=https://sistema-de-ventas-frontend-sandy.vercel.app
 CORS_ALLOW_CREDENTIALS=True
 DATABASE_URL=postgresql://USUARIO:CONTRASENA@HOST_POOLER:5432/postgres?sslmode=require
+DATABASE_CONN_MAX_AGE=0
 R2_STORAGE_ENABLED=True
 R2_ACCESS_KEY_ID=CLAVE_DE_ACCESO_R2
 R2_SECRET_ACCESS_KEY=CLAVE_SECRETA_R2
@@ -88,6 +89,8 @@ sube a Git.
 ## Persistencia
 
 - Render usa Supabase PostgreSQL mediante `DATABASE_URL` para los datos.
+- `DATABASE_CONN_MAX_AGE=0` libera la conexion al terminar cada solicitud y
+  evita agotar el limite del Session pooler de Supabase.
 - Las imagenes usan Cloudflare R2 cuando `R2_STORAGE_ENABLED=True`.
 - No se depende del disco efimero de Render para datos ni archivos cargados.
 - Durante pruebas se permite `r2.dev`; para produccion se configurara un
