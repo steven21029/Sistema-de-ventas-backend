@@ -62,11 +62,14 @@ JWT_SESSION_MAX_HOURS=5
 JWT_REFRESH_COOKIE_NAME=ventas_refresh
 JWT_REFRESH_COOKIE_SECURE=True
 JWT_REFRESH_COOKIE_SAMESITE=None
-EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
 EMAIL_HOST=smtp-relay.brevo.com
 EMAIL_PORT=587
 EMAIL_USE_TLS=True
-DEFAULT_FROM_EMAIL=Sistema de Ventas <no-reply@example.com>
+EMAIL_TIMEOUT=10
+EMAIL_HOST_USER=USUARIO_SMTP_DE_BREVO
+EMAIL_HOST_PASSWORD=CLAVE_SMTP_DE_BREVO
+DEFAULT_FROM_EMAIL=Sistema de Ventas <REMITENTE_VERIFICADO_EN_BREVO>
 PAGOS_PROVEEDOR_DEFAULT=simulado
 DJANGO_SUPERUSER_USERNAME=admin
 DJANGO_SUPERUSER_EMAIL=correo-administrativo@example.com
@@ -75,9 +78,15 @@ DJANGO_SUPERUSER_PASSWORD=UNA_CONTRASENA_SEGURA
 
 No incluir `/` al final de los origenes o dominios.
 
-`CORS_ALLOWED_ORIGIN_REGEXES`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` y
-`PAGOS_WEBHOOK_SECRET` son opcionales. Pueden omitirse mientras se usan
-origenes CORS exactos, correo por consola y pagos simulados.
+`CORS_ALLOWED_ORIGIN_REGEXES` y `PAGOS_WEBHOOK_SECRET` son opcionales mientras
+se usan origenes CORS exactos y pagos simulados. `EMAIL_HOST_USER` y
+`EMAIL_HOST_PASSWORD` son obligatorios cuando se activa el backend SMTP.
+
+En Brevo, `EMAIL_HOST_USER` es el inicio de sesion SMTP y
+`EMAIL_HOST_PASSWORD` es una clave SMTP, no la contrasena de la cuenta ni una
+clave de API. El correo incluido en `DEFAULT_FROM_EMAIL` debe existir como
+remitente verificado en Brevo. Guardar estos valores solamente en
+`Render > Environment` y en el `.env` local ignorado por Git.
 
 Las variables `R2_*` son obligatorias cuando `R2_STORAGE_ENABLED=True`. Las
 credenciales deben pertenecer a un token limitado al bucket de medios.
