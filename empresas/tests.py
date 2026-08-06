@@ -183,7 +183,10 @@ class EmpresaActualAPITests(APITestCase):
         self.assertEqual(response.data[0]["nombre"], "Sucursal Centro")
         self.assertIsNone(response.data[0]["imagen_final"])
         self.assertNotIn("imagen_url", response.data[0])
-        self.assertNotIn("id", response.data[0])
+        self.assertEqual(
+            response.data[0]["id"],
+            SucursalEmpresa.objects.get(nombre="Sucursal Centro").pk,
+        )
 
     def test_sucursales_usan_imagen_general_de_empresa(self):
         self.empresa.imagen_sucursales_url = "https://example.com/sucursales-general.jpg"

@@ -329,6 +329,8 @@ class PedidoSerializer(serializers.ModelSerializer):
             "departamento_entrega",
             "municipio_entrega",
             "estado_pago",
+            "metodo_pago",
+            "sucursal_pago",
             "subtotal",
             "descuento_total",
             "impuesto",
@@ -359,6 +361,10 @@ class GenerarPedidoDesdeCarritoSerializer(serializers.Serializer):
     referencia_entrega = serializers.CharField(required=False, allow_blank=True, default="")
     departamento_entrega = serializers.CharField(required=False, allow_blank=True, default="")
     municipio_entrega = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class PagoEnSucursalSerializer(serializers.Serializer):
+    sucursal_id = serializers.IntegerField(min_value=1)
 
 
 class AgregarArticuloCarritoSerializer(serializers.Serializer):
@@ -733,6 +739,7 @@ class PrefacturaSerializer(serializers.ModelSerializer):
     )
     direccion_entrega = serializers.SerializerMethodField()
     metodo_pago = serializers.SerializerMethodField()
+    sucursal = serializers.SerializerMethodField()
     estado_pago = serializers.CharField(source="pedido.estado_pago", read_only=True)
     estado_pago_nombre = serializers.CharField(
         source="pedido.get_estado_pago_display",
@@ -807,8 +814,10 @@ class PrefacturaSerializer(serializers.ModelSerializer):
             "total",
             "moneda",
             "metodo_pago",
+            "sucursal",
             "estado_pago",
             "estado_pago_nombre",
+            "fecha_vencimiento",
             "leyenda",
         ]
         read_only_fields = fields
@@ -848,4 +857,15 @@ class PrefacturaSerializer(serializers.ModelSerializer):
         }
 
     def get_metodo_pago(self, obj):
-        return "pendiente_integracion_pago"
+        return obj.pedido.metodo_pago
+
+    def get_sucursal(self, obj):
+        sucursal = obj.pedido.sucursal_pago
+        if not sucursal:
+            return None
+        return {
+            "id": sucursal.pk,
+            "nombre": sucursal.nombre,
+            "direccion": sucursal.direccion,
+            "telefono": sucursal.telefono,
+        }

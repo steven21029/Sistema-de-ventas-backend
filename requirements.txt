@@ -9,6 +9,7 @@ djangorestframework==3.17.1
 djangorestframework-simplejwt==5.5.1
 gunicorn==26.0.0
 jmespath==1.1.0
+openpyxl==3.1.5
 packaging==26.2
 pillow==12.3.0
 PyJWT==2.13.0
@@ -16,6 +17,7 @@ psycopg==3.3.4
 psycopg-binary==3.3.4
 python-decouple==3.8
 python-dateutil==2.9.0.post0
+reportlab==5.0.0
 s3transfer==0.19.2
 six==1.17.0
 sqlparse==0.5.5

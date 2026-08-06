@@ -64,6 +64,8 @@ class PedidoAdmin(admin.ModelAdmin):
         "usuario",
         "empresa",
         "tipo_entrega",
+        "metodo_pago",
+        "sucursal_pago",
         "estado_pago",
         "inventario_descontado",
         "subtotal",
@@ -74,6 +76,8 @@ class PedidoAdmin(admin.ModelAdmin):
     list_filter = (
         "empresa",
         "tipo_entrega",
+        "metodo_pago",
+        "sucursal_pago",
         "estado_pago",
         "inventario_descontado",
         "moneda",
@@ -86,6 +90,8 @@ class PedidoAdmin(admin.ModelAdmin):
         "carrito_origen",
         "numero",
         "tipo_entrega",
+        "metodo_pago",
+        "sucursal_pago",
         "nombre_recibe",
         "telefono_recibe",
         "direccion_entrega",
@@ -237,7 +243,16 @@ class DetallePedidoComponenteAdmin(admin.ModelAdmin):
 
 @admin.register(Prefactura)
 class PrefacturaAdmin(admin.ModelAdmin):
-    list_display = ("numero", "pedido", "empresa", "cliente", "fecha_creacion")
+    list_display = (
+        "numero",
+        "pedido",
+        "empresa",
+        "cliente",
+        "fecha_vencimiento",
+        "intentos_correo",
+        "correo_enviado_en",
+        "fecha_creacion",
+    )
     search_fields = (
         "numero",
         "pedido__numero",
@@ -250,6 +265,10 @@ class PrefacturaAdmin(admin.ModelAdmin):
     readonly_fields = (
         "numero",
         "leyenda",
+        "fecha_vencimiento",
+        "intentos_correo",
+        "fecha_ultimo_intento_correo",
+        "correo_enviado_en",
         "fecha_creacion",
         "fecha_actualizacion",
     )

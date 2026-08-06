@@ -23,6 +23,7 @@ class PagoSerializer(serializers.ModelSerializer):
             "usuario",
             "usuario_email",
             "proveedor",
+            "metodo",
             "identificador_externo",
             "monto",
             "moneda",

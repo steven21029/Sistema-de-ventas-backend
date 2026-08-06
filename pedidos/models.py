@@ -1,17 +1,23 @@
 import uuid
+from datetime import timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
+from django.utils import timezone
 
 from catalogo.models import PaqueteCatalogo, Producto
-from empresas.models import Empresa
+from empresas.models import Empresa, SucursalEmpresa
 
 
 ISV_RATE = Decimal("0.15")
 MONEY_QUANTIZER = Decimal("0.01")
+
+
+def fecha_vencimiento_prefactura():
+    return timezone.now() + timedelta(hours=settings.PREFACTURA_VIGENCIA_HORAS)
 
 
 class Carrito(models.Model):
@@ -234,6 +240,12 @@ class Pedido(models.Model):
     class EstadoPago(models.TextChoices):
         PENDIENTE = "pendiente", "Pendiente"
         PAGADO = "pagado", "Pagado"
+        CANCELADO = "cancelado", "Cancelado"
+
+    class MetodoPago(models.TextChoices):
+        PENDIENTE = "pendiente", "Pendiente de seleccion"
+        EN_LINEA = "en_linea", "Pago en linea"
+        SUCURSAL = "sucursal", "Pago en sucursal"
 
     empresa = models.ForeignKey(
         Empresa,
@@ -269,6 +281,18 @@ class Pedido(models.Model):
         choices=EstadoPago.choices,
         default=EstadoPago.PENDIENTE,
     )
+    metodo_pago = models.CharField(
+        max_length=20,
+        choices=MetodoPago.choices,
+        default=MetodoPago.PENDIENTE,
+    )
+    sucursal_pago = models.ForeignKey(
+        SucursalEmpresa,
+        on_delete=models.PROTECT,
+        related_name="pedidos_pago_sucursal",
+        null=True,
+        blank=True,
+    )
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     descuento_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     impuesto = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -297,6 +321,7 @@ class Pedido(models.Model):
 
     def clean(self):
         super().clean()
+        self._validar_metodo_pago()
         if self.pk:
             try:
                 original = Pedido.objects.get(pk=self.pk)
@@ -377,6 +402,22 @@ class Pedido(models.Model):
                 }
             )
 
+        metodo_modificado = (
+            self.metodo_pago != original.metodo_pago
+            or self.sucursal_pago_id != original.sucursal_pago_id
+        )
+        if metodo_modificado:
+            if not getattr(self, "_seleccion_metodo_controlada", False):
+                raise ValidationError(
+                    {"metodo_pago": "El metodo de pago solo cambia mediante su flujo."}
+                )
+            if original.metodo_pago != self.MetodoPago.PENDIENTE:
+                raise ValidationError(
+                    {"metodo_pago": "El metodo de pago seleccionado no puede cambiar."}
+                )
+
+        self._validar_metodo_pago()
+
         estados_validos = {opcion for opcion, _nombre in self.EstadoPago.choices}
         if self.estado_pago not in estados_validos:
             raise ValidationError({"estado_pago": "El estado de pago no es valido."})
@@ -388,6 +429,61 @@ class Pedido(models.Model):
             raise ValidationError(
                 {"estado_pago": "Un pedido pagado no puede volver a pendiente."}
             )
+
+    def _validar_metodo_pago(self):
+        if self.metodo_pago == self.MetodoPago.SUCURSAL:
+            if not self.sucursal_pago_id:
+                raise ValidationError(
+                    {"sucursal_pago": "Selecciona la sucursal donde se pagara."}
+                )
+            if self.empresa_id != self.sucursal_pago.empresa_id:
+                raise ValidationError(
+                    {"sucursal_pago": "La sucursal debe pertenecer a la empresa."}
+                )
+            return
+
+        if self.sucursal_pago_id:
+            raise ValidationError(
+                {"sucursal_pago": "Solo el pago en sucursal admite una sucursal."}
+            )
+
+    def seleccionar_metodo_pago(self, metodo, sucursal=None):
+        if self.estado_pago != self.EstadoPago.PENDIENTE:
+            raise ValidationError(
+                {"estado_pago": "Solo un pedido pendiente puede elegir metodo de pago."}
+            )
+        if metodo not in {
+            self.MetodoPago.EN_LINEA,
+            self.MetodoPago.SUCURSAL,
+        }:
+            raise ValidationError({"metodo_pago": "El metodo de pago no es valido."})
+        if self.metodo_pago not in {self.MetodoPago.PENDIENTE, metodo}:
+            raise ValidationError(
+                {"metodo_pago": "El pedido ya tiene otro metodo de pago seleccionado."}
+            )
+
+        sucursal_id = sucursal.pk if sucursal else None
+        if self.metodo_pago == metodo:
+            if self.sucursal_pago_id != sucursal_id:
+                raise ValidationError(
+                    {"sucursal_pago": "El pedido ya tiene otra sucursal seleccionada."}
+                )
+            return False
+
+        self.metodo_pago = metodo
+        self.sucursal_pago = sucursal
+        self._seleccion_metodo_controlada = True
+        try:
+            self.save(
+                update_fields=[
+                    "metodo_pago",
+                    "sucursal_pago",
+                    "fecha_actualizacion",
+                ]
+            )
+        finally:
+            del self._seleccion_metodo_controlada
+        return True
 
     def delete(self, *args, **kwargs):
         if self.pk:
@@ -1093,10 +1189,7 @@ class DetallePedidoComponente(models.Model):
 
 
 class Prefactura(models.Model):
-    LEYENDA = (
-        "Este documento corresponde a una prefactura y no representa una factura "
-        "fiscal original."
-    )
+    LEYENDA = "PREFACTURA - NO ES COMPROBANTE FISCAL"
 
     pedido = models.OneToOneField(
         Pedido,
@@ -1105,6 +1198,10 @@ class Prefactura(models.Model):
     )
     numero = models.CharField(max_length=30, unique=True, editable=False)
     leyenda = models.CharField(max_length=180, default=LEYENDA)
+    fecha_vencimiento = models.DateTimeField(default=fecha_vencimiento_prefactura)
+    intentos_correo = models.PositiveSmallIntegerField(default=0)
+    fecha_ultimo_intento_correo = models.DateTimeField(null=True, blank=True)
+    correo_enviado_en = models.DateTimeField(null=True, blank=True)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
 
@@ -1118,15 +1215,28 @@ class Prefactura(models.Model):
 
     @classmethod
     def obtener_o_crear_para_pedido(cls, pedido):
-        if pedido.estado_pago != Pedido.EstadoPago.PAGADO:
+        if not cls.puede_generarse_para(pedido):
             raise ValidationError(
-                {"pedido": "Solo se puede generar prefactura para pedidos pagados."}
+                {
+                    "pedido": (
+                        "La prefactura requiere un pedido pagado o un pago "
+                        "pendiente en sucursal."
+                    )
+                }
             )
 
         return cls.objects.get_or_create(
             pedido=pedido,
             defaults={"numero": cls.generar_numero(pedido)},
         )[0]
+
+    @classmethod
+    def puede_generarse_para(cls, pedido):
+        return pedido.estado_pago == Pedido.EstadoPago.PAGADO or (
+            pedido.estado_pago == Pedido.EstadoPago.PENDIENTE
+            and pedido.metodo_pago == Pedido.MetodoPago.SUCURSAL
+            and pedido.sucursal_pago_id
+        )
 
     @classmethod
     def generar_numero(cls, pedido):
@@ -1144,9 +1254,14 @@ class Prefactura(models.Model):
 
     def clean(self):
         super().clean()
-        if self.pedido_id and self.pedido.estado_pago != Pedido.EstadoPago.PAGADO:
+        if self.pedido_id and not self.puede_generarse_para(self.pedido):
             raise ValidationError(
-                {"pedido": "Solo se puede generar prefactura para pedidos pagados."}
+                {
+                    "pedido": (
+                        "La prefactura requiere un pedido pagado o un pago "
+                        "pendiente en sucursal."
+                    )
+                }
             )
 
     def save(self, *args, **kwargs):

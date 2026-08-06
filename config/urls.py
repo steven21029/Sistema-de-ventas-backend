@@ -30,6 +30,7 @@ urlpatterns = [
     path('api/v1/', include('favoritos.urls')),
     path('api/v1/', include('promociones.urls')),
     path('api/v1/', include('contacto.urls')),
+    path('api/v1/', include('reportes.urls')),
     path('api/', include('empresas.urls')),
     path('api/', include('usuarios.urls')),
     path('api/', include('catalogo.urls')),
@@ -39,6 +40,7 @@ urlpatterns = [
     path('api/', include('favoritos.urls')),
     path('api/', include('promociones.urls')),
     path('api/', include('contacto.urls')),
+    path('api/', include('reportes.urls')),
 ]
 
 if settings.DEBUG and not settings.R2_STORAGE_ENABLED:

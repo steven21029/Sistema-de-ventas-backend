@@ -285,7 +285,7 @@ class ContenidoEmpresaAdministrativoAPITests(ContextoAdministrativoAPITests):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_sucursales_publicas_conservan_lista_sin_paginar(self):
-        SucursalEmpresa.objects.create(
+        principal = SucursalEmpresa.objects.create(
             empresa=self.analiza,
             nombre="Principal",
             direccion="Centro",
@@ -305,7 +305,7 @@ class ContenidoEmpresaAdministrativoAPITests(ContextoAdministrativoAPITests):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIsInstance(response.data, list)
         self.assertEqual(len(response.data), 1)
-        self.assertNotIn("id", response.data[0])
+        self.assertEqual(response.data[0]["id"], principal.pk)
 
     def test_admin_gestiona_sucursales_con_paginacion(self):
         self.client.force_authenticate(self.admin_empresa)

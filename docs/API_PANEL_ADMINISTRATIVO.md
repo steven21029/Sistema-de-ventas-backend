@@ -1,6 +1,6 @@
 # Contrato API del panel administrativo
 
-Estado: implementado en backend Django y verificado el 3 de agosto de 2026.
+Estado: implementado en backend Django y verificado el 6 de agosto de 2026.
 
 Este documento es el contrato oficial para implementar el panel React. Las
 rutas publicas existentes se conservan. Todas las rutas indicadas empiezan con
@@ -351,3 +351,42 @@ Preferir siempre `PATCH {"activo": false}` o `PATCH {"activa": false}`.
 8. Ante `401`, intentar refresh una vez; si falla, volver al login.
 9. Ante `403`, cerrar la vista solicitada sin mostrar datos parciales.
 10. Ante `409`, ofrecer desactivar el registro.
+
+## 14. Reportes comerciales
+
+El panel debe consumir los calculos oficiales del backend mediante:
+
+- `GET /api/v1/reportes/resumen-ventas/`
+- `GET /api/v1/reportes/ventas/exportar/`
+
+Ambas rutas tambien conservan compatibilidad bajo `/api/`. Solo pueden usarlas
+superusuarios, administradores maestros autorizados, administradores de empresa
+y gerentes de la empresa solicitada. Los compradores reciben `403`.
+
+El contrato completo, las reglas contables, los parametros y los formatos de
+descarga estan documentados en `docs/API_REPORTES_COMERCIALES.md`.
+
+## 15. Pago en sucursal
+
+El pago en linea existente conserva su contrato:
+
+- `POST /api/v1/pagos/iniciar/`
+
+El comprador puede elegir una sucursal activa de la empresa y generar su
+prefactura mediante:
+
+- `POST /api/v1/pedidos/pedidos/{pedido_id}/pago-en-sucursal/`
+- `GET /api/v1/pedidos/pedidos/{pedido_id}/prefactura/pdf/`
+- `POST /api/v1/pedidos/pedidos/{pedido_id}/prefactura/reenviar-correo/`
+
+La confirmacion presencial es administrativa:
+
+- `POST /api/v1/pagos/{referencia}/confirmar-en-sucursal/`
+
+Todas las rutas tambien funcionan bajo `/api/`. El inicio es idempotente, no
+descuenta inventario y envia el PDF solamente al correo verificado del
+comprador. La confirmacion valida inventario y reutiliza los efectos
+comerciales del pago aprobado, sin duplicarlos si se repite.
+
+El contrato completo, las respuestas, permisos, errores y variables de
+entorno estan documentados en `docs/API_PAGO_EN_SUCURSAL.md`.

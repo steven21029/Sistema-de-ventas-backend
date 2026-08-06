@@ -1407,3 +1407,116 @@ Verificacion:
 - Django cargo `CONN_MAX_AGE=0` desde la configuracion local.
 - `python manage.py check`: sin problemas.
 - La consulta de empresa mediante el proxy local de Vite respondio HTTP `200`.
+
+## 2026-08-06 - Reportes comerciales administrativos
+
+Estado: implementado y verificado.
+
+Cambios:
+
+- Se agrego `GET /api/v1/reportes/resumen-ventas/` con filtros de empresa,
+  fechas, agrupacion diaria o mensual y comparacion contra el periodo anterior.
+- Los ingresos usan la fotografia historica de pedidos pagados o con pago
+  aprobado. Pendientes, rechazados y cancelados se clasifican por separado.
+- Se agregaron serie temporal, desglose por estado y productos mas vendidos.
+- Se agrego `GET /api/v1/reportes/ventas/exportar/` para CSV, XLSX y PDF, con
+  reportes de resumen, ventas, pagos e impuestos.
+- Las dos rutas conservan compatibilidad bajo `/api/`.
+- Se agrego el estado oficial `cancelado` a los pedidos.
+- Se instalaron `openpyxl` y `ReportLab` para exportaciones estructuradas.
+- Se documento el contrato en `docs/API_REPORTES_COMERCIALES.md`.
+
+Seguridad:
+
+- Solo acceden superusuarios, administradores maestros autorizados,
+  administradores de empresa y gerentes de la empresa solicitada.
+- Compradores y usuarios que solicitan otra empresa reciben `403`.
+- Los filtros usan limites conscientes de `America/Tegucigalpa`.
+- Los valores exportados se neutralizan para evitar formulas inyectadas en
+  CSV y XLSX.
+
+Impacto para el frontend:
+
+- El panel debe reemplazar sus calculos temporales por `resumen`, `serie`,
+  `estados` y `productos_mas_vendidos`.
+- Las descargas deben solicitarse como `blob` y usar el nombre recibido en
+  `Content-Disposition`.
+- Los montos llegan como cadenas de dos decimales y las variaciones como numero
+  de un decimal o `null` cuando el periodo anterior no tiene base comparable.
+
+Verificacion:
+
+- 12 pruebas nuevas cubren aislamiento entre empresas, rangos, estados,
+  comparacion mensual, totales, roles, formatos y rutas compatibles.
+- `python manage.py test`: 171 pruebas aprobadas contra SQLite temporal, con
+  correo en memoria y R2 desactivado.
+- `python manage.py makemigrations --check --dry-run`: sin cambios pendientes.
+- `python manage.py check`: sin problemas.
+
+## 2026-08-06 - Pago en sucursal y prefactura por correo
+
+Estado: implementado y verificado.
+
+Cambios:
+
+- Se mantuvo `POST /api/v1/pagos/iniciar/` para pago en linea y se marco su
+  metodo de forma explicita en pedidos y pagos.
+- Se agrego `POST /api/v1/pedidos/pedidos/{id}/pago-en-sucursal/` para crear o
+  recuperar idempotentemente el pago pendiente, la sucursal y la prefactura.
+- Se agrego la descarga PDF autenticada con la leyenda legal, fotografia
+  comercial del pedido, sucursal, comprador, detalle, totales y vencimiento.
+- Se agrego el envio inicial por Brevo al correo verificado y el reenvio con
+  un limite configurable de intentos.
+- Se agrego la confirmacion administrativa por referencia. Reutiliza el flujo
+  comercial de pagos aprobados, valida inventario y no duplica movimientos.
+- El inventario permanece intacto mientras el pago presencial esta pendiente.
+- Se agrego una migracion de datos que identifica como `en_linea` los pedidos
+  historicos que ya tenian pagos antes de este cambio.
+- Las rutas nuevas funcionan tanto bajo `/api/v1/` como bajo `/api/`.
+- Se documento el contrato en `docs/API_PAGO_EN_SUCURSAL.md` y las variables
+  de prefactura en la guia de Render.
+
+Seguridad:
+
+- Solo el comprador propietario puede iniciar el pago, descargar desde su
+  alcance y reenviar la prefactura.
+- La sucursal se valida activa y dentro de la misma empresa del pedido.
+- El correo destino se obtiene del perfil verificado; la API no acepta una
+  direccion alternativa enviada por el cliente.
+- Solo superusuarios, administradores maestros autorizados, administradores
+  de empresa y gerentes de la empresa pueden confirmar pagos presenciales.
+- Los querysets ocultan pedidos y pagos de empresas o compradores ajenos.
+
+Impacto para el frontend:
+
+- Para pago presencial debe enviar solo `sucursal_id` y aceptar `201` al crear
+  o `200` al recuperar el mismo flujo.
+- Debe descargar el PDF desde `prefactura.url_pdf` usando el JWT.
+- El flujo existente de pago en linea no cambia de ruta ni de cuerpo.
+
+Verificacion:
+
+- 12 pruebas nuevas cubren permisos, aislamiento, idempotencia, PDF, correo,
+  limite de reenvios, sucursal inactiva, pedido ajeno, inventario, doble
+  confirmacion, pago en linea y rutas compatibles.
+- `python manage.py test`: 183 pruebas aprobadas contra SQLite temporal, con
+  correo en memoria y R2 desactivado.
+- No se modifico Supabase, R2 ni se enviaron correos reales durante las pruebas.
+
+Correccion posterior de integracion:
+
+- El listado publico `GET /api/v1/empresas/sucursales/` ahora incluye el `id`
+  de cada sucursal activa para que el comprador pueda enviarlo como
+  `sucursal_id` al iniciar el pago presencial.
+- Antes de esta correccion el frontend recibia la sucursal sin identificador y
+  terminaba enviando `sucursal_id: null`, lo que producia un `400` correcto
+  pero impedia completar el flujo.
+- Se verificaron los identificadores reales de las sucursales activas de
+  Analiza y las 72 pruebas de empresas y pagos aprobaron.
+- Se corrigieron los bloqueos transaccionales del pago presencial para no
+  aplicar `FOR UPDATE` sobre relaciones opcionales creadas con `LEFT JOIN`,
+  operacion que PostgreSQL rechaza aunque SQLite la permita.
+- El bloqueo del pedido y de la prefactura se verifico directamente contra
+  Supabase. Las 12 pruebas especificas del pago presencial aprobaron y el
+  intento fallido del pedido de prueba no dejo pagos, prefacturas ni movimientos
+  de inventario.

@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     'favoritos.apps.FavoritosConfig',
     'promociones.apps.PromocionesConfig',
     'contacto.apps.ContactoConfig',
+    'reportes.apps.ReportesConfig',
 ]
 
 MIDDLEWARE = [
@@ -273,6 +274,16 @@ PAGOS_PROVEEDOR_DEFAULT = config(
 PAGOS_WEBHOOK_SECRET = config(
     'PAGOS_WEBHOOK_SECRET',
     default='',
+)
+PREFACTURA_VIGENCIA_HORAS = config(
+    'PREFACTURA_VIGENCIA_HORAS',
+    default=48,
+    cast=int,
+)
+PREFACTURA_MAX_INTENTOS_CORREO = config(
+    'PREFACTURA_MAX_INTENTOS_CORREO',
+    default=4,
+    cast=int,
 )
 
 # Default primary key field type

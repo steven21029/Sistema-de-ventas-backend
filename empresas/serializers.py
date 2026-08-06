@@ -348,6 +348,7 @@ class SucursalEmpresaPublicaSerializer(serializers.ModelSerializer):
     class Meta:
         model = SucursalEmpresa
         fields = [
+            "id",
             "nombre",
             "direccion",
             "telefono",

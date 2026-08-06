@@ -71,6 +71,8 @@ EMAIL_HOST_USER=USUARIO_SMTP_DE_BREVO
 EMAIL_HOST_PASSWORD=CLAVE_SMTP_DE_BREVO
 DEFAULT_FROM_EMAIL=Sistema de Ventas <REMITENTE_VERIFICADO_EN_BREVO>
 PAGOS_PROVEEDOR_DEFAULT=simulado
+PREFACTURA_VIGENCIA_HORAS=48
+PREFACTURA_MAX_INTENTOS_CORREO=4
 DJANGO_SUPERUSER_USERNAME=admin
 DJANGO_SUPERUSER_EMAIL=correo-administrativo@example.com
 DJANGO_SUPERUSER_PASSWORD=UNA_CONTRASENA_SEGURA
@@ -87,6 +89,10 @@ En Brevo, `EMAIL_HOST_USER` es el inicio de sesion SMTP y
 clave de API. El correo incluido en `DEFAULT_FROM_EMAIL` debe existir como
 remitente verificado en Brevo. Guardar estos valores solamente en
 `Render > Environment` y en el `.env` local ignorado por Git.
+
+`PREFACTURA_VIGENCIA_HORAS` define por cuanto tiempo puede presentarse una
+prefactura para pago en sucursal. `PREFACTURA_MAX_INTENTOS_CORREO` incluye el
+envio inicial y los reenvios solicitados por el comprador.
 
 Las variables `R2_*` son obligatorias cuando `R2_STORAGE_ENABLED=True`. Las
 credenciales deben pertenecer a un token limitado al bucket de medios.

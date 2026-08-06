@@ -8,13 +8,14 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404
 
 from rest_framework import decorators, response, status, viewsets
-from rest_framework.exceptions import APIException, PermissionDenied, ValidationError
-from rest_framework.permissions import AllowAny
+from rest_framework.exceptions import APIException, NotFound, PermissionDenied, ValidationError
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
 from pedidos.models import Pedido
 from config.api import FiltroRangoFechasMixin, PaginacionAdministrativaOpcionalMixin
 from empresas.contexto import empresas_administrables, obtener_empresa_administrable
+from usuarios.permissions import IsAdministrativeUser
 
 from .models import EventoWebhookPago, Pago
 from .permissions import IsPagoOwnerOrEmpresaStaff
@@ -29,6 +30,11 @@ class PagoViewSet(
     serializer_class = PagoSerializer
     permission_classes = [IsPagoOwnerOrEmpresaStaff]
     lookup_field = "referencia"
+
+    def get_permissions(self):
+        if self.action == "confirmar_en_sucursal":
+            return [IsAuthenticated(), IsAdministrativeUser()]
+        return super().get_permissions()
 
     def get_queryset(self):
         queryset = Pago.objects.select_related("pedido", "empresa", "usuario")
@@ -106,7 +112,14 @@ class PagoViewSet(
             raise APIException("No hay un proveedor de pagos configurado.")
 
         try:
-            pago, creado = Pago.obtener_o_crear_pendiente(pedido, proveedor)
+            with transaction.atomic():
+                pedido = Pedido.objects.select_for_update().get(pk=pedido.pk)
+                pedido.seleccionar_metodo_pago(Pedido.MetodoPago.EN_LINEA)
+                pago, creado = Pago.obtener_o_crear_pendiente(
+                    pedido,
+                    proveedor,
+                    metodo=Pago.Metodo.EN_LINEA,
+                )
         except DjangoValidationError as exc:
             raise ValidationError(self._normalizar_error(exc)) from exc
 
@@ -114,6 +127,46 @@ class PagoViewSet(
         return response.Response(
             salida.data,
             status=status.HTTP_201_CREATED if creado else status.HTTP_200_OK,
+        )
+
+    @decorators.action(
+        detail=True,
+        methods=["post"],
+        url_path="confirmar-en-sucursal",
+    )
+    def confirmar_en_sucursal(self, request, referencia=None):
+        pago = self.get_object()
+        if pago.metodo != Pago.Metodo.SUCURSAL or pago.proveedor != "sucursal":
+            raise ValidationError(
+                {"pago": "Solo se pueden confirmar pagos pendientes en sucursal."}
+            )
+
+        try:
+            pago, cambio = Pago.procesar_resultado(
+                referencia=pago.referencia,
+                proveedor="sucursal",
+                estado=Pago.Estado.APROBADO,
+                identificador_externo=f"SUC-{pago.referencia}",
+                codigo_respuesta="CONFIRMADO_SUCURSAL",
+            )
+        except (DjangoValidationError, Pago.DoesNotExist) as exc:
+            if isinstance(exc, Pago.DoesNotExist):
+                raise NotFound("No existe el pago solicitado.") from exc
+            raise ValidationError(self._normalizar_error(exc)) from exc
+
+        pago.pedido.refresh_from_db()
+        return response.Response(
+            {
+                "pago": PagoSerializer(pago).data,
+                "pedido": {
+                    "id": pago.pedido_id,
+                    "numero": pago.pedido.numero,
+                    "estado_pago": pago.pedido.estado_pago,
+                    "metodo_pago": pago.pedido.metodo_pago,
+                },
+                "duplicado": not cambio,
+            },
+            status=status.HTTP_200_OK,
         )
 
     def _obtener_pedido_pagable(self, pedido_id):

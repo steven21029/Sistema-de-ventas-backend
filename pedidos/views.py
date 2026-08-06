@@ -1,17 +1,22 @@
 from decimal import Decimal
 
+from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from django.db.models import Prefetch, Q
+from django.http import HttpResponse
 from django.utils import timezone
 
 from rest_framework import decorators, response, status, viewsets
-from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
+from rest_framework.exceptions import APIException, NotFound, PermissionDenied, ValidationError
 from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 
 from catalogo.models import PaqueteCatalogo, Producto
 from config.api import FiltroRangoFechasMixin, PaginacionAdministrativaOpcionalMixin
 from empresas.contexto import empresas_administrables, obtener_empresa_administrable
+from empresas.models import SucursalEmpresa
+from pagos.models import Pago
 from usuarios.models import PerfilUsuario
 from .models import Carrito, DetallePedido, ItemCarrito, Pedido, Prefactura, TarifaEntrega
 from .permissions import IsPedidoOwnerOrEmpresaManager, IsTarifaEntregaAdmin
@@ -24,9 +29,18 @@ from .serializers import (
     DetallePedidoSerializer,
     GenerarPedidoDesdeCarritoSerializer,
     ItemCarritoSerializer,
+    PagoEnSucursalSerializer,
     PedidoSerializer,
     PrefacturaSerializer,
     TarifaEntregaSerializer,
+)
+from .prefacturas import (
+    ErrorEnvioCorreoPrefactura,
+    LimiteIntentosCorreoPrefactura,
+    correo_comprador_verificado,
+    enmascarar_correo,
+    enviar_prefactura_por_correo,
+    generar_pdf_prefactura,
 )
 from .services import calcular_carrito
 
@@ -471,7 +485,9 @@ class PedidoViewSet(
         queryset = Pedido.objects.select_related(
             "empresa",
             "usuario",
+            "usuario__perfil",
             "carrito_origen",
+            "sucursal_pago",
         ).prefetch_related(
             "detalles__producto",
             "detalles__paquete",
@@ -547,14 +563,196 @@ class PedidoViewSet(
     def prefactura(self, request, pk=None):
         pedido = self.get_object()
 
-        if pedido.estado_pago != Pedido.EstadoPago.PAGADO:
+        if not Prefactura.puede_generarse_para(pedido):
             raise ValidationError(
-                {"pedido": "La prefactura solo esta disponible para pedidos pagados."}
+                {"pedido": "La prefactura no esta disponible para este pedido."}
             )
 
         prefactura = Prefactura.obtener_o_crear_para_pedido(pedido)
         serializer = PrefacturaSerializer(prefactura)
         return response.Response(serializer.data)
+
+    @decorators.action(
+        detail=True,
+        methods=["post"],
+        url_path="pago-en-sucursal",
+    )
+    def pago_en_sucursal(self, request, pk=None):
+        pedido = self.get_object()
+        self._validar_comprador_propietario(pedido)
+        entrada = PagoEnSucursalSerializer(data=request.data)
+        entrada.is_valid(raise_exception=True)
+        sucursal = SucursalEmpresa.objects.filter(
+            pk=entrada.validated_data["sucursal_id"],
+            empresa=pedido.empresa,
+            activa=True,
+        ).first()
+        if not sucursal:
+            raise ValidationError(
+                {"sucursal_id": "La sucursal no existe, esta inactiva o pertenece a otra empresa."}
+            )
+        try:
+            correo = correo_comprador_verificado(pedido)
+        except DjangoValidationError as exc:
+            raise ValidationError(self._normalizar_error(exc)) from exc
+
+        try:
+            with transaction.atomic():
+                sucursal = SucursalEmpresa.objects.select_for_update().filter(
+                    pk=sucursal.pk,
+                    empresa=pedido.empresa,
+                    activa=True,
+                ).first()
+                if not sucursal:
+                    raise DjangoValidationError(
+                        {
+                            "sucursal_id": (
+                                "La sucursal dejo de estar disponible para este pago."
+                            )
+                        }
+                    )
+                pedido = (
+                    Pedido.objects.select_for_update()
+                    .select_related("empresa", "usuario")
+                    .prefetch_related("detalles")
+                    .get(pk=pedido.pk)
+                )
+                metodo_creado = pedido.seleccionar_metodo_pago(
+                    Pedido.MetodoPago.SUCURSAL,
+                    sucursal=sucursal,
+                )
+                pago, pago_creado = Pago.obtener_o_crear_pendiente(
+                    pedido=pedido,
+                    proveedor="sucursal",
+                    metodo=Pago.Metodo.SUCURSAL,
+                )
+                prefactura_existia = Prefactura.objects.filter(pedido=pedido).exists()
+                prefactura = Prefactura.obtener_o_crear_para_pedido(pedido)
+        except DjangoValidationError as exc:
+            raise ValidationError(self._normalizar_error(exc)) from exc
+
+        if not prefactura.intentos_correo:
+            try:
+                enviar_prefactura_por_correo(prefactura)
+            except ErrorEnvioCorreoPrefactura as exc:
+                error = APIException(str(exc))
+                error.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+                raise error from exc
+
+        prefactura.refresh_from_db()
+        pedido.refresh_from_db()
+        codigo_estado = (
+            status.HTTP_201_CREATED
+            if metodo_creado or pago_creado or not prefactura_existia
+            else status.HTTP_200_OK
+        )
+        return response.Response(
+            {
+                "pedido": {
+                    "id": pedido.pk,
+                    "numero": pedido.numero,
+                    "estado_pago": pedido.estado_pago,
+                    "metodo_pago": pedido.metodo_pago,
+                },
+                "pago": {
+                    "referencia": str(pago.referencia),
+                    "estado": pago.estado,
+                    "metodo": pago.metodo,
+                },
+                "prefactura": {
+                    "numero": prefactura.numero,
+                    "url_pdf": (
+                        request.path.removesuffix("pago-en-sucursal/")
+                        + "prefactura/pdf/"
+                    ),
+                    "correo_enviado": bool(prefactura.correo_enviado_en),
+                    "correo_destino": enmascarar_correo(correo),
+                },
+            },
+            status=codigo_estado,
+        )
+
+    @decorators.action(
+        detail=True,
+        methods=["get"],
+        url_path="prefactura/pdf",
+    )
+    def prefactura_pdf(self, request, pk=None):
+        pedido = self.get_object()
+        try:
+            prefactura = Prefactura.objects.select_related(
+                "pedido__empresa",
+                "pedido__usuario__perfil",
+                "pedido__sucursal_pago",
+            ).prefetch_related("pedido__detalles").get(pedido=pedido)
+        except Prefactura.DoesNotExist as exc:
+            raise NotFound("El pedido no tiene una prefactura disponible.") from exc
+
+        contenido = generar_pdf_prefactura(prefactura)
+        respuesta = HttpResponse(contenido, content_type="application/pdf")
+        respuesta["Content-Disposition"] = (
+            f'attachment; filename="prefactura-{pedido.numero}.pdf"'
+        )
+        return respuesta
+
+    @decorators.action(
+        detail=True,
+        methods=["post"],
+        url_path="prefactura/reenviar-correo",
+    )
+    def reenviar_correo_prefactura(self, request, pk=None):
+        pedido = self.get_object()
+        self._validar_comprador_propietario(pedido)
+        try:
+            prefactura = Prefactura.objects.select_related(
+                "pedido__usuario__perfil",
+                "pedido__empresa",
+                "pedido__sucursal_pago",
+            ).prefetch_related("pedido__detalles").get(pedido=pedido)
+            correo = correo_comprador_verificado(pedido)
+            enviar_prefactura_por_correo(prefactura, es_reenvio=True)
+        except Prefactura.DoesNotExist as exc:
+            raise NotFound("El pedido no tiene una prefactura disponible.") from exc
+        except LimiteIntentosCorreoPrefactura as exc:
+            error = APIException(str(exc))
+            error.status_code = status.HTTP_429_TOO_MANY_REQUESTS
+            raise error from exc
+        except ErrorEnvioCorreoPrefactura as exc:
+            error = APIException(str(exc))
+            error.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+            raise error from exc
+        except DjangoValidationError as exc:
+            raise ValidationError(self._normalizar_error(exc)) from exc
+
+        prefactura.refresh_from_db()
+        return response.Response(
+            {
+                "correo_enviado": True,
+                "correo_destino": enmascarar_correo(correo),
+                "intentos_restantes": max(
+                    settings.PREFACTURA_MAX_INTENTOS_CORREO
+                    - prefactura.intentos_correo,
+                    0,
+                ),
+            }
+        )
+
+    def _validar_comprador_propietario(self, pedido):
+        perfil = getattr(self.request.user, "perfil", None)
+        if (
+            pedido.usuario_id != self.request.user.id
+            or not perfil
+            or not perfil.activo
+            or not perfil.es_comprador
+        ):
+            raise PermissionDenied(
+                "Solo el comprador propietario puede gestionar este pago."
+            )
+
+    def _normalizar_error(self, error):
+        if hasattr(error, "message_dict"):
+            return error.message_dict
+        return {"detail": error.messages}
 
 
 class DetallePedidoViewSet(

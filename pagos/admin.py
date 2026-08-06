@@ -11,12 +11,20 @@ class PagoAdmin(admin.ModelAdmin):
         "empresa",
         "usuario",
         "proveedor",
+        "metodo",
         "monto",
         "moneda",
         "estado",
         "fecha_creacion",
     )
-    list_filter = ("empresa", "proveedor", "estado", "moneda", "fecha_creacion")
+    list_filter = (
+        "empresa",
+        "proveedor",
+        "metodo",
+        "estado",
+        "moneda",
+        "fecha_creacion",
+    )
     search_fields = (
         "referencia",
         "pedido__numero",
@@ -30,6 +38,7 @@ class PagoAdmin(admin.ModelAdmin):
         "usuario",
         "referencia",
         "proveedor",
+        "metodo",
         "identificador_externo",
         "monto",
         "moneda",

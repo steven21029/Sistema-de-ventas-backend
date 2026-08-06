@@ -16,12 +16,17 @@ class Pago(models.Model):
         APROBADO = "aprobado", "Aprobado"
         RECHAZADO = "rechazado", "Rechazado"
 
+    class Metodo(models.TextChoices):
+        EN_LINEA = "en_linea", "Pago en linea"
+        SUCURSAL = "sucursal", "Pago en sucursal"
+
     CAMPOS_INMUTABLES = (
         "pedido_id",
         "empresa_id",
         "usuario_id",
         "referencia",
         "proveedor",
+        "metodo",
         "monto",
         "moneda",
     )
@@ -50,6 +55,11 @@ class Pago(models.Model):
     )
     referencia = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     proveedor = models.CharField(max_length=50)
+    metodo = models.CharField(
+        max_length=20,
+        choices=Metodo.choices,
+        default=Metodo.EN_LINEA,
+    )
     identificador_externo = models.CharField(max_length=150, blank=True)
     monto = models.DecimalField(
         max_digits=12,
@@ -91,6 +101,7 @@ class Pago(models.Model):
         ]
         indexes = [
             models.Index(fields=["empresa", "estado"]),
+            models.Index(fields=["empresa", "metodo", "estado"]),
             models.Index(fields=["proveedor", "estado"]),
         ]
 
@@ -168,7 +179,12 @@ class Pago(models.Model):
         return super().delete(*args, **kwargs)
 
     @classmethod
-    def obtener_o_crear_pendiente(cls, pedido, proveedor):
+    def obtener_o_crear_pendiente(
+        cls,
+        pedido,
+        proveedor,
+        metodo=Metodo.EN_LINEA,
+    ):
         with transaction.atomic():
             pedido = Pedido.objects.select_for_update().get(pk=pedido.pk)
             if pedido.estado_pago != Pedido.EstadoPago.PENDIENTE:
@@ -190,9 +206,29 @@ class Pago(models.Model):
                 .first()
             )
             if existente:
+                if existente.metodo != metodo:
+                    raise ValidationError(
+                        {
+                            "metodo": (
+                                "El pedido ya tiene un pago pendiente con otro metodo."
+                            )
+                        }
+                    )
+                if metodo == cls.Metodo.SUCURSAL and existente.proveedor != proveedor:
+                    raise ValidationError(
+                        {
+                            "proveedor": (
+                                "El pago en sucursal pendiente tiene otro proveedor."
+                            )
+                        }
+                    )
                 return existente, False
 
-            return cls.objects.create(pedido=pedido, proveedor=proveedor), True
+            return cls.objects.create(
+                pedido=pedido,
+                proveedor=proveedor,
+                metodo=metodo,
+            ), True
 
     @classmethod
     def procesar_resultado(
