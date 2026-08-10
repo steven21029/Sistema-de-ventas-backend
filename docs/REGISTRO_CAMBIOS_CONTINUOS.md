@@ -1520,3 +1520,38 @@ Correccion posterior de integracion:
   Supabase. Las 12 pruebas especificas del pago presencial aprobaron y el
   intento fallido del pedido de prueba no dejo pagos, prefacturas ni movimientos
   de inventario.
+
+## 2026-08-10 - Validaciones del registro y confirmacion SMTP
+
+Estado: implementado y verificado.
+
+Cambios:
+
+- El nombre completo del comprador ahora acepta exclusivamente letras Unicode
+  y espacios; tambien se valida nombre y apellido en la administracion.
+- El telefono acepta solo digitos en registro, perfiles y administracion.
+- La identidad conserva la regla oficial de exactamente 13 digitos.
+- Los nombres se normalizan eliminando espacios repetidos antes de guardarse.
+- El envio de codigos exige que el backend SMTP confirme exactamente un
+  mensaje. Los rechazos y fallos de Brevo producen `503` y revierten la
+  transaccion para no dejar cuentas o codigos inconsistentes.
+- Se agrego la migracion `usuarios.0007` y se aplico en Supabase.
+- Se documento el contrato y los controles del frontend en
+  `docs/API_REGISTRO_COMPRADOR.md`, incluido el ojo de contrasena.
+
+Diagnostico del correo mostrado:
+
+- La cuenta existe inactiva y con correo pendiente de verificacion.
+- Supabase registra dos codigos generados por las solicitudes del frontend;
+  el segundo invalido correctamente al primero.
+- La configuracion activa usa el backend SMTP, host y credenciales de Brevo.
+- Una aceptacion SMTP no garantiza que Gmail coloque el mensaje en Recibidos;
+  los rebotes y bloqueos posteriores se consultan en el log de Brevo.
+
+Verificacion:
+
+- 7 pruebas nuevas cubren nombre, telefono, identidad, registro, correo,
+  reenvio y rollback cuando SMTP no confirma.
+- Las 26 pruebas de usuarios aprobaron contra SQLite temporal y correo en
+  memoria, sin enviar secretos de autenticacion.
+- `python manage.py test`: 190 pruebas aprobadas en la suite completa.

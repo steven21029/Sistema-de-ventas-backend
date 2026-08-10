@@ -28,6 +28,7 @@ python manage.py runserver
 - `docs/API_PANEL_ADMINISTRATIVO.md`: contrato general del panel.
 - `docs/API_REPORTES_COMERCIALES.md`: resumen y exportacion de ventas.
 - `docs/API_PAGO_EN_SUCURSAL.md`: pago presencial, prefactura y confirmacion.
+- `docs/API_REGISTRO_COMPRADOR.md`: registro, validaciones y correo de activacion.
 
 ## Notas
 

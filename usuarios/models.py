@@ -1,3 +1,4 @@
+import logging
 import secrets
 
 from django.conf import settings
@@ -14,6 +15,17 @@ numero_identidad_validator = RegexValidator(
     regex=r"^\d{13}$",
     message="El numero de identidad debe tener exactamente 13 digitos.",
 )
+telefono_validator = RegexValidator(
+    regex=r"^\d+$",
+    message="El telefono solo debe contener numeros.",
+)
+
+
+logger = logging.getLogger(__name__)
+
+
+class ErrorEnvioCodigoCorreo(Exception):
+    pass
 
 
 class PerfilUsuario(models.Model):
@@ -49,7 +61,11 @@ class PerfilUsuario(models.Model):
         choices=Rol.choices,
         default=Rol.COMPRADOR,
     )
-    telefono = models.CharField(max_length=30, blank=True)
+    telefono = models.CharField(
+        max_length=30,
+        blank=True,
+        validators=[telefono_validator],
+    )
     numero_identidad = models.CharField(
         max_length=13,
         blank=True,
@@ -210,10 +226,28 @@ class CodigoVerificacionCorreo(models.Model):
                 f"Este codigo vence en {self.DURACION_MINUTOS} minutos."
             )
 
-        send_mail(
-            subject=subject,
-            message=message,
-            from_email=None,
-            recipient_list=[self.usuario.email],
-            fail_silently=False,
+        try:
+            enviados = send_mail(
+                subject=subject,
+                message=message,
+                from_email=None,
+                recipient_list=[self.usuario.email],
+                fail_silently=False,
+            )
+        except Exception as exc:
+            logger.exception(
+                "El proveedor rechazo el correo de codigo para el usuario %s.",
+                self.usuario_id,
+            )
+            raise ErrorEnvioCodigoCorreo(
+                "No fue posible enviar el codigo de verificacion."
+            ) from exc
+        if enviados != 1:
+            raise ErrorEnvioCodigoCorreo(
+                "El proveedor de correo no confirmo el envio del codigo."
+            )
+        logger.info(
+            "Correo de codigo aceptado por el proveedor para el usuario %s.",
+            self.usuario_id,
         )
+        return enviados

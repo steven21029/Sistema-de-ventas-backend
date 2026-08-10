@@ -4,15 +4,43 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers
-from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.exceptions import APIException, AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
 from empresas.models import Empresa
-from .models import CodigoVerificacionCorreo, PerfilUsuario
+from .models import (
+    CodigoVerificacionCorreo,
+    ErrorEnvioCodigoCorreo,
+    PerfilUsuario,
+)
 from .services import revocar_sesiones_usuario
 
 User = get_user_model()
+
+
+def normalizar_nombre_persona(value, campo="El nombre"):
+    nombre = " ".join(value.split())
+    if not nombre or any(
+        not caracter.isalpha() and caracter != " " for caracter in nombre
+    ):
+        raise serializers.ValidationError(
+            f"{campo} solo debe contener letras y espacios."
+        )
+    return nombre
+
+
+class ServicioCorreoNoDisponible(APIException):
+    status_code = 503
+    default_detail = "No fue posible enviar el correo. Intentalo nuevamente."
+    default_code = "servicio_correo_no_disponible"
+
+
+def enviar_codigo_por_correo(codigo):
+    try:
+        codigo.enviar_por_correo()
+    except ErrorEnvioCodigoCorreo as exc:
+        raise ServicioCorreoNoDisponible() from exc
 
 
 class UsuarioBasicoSerializer(serializers.ModelSerializer):
@@ -137,6 +165,14 @@ class UsuarioAdministrativoSerializer(serializers.ModelSerializer):
             {"id": empresa.id, "nombre": empresa.nombre, "slug": empresa.slug}
             for empresa in obj.empresas_permitidas.all().order_by("nombre")
         ]
+
+    def validate_first_name(self, value):
+        return normalizar_nombre_persona(value, "El nombre")
+
+    def validate_last_name(self, value):
+        if not value.strip():
+            return ""
+        return normalizar_nombre_persona(value, "El apellido")
 
     def to_internal_value(self, data):
         datos = data.copy()
@@ -363,7 +399,13 @@ class RegistroCompradorSerializer(serializers.Serializer):
     empresa_slug = serializers.CharField(write_only=True)
     nombre_completo = serializers.CharField(max_length=180)
     email = serializers.EmailField()
-    telefono = serializers.CharField(max_length=30)
+    telefono = serializers.RegexField(
+        regex=r"^\d+$",
+        max_length=30,
+        error_messages={
+            "invalid": "El telefono solo debe contener numeros.",
+        },
+    )
     numero_identidad = serializers.RegexField(
         regex=r"^\d{13}$",
         error_messages={
@@ -374,6 +416,9 @@ class RegistroCompradorSerializer(serializers.Serializer):
     password_confirmacion = serializers.CharField(write_only=True, trim_whitespace=False)
     acepta_terminos = serializers.BooleanField(write_only=True)
     acepta_privacidad = serializers.BooleanField(write_only=True)
+
+    def validate_nombre_completo(self, value):
+        return normalizar_nombre_persona(value, "El nombre")
 
     def validate_email(self, value):
         email = value.strip().lower()
@@ -467,7 +512,7 @@ class RegistroCompradorSerializer(serializers.Serializer):
         perfil.save()
 
         codigo = CodigoVerificacionCorreo.crear_para_usuario(usuario)
-        codigo.enviar_por_correo()
+        enviar_codigo_por_correo(codigo)
 
         return {"usuario": usuario, "perfil": perfil}
 
@@ -630,7 +675,7 @@ class ReenviarVerificacionCorreoSerializer(serializers.Serializer):
         codigo = CodigoVerificacionCorreo.crear_para_usuario(
             self.validated_data["usuario"]
         )
-        codigo.enviar_por_correo()
+        enviar_codigo_por_correo(codigo)
         return {
             "usuario": self.validated_data["usuario"],
             "perfil": self.validated_data["perfil"],
@@ -680,7 +725,7 @@ class SolicitarRecuperacionContrasenaSerializer(serializers.Serializer):
             usuario=usuario,
             tipo=CodigoVerificacionCorreo.Tipo.RECUPERACION_CONTRASENA,
         )
-        codigo.enviar_por_correo()
+        enviar_codigo_por_correo(codigo)
         return {"codigo_enviado": True}
 
     def to_representation(self, instance):
