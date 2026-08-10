@@ -62,13 +62,9 @@ JWT_SESSION_MAX_HOURS=5
 JWT_REFRESH_COOKIE_NAME=ventas_refresh
 JWT_REFRESH_COOKIE_SECURE=True
 JWT_REFRESH_COOKIE_SAMESITE=None
-EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
-EMAIL_HOST=smtp-relay.brevo.com
-EMAIL_PORT=587
-EMAIL_USE_TLS=True
-EMAIL_TIMEOUT=10
-EMAIL_HOST_USER=USUARIO_SMTP_DE_BREVO
-EMAIL_HOST_PASSWORD=CLAVE_SMTP_DE_BREVO
+BREVO_API_KEY=CLAVE_API_DE_BREVO
+BREVO_API_URL=https://api.brevo.com/v3/smtp/email
+BREVO_API_TIMEOUT=15
 DEFAULT_FROM_EMAIL=Sistema de Ventas <REMITENTE_VERIFICADO_EN_BREVO>
 PAGOS_PROVEEDOR_DEFAULT=simulado
 PREFACTURA_VIGENCIA_HORAS=48
@@ -81,14 +77,16 @@ DJANGO_SUPERUSER_PASSWORD=UNA_CONTRASENA_SEGURA
 No incluir `/` al final de los origenes o dominios.
 
 `CORS_ALLOWED_ORIGIN_REGEXES` y `PAGOS_WEBHOOK_SECRET` son opcionales mientras
-se usan origenes CORS exactos y pagos simulados. `EMAIL_HOST_USER` y
-`EMAIL_HOST_PASSWORD` son obligatorios cuando se activa el backend SMTP.
+se usan origenes CORS exactos y pagos simulados. `BREVO_API_KEY` es obligatoria
+para todos los correos transaccionales.
 
-En Brevo, `EMAIL_HOST_USER` es el inicio de sesion SMTP y
-`EMAIL_HOST_PASSWORD` es una clave SMTP, no la contrasena de la cuenta ni una
-clave de API. El correo incluido en `DEFAULT_FROM_EMAIL` debe existir como
-remitente verificado en Brevo. Guardar estos valores solamente en
-`Render > Environment` y en el `.env` local ignorado por Git.
+La clave debe crearse en `Brevo > SMTP & API > API Keys`; no es una clave SMTP
+ni la contrasena de la cuenta. El backend envia por la API HTTPS de Brevo porque
+los servicios gratuitos de Render bloquean los puertos SMTP. El correo incluido
+en `DEFAULT_FROM_EMAIL` debe existir como remitente verificado en Brevo. Guardar
+estos valores solamente en `Render > Environment` y en el `.env` local ignorado
+por Git. La ruta oficial de Brevo contiene `/smtp/email`, pero se consume como
+una solicitud HTTPS y no abre una conexion SMTP.
 
 `PREFACTURA_VIGENCIA_HORAS` define por cuanto tiempo puede presentarse una
 prefactura para pago en sucursal. `PREFACTURA_MAX_INTENTOS_CORREO` incluye el

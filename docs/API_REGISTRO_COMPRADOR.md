@@ -35,7 +35,7 @@ Reglas oficiales del backend:
 - El correo y la identidad deben ser unicos dentro de su alcance.
 
 Un `201 Created` significa que la cuenta inactiva, el codigo y el correo se
-crearon correctamente y que el proveedor SMTP acepto un mensaje. Si SMTP no
+crearon correctamente y que la API de Brevo acepto un mensaje. Si Brevo no
 confirma el envio, la API devuelve `503` y revierte la cuenta y el codigo.
 
 ## Verificar correo
@@ -67,7 +67,7 @@ Content-Type: application/json
 Solo debe llamarse cuando el comprador pulse la accion de reenvio. El registro
 inicial ya envia un codigo. Hay que esperar al menos 60 segundos entre
 solicitudes. Mostrar "Codigo reenviado" solamente despues de recibir `200`.
-Un `400` contiene una validacion por campo y un `503` indica que SMTP no
+Un `400` contiene una validacion por campo y un `503` indica que Brevo no
 confirmo el envio.
 
 ## Controles del frontend
@@ -144,8 +144,8 @@ debajo del campo que coincida con la clave de la respuesta.
 
 ## Entrega de Brevo
 
-Una respuesta exitosa confirma la aceptacion SMTP, no la ubicacion final en la
-bandeja de Gmail. Si el mensaje no aparece, revisar Spam, Promociones y el log
-transaccional de Brevo para identificar `delivered`, `deferred`, `blocked` o
-`bounced`. Para produccion se debe autenticar un dominio remitente con DKIM y
-DMARC.
+Una respuesta exitosa confirma que la API HTTPS de Brevo devolvio un
+`messageId`, no la ubicacion final en la bandeja de Gmail. Si el mensaje no
+aparece, revisar Spam, Promociones y el log transaccional de Brevo para
+identificar `delivered`, `deferred`, `blocked` o `bounced`. Para produccion se
+debe autenticar un dominio remitente con DKIM y DMARC.

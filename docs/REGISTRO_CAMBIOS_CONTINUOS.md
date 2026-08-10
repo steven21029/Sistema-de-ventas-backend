@@ -1521,7 +1521,7 @@ Correccion posterior de integracion:
   intento fallido del pedido de prueba no dejo pagos, prefacturas ni movimientos
   de inventario.
 
-## 2026-08-10 - Validaciones del registro y confirmacion SMTP
+## 2026-08-10 - Validaciones del registro y confirmacion de correo
 
 Estado: implementado y verificado.
 
@@ -1532,7 +1532,7 @@ Cambios:
 - El telefono acepta solo digitos en registro, perfiles y administracion.
 - La identidad conserva la regla oficial de exactamente 13 digitos.
 - Los nombres se normalizan eliminando espacios repetidos antes de guardarse.
-- El envio de codigos exige que el backend SMTP confirme exactamente un
+- El envio de codigos exige que el backend de correo confirme exactamente un
   mensaje. Los rechazos y fallos de Brevo producen `503` y revierten la
   transaccion para no dejar cuentas o codigos inconsistentes.
 - Se agrego la migracion `usuarios.0007` y se aplico en Supabase.
@@ -1551,7 +1551,47 @@ Diagnostico del correo mostrado:
 Verificacion:
 
 - 7 pruebas nuevas cubren nombre, telefono, identidad, registro, correo,
-  reenvio y rollback cuando SMTP no confirma.
+  reenvio y rollback cuando el proveedor no confirma.
 - Las 26 pruebas de usuarios aprobaron contra SQLite temporal y correo en
   memoria, sin enviar secretos de autenticacion.
 - `python manage.py test`: 190 pruebas aprobadas en la suite completa.
+
+## 2026-08-10 - Migracion de Brevo SMTP a API HTTPS
+
+Estado: implementado y verificado localmente.
+
+Cambios:
+
+- Se reemplazo el transporte SMTP por un backend de correo Django que consume
+  `POST https://api.brevo.com/v3/smtp/email` mediante HTTPS.
+- El cambio aplica sin modificar los servicios existentes de codigos de
+  activacion, recuperacion de contrasena y prefacturas con PDF adjunto.
+- El backend soporta texto, HTML, copia, copia oculta, respuesta y adjuntos en
+  base64, y solo confirma el envio cuando Brevo devuelve un `messageId`.
+- Las variables SMTP se retiraron de `settings.py`, `.env.example` y la
+  documentacion activa. La nueva credencial obligatoria es `BREVO_API_KEY`.
+- La configuracion fija el backend de API para impedir que variables SMTP
+  antiguas de Render reactiven accidentalmente el transporte bloqueado.
+
+Motivo:
+
+- Render Free bloquea las conexiones salientes a los puertos SMTP 25, 465 y
+  587. La API de Brevo usa HTTPS y mantiene el limite del plan contratado de
+  Brevo sin consumir puertos SMTP.
+
+Configuracion externa pendiente:
+
+- Crear una clave en `Brevo > SMTP & API > API Keys` y agregarla como
+  `BREVO_API_KEY` al `.env` local y a `Render > Environment`.
+- Conservar `DEFAULT_FROM_EMAIL` con un remitente verificado y eliminar de
+  Render `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`,
+  `EMAIL_TIMEOUT`, `EMAIL_HOST_USER` y `EMAIL_HOST_PASSWORD`.
+- Desplegar y probar un unico envio antes de restablecer los intentos agotados
+  de una prefactura existente.
+
+Verificacion:
+
+- 6 pruebas del backend de correo cubren texto, HTML, PDF, autenticacion,
+  errores y la integracion con `send_mail()` de Django.
+- Las 196 pruebas del proyecto aprobaron contra SQLite temporal, sin consumir
+  envios reales de Brevo.

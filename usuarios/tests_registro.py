@@ -128,7 +128,7 @@ class RegistroCompradorAPITests(APITestCase):
         self.assertEqual(mail.outbox[-1].to, [usuario.email])
 
     @patch("usuarios.models.send_mail", return_value=0)
-    def test_registro_devuelve_503_y_revierte_si_smtp_no_confirma(self, _send_mail):
+    def test_registro_devuelve_503_y_revierte_si_brevo_no_confirma(self, _send_mail):
         respuesta = self.client.post(
             self.url_registro,
             self.datos_validos(),

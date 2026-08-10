@@ -255,15 +255,13 @@ JWT_REFRESH_COOKIE_SAMESITE = config(
 )
 JWT_REFRESH_COOKIE_PATH = '/api/'
 
-EMAIL_BACKEND = config(
-    'EMAIL_BACKEND',
+EMAIL_BACKEND = 'config.email_backends.BrevoAPIEmailBackend'
+BREVO_API_KEY = config('BREVO_API_KEY', default='')
+BREVO_API_URL = config(
+    'BREVO_API_URL',
+    default='https://api.brevo.com/v3/smtp/email',
 )
-EMAIL_HOST = config('EMAIL_HOST')
-EMAIL_PORT = config('EMAIL_PORT', cast=int)
-EMAIL_USE_TLS = config('EMAIL_USE_TLS', cast=bool)
-EMAIL_TIMEOUT = config('EMAIL_TIMEOUT', default=10, cast=int)
-EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
-EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+BREVO_API_TIMEOUT = config('BREVO_API_TIMEOUT', default=15, cast=int)
 DEFAULT_FROM_EMAIL = config(
     'DEFAULT_FROM_EMAIL',
 )

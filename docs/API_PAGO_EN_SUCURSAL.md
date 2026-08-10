@@ -172,7 +172,7 @@ PREFACTURA_MAX_INTENTOS_CORREO=4
 ```
 
 `PREFACTURA_MAX_INTENTOS_CORREO` cuenta el envio inicial y los reenvios. El
-correo utiliza la configuracion SMTP existente de Brevo.
+correo y el PDF adjunto se envian mediante la API HTTPS de Brevo.
 
 ## Integracion del frontend
 

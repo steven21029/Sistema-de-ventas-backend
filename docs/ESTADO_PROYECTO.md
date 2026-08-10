@@ -15,7 +15,7 @@ La base de datos actual es SQLite local para desarrollo. La base definitiva sera
 - Backend: Django 5.2.16.
 - API: Django REST Framework.
 - Autenticacion API: JWT con djangorestframework-simplejwt.
-- Correo futuro: Brevo SMTP configurado por variables de entorno, sin claves reales.
+- Correo transaccional: Brevo API HTTPS configurada por variables de entorno.
 - CORS: django-cors-headers.
 - Base de datos local: SQLite.
 - Base de datos futura: Supabase PostgreSQL por `DATABASE_URL`.
@@ -1168,16 +1168,16 @@ Seguridad de sesion implementada:
 - El refresh y logout requieren `credentials: "include"`.
 - Cerrar sesion bloquea el refresh token y elimina la cookie.
 
-Pendiente por implementar:
+Pendiente de configuracion externa:
 
-- Conectar Brevo con claves reales cuando se autorice.
+- Crear la clave de API de Brevo y configurarla en cada entorno autorizado.
 
 Correo:
 
 - El proveedor elegido para correo es Brevo.
-- La configuracion SMTP quedo preparada con variables de entorno.
-- No se han agregado claves reales.
-- Mientras no se configure una clave real, el backend usa salida por consola para desarrollo.
+- El envio usa la API HTTPS de Brevo para funcionar en Render sin puertos SMTP.
+- `BREVO_API_KEY` y el remitente verificado se configuran por entorno.
+- El backend exige confirmacion de Brevo y registra el `messageId` aceptado.
 - El codigo de verificacion vence en 15 minutos.
 - El codigo tiene 6 digitos.
 - El maximo de intentos por codigo es 5.
@@ -1278,4 +1278,4 @@ Pruebas hechas con rollback:
 
 ## 21. Ultimo estado
 
-El backend local tiene empresas, empresa publica por slug, usuarios/perfiles, catalogo publico con filtros, inventario con resumen/listado/alertas/ajustes, favoritos, banners promocionales, carrito por codigo de barra, pedidos con direccion simple para envios, prefactura, login JWT, registro de compradores, verificacion de correo y recuperacion de contrasena funcionando como base inicial. Falta conexion con Supabase, claves reales de Brevo, integracion de pago, descuentos/promociones de productos, PDF de prefactura y almacenamiento de imagenes en produccion antes de usuarios reales en produccion.
+El backend tiene empresas, empresa publica por slug, usuarios/perfiles, catalogo publico con filtros, inventario con resumen/listado/alertas/ajustes, favoritos, banners promocionales, carrito por codigo de barra, pedidos, prefactura PDF, login JWT, registro de compradores, verificacion de correo, recuperacion de contrasena, reportes y pago en sucursal. Usa Supabase y almacenamiento R2 por configuracion, y el correo transaccional sale por la API HTTPS de Brevo. Antes de usuarios reales deben configurarse y validarse en Render las credenciales definitivas de cada proveedor.
