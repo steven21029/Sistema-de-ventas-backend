@@ -1,6 +1,6 @@
 # Contrato API de reportes comerciales
 
-Estado: implementado y verificado el 6 de agosto de 2026.
+Estado: implementado y verificado el 10 de agosto de 2026.
 
 Las rutas estan disponibles con las bases `/api/` y `/api/v1/`. El frontend
 debe preferir `/api/v1/`.
@@ -60,6 +60,30 @@ Respuesta:
     "envios": "700.00",
     "monto_pendiente": "3500.00",
     "pedidos_pendientes": 5,
+    "pagos_por_metodo": {
+      "sucursal": {
+        "cantidad": 12,
+        "monto": "9000.00"
+      },
+      "en_linea": {
+        "cantidad": 20,
+        "monto": "16000.00"
+      }
+    },
+    "pendientes_por_metodo": {
+      "sucursal": {
+        "cantidad": 3,
+        "monto": "2100.00"
+      },
+      "en_linea": {
+        "cantidad": 1,
+        "monto": "900.00"
+      },
+      "sin_metodo": {
+        "cantidad": 1,
+        "monto": "500.00"
+      }
+    },
     "variacion_ingresos_porcentaje": 12.5,
     "variacion_ventas_porcentaje": 8.2
   },
@@ -96,6 +120,15 @@ Respuesta:
 - Los totales confirmados usan exclusivamente la fotografia historica del
   pedido: `subtotal`, `descuento_total`, `impuesto`, `envio` y `total`.
 - `ticket_promedio` es ingresos confirmados entre ventas confirmadas.
+- `pagos_por_metodo` usa exclusivamente pagos con `estado=aprobado` y el
+  valor historico de `Pago.metodo`. Cada pedido se cuenta y suma una sola vez,
+  aunque existan varios intentos. Siempre contiene `sucursal` y `en_linea`, con
+  cantidad cero y monto `"0.00"` cuando no hay pagos confirmados.
+- `pendientes_por_metodo` incluye pedidos cuyo `estado_pago` oficial sigue en
+  `pendiente` y que no tienen ningun pago aprobado. Se agrupan por
+  `Pedido.metodo_pago`; el valor `pendiente` de seleccion se informa como
+  `sin_metodo`. Los intentos rechazados no duplican ni eliminan el pedido de
+  este agregado. Las tres claves siempre estan presentes y usan `Pedido.total`.
 - Un pedido es pendiente si no esta pagado, no esta cancelado y no tiene un
   resultado final rechazado sin otro intento pendiente.
 - Un intento rechazado no elimina la posibilidad de reintentar. Si existe
@@ -156,6 +189,10 @@ La respuesta incluye `Content-Disposition: attachment` con el nombre final.
 ## Integracion del frontend
 
 - Sustituir los calculos locales del panel por el objeto `resumen`.
+- Consumir `resumen.pagos_por_metodo` directamente para cantidades y montos
+  confirmados por canal; no reconstruirlo a partir de intentos de pago.
+- Consumir `resumen.pendientes_por_metodo` para los pedidos administrables que
+  aun no tienen pago confirmado.
 - Usar `serie` directamente para graficas; no volver a agrupar pedidos.
 - Usar `estados` para distribucion de ventas y `productos_mas_vendidos` para el
   ranking.
@@ -163,3 +200,8 @@ La respuesta incluye `Content-Disposition: attachment` con el nombre final.
 - Para descargar, solicitar el endpoint como `blob` y respetar el nombre de
   `Content-Disposition`.
 - Mostrar `403` como falta de acceso a la empresa y `400` como error de filtros.
+
+Campos relacionados ya disponibles:
+
+- `GET /api/v1/pedidos/pedidos/` incluye `metodo_pago` en cada pedido.
+- `GET /api/v1/pagos/` incluye `metodo` en cada pago.

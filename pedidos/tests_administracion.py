@@ -87,6 +87,7 @@ class PedidosAdministrativosAPITests(APITestCase):
         self.assertEqual(respuesta.status_code, status.HTTP_200_OK)
         ids = {item["id"] for item in respuesta.data}
         self.assertEqual(ids, {self.pedido_uno.id, self.pedido_dos.id})
+        self.assertTrue(all("metodo_pago" in item for item in respuesta.data))
 
     def test_comprador_solo_ve_sus_pedidos(self):
         self.client.force_authenticate(self.cliente_uno)

@@ -310,6 +310,11 @@ class PedidoSerializer(serializers.ModelSerializer):
     detalles = DetallePedidoSerializer(many=True, read_only=True)
     empresa_nombre = serializers.CharField(source="empresa.nombre", read_only=True)
     usuario_nombre = serializers.CharField(source="usuario.username", read_only=True)
+    cancelado_por_email = serializers.EmailField(
+        source="cancelado_por.email",
+        read_only=True,
+        allow_null=True,
+    )
 
     class Meta:
         model = Pedido
@@ -341,6 +346,10 @@ class PedidoSerializer(serializers.ModelSerializer):
             "moneda",
             "observaciones",
             "inventario_descontado",
+            "motivo_cancelacion",
+            "cancelado_por",
+            "cancelado_por_email",
+            "fecha_cancelacion",
             "detalles",
             "fecha_creacion",
             "fecha_actualizacion",
@@ -365,6 +374,15 @@ class GenerarPedidoDesdeCarritoSerializer(serializers.Serializer):
 
 class PagoEnSucursalSerializer(serializers.Serializer):
     sucursal_id = serializers.IntegerField(min_value=1)
+
+
+class CancelarPedidoPendienteSerializer(serializers.Serializer):
+    motivo = serializers.CharField(max_length=1000, trim_whitespace=True)
+
+    def validate_motivo(self, value):
+        if not value:
+            raise serializers.ValidationError("El motivo es obligatorio.")
+        return value
 
 
 class AgregarArticuloCarritoSerializer(serializers.Serializer):

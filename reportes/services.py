@@ -74,6 +74,8 @@ class ReporteVentasService:
         confirmados = self._pedidos_confirmados(pedidos)
         totales = self._totales_confirmados(confirmados)
         estados, acumulados_estados = self._estados(pedidos)
+        pagos_por_metodo = self._pagos_por_metodo()
+        pendientes_por_metodo = self._pendientes_por_metodo(pedidos)
 
         variacion_ingresos = None
         variacion_ventas = None
@@ -113,6 +115,8 @@ class ReporteVentasService:
                     acumulados_estados["pendiente"]["monto"]
                 ),
                 "pedidos_pendientes": acumulados_estados["pendiente"]["cantidad"],
+                "pagos_por_metodo": pagos_por_metodo,
+                "pendientes_por_metodo": pendientes_por_metodo,
                 "variacion_ingresos_porcentaje": variacion_ingresos,
                 "variacion_ventas_porcentaje": variacion_ventas,
             },
@@ -270,6 +274,70 @@ class ReporteVentasService:
             "ticket_promedio": ingresos / ventas if ventas else ZERO,
         }
 
+    def _pagos_por_metodo(self):
+        acumulados = {
+            Pago.Metodo.SUCURSAL: {"cantidad": 0, "monto": ZERO},
+            Pago.Metodo.EN_LINEA: {"cantidad": 0, "monto": ZERO},
+        }
+        pagos = (
+            Pago.objects.filter(
+                empresa=self.empresa,
+                pedido__empresa=self.empresa,
+                pedido__fecha_creacion__gte=self.inicio,
+                pedido__fecha_creacion__lt=self.fin_exclusivo,
+                estado=Pago.Estado.APROBADO,
+                metodo__in=acumulados,
+            )
+            .order_by("pedido_id", "id")
+            .values_list("pedido_id", "metodo", "monto")
+        )
+        pedidos_contados = set()
+        for pedido_id, metodo, monto in pagos:
+            if pedido_id in pedidos_contados:
+                continue
+            pedidos_contados.add(pedido_id)
+            acumulados[metodo]["cantidad"] += 1
+            acumulados[metodo]["monto"] += monto
+
+        return {
+            metodo: {
+                "cantidad": valores["cantidad"],
+                "monto": formatear_monto(valores["monto"]),
+            }
+            for metodo, valores in acumulados.items()
+        }
+
+    def _pendientes_por_metodo(self, pedidos):
+        acumulados = {
+            Pedido.MetodoPago.SUCURSAL: {"cantidad": 0, "monto": ZERO},
+            Pedido.MetodoPago.EN_LINEA: {"cantidad": 0, "monto": ZERO},
+            "sin_metodo": {"cantidad": 0, "monto": ZERO},
+        }
+        for pedido in pedidos.only("estado_pago", "metodo_pago", "total"):
+            if (
+                pedido.estado_pago != Pedido.EstadoPago.PENDIENTE
+                or pedido.tiene_pago_aprobado
+            ):
+                continue
+            metodo = (
+                pedido.metodo_pago
+                if pedido.metodo_pago in {
+                    Pedido.MetodoPago.SUCURSAL,
+                    Pedido.MetodoPago.EN_LINEA,
+                }
+                else "sin_metodo"
+            )
+            acumulados[metodo]["cantidad"] += 1
+            acumulados[metodo]["monto"] += pedido.total
+
+        return {
+            metodo: {
+                "cantidad": valores["cantidad"],
+                "monto": formatear_monto(valores["monto"]),
+            }
+            for metodo, valores in acumulados.items()
+        }
+
     def _estados(self, pedidos):
         acumulados = {
             estado: {"cantidad": 0, "monto": ZERO}
@@ -409,6 +477,7 @@ class ReporteVentasService:
                 Pago.Estado.APROBADO,
                 Pago.Estado.PENDIENTE,
                 Pago.Estado.RECHAZADO,
+                Pago.Estado.CANCELADO,
             )
         )
         filas = tuple(

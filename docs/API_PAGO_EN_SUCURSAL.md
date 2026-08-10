@@ -164,6 +164,69 @@ devuelve `200 OK`, `duplicado=true` y no repite el movimiento de inventario.
 Si falta inventario, responde `400` y la transaccion conserva pago y pedido
 como pendientes.
 
+## Cancelar un pedido pendiente
+
+```http
+POST /api/v1/pedidos/pedidos/123/cancelar-pendiente/
+Content-Type: application/json
+
+{
+  "motivo": "Pedido abandonado por el cliente"
+}
+```
+
+Solo puede usarlo un superusuario, administrador maestro autorizado,
+administrador de empresa o gerente de la empresa del pedido. El pedido debe
+seguir con `estado_pago=pendiente` y no puede tener pagos aprobados.
+
+Respuesta `200 OK`:
+
+```json
+{
+  "pedido": {
+    "id": 123,
+    "estado_pago": "cancelado",
+    "metodo_pago": "sucursal",
+    "motivo_cancelacion": "Pedido abandonado por el cliente",
+    "cancelado_por": 8,
+    "cancelado_por_email": "admin@example.com",
+    "fecha_cancelacion": "2026-08-10T14:30:00-06:00",
+    "inventario_descontado": false
+  },
+  "pagos_cancelados": [
+    {
+      "referencia": "550e8400-e29b-41d4-a716-446655440000",
+      "pedido": 123,
+      "metodo": "sucursal",
+      "estado": "cancelado",
+      "monto": "123.50"
+    }
+  ],
+  "duplicado": false
+}
+```
+
+La operacion bloquea pedido e intentos dentro de una transaccion. Solo cambia
+intentos que todavia esten `pendiente`; conserva rechazados como historial y
+no crea movimientos de inventario. Repetirla devuelve `duplicado=true`, el
+mismo motivo y la misma auditoria. Un pedido pagado o con pago aprobado recibe
+`400`, un comprador recibe `403` y un administrador de otra empresa recibe
+`403`.
+
+Esta accion no reemplaza la confirmacion presencial. La unica ruta que puede
+aprobar administrativamente un pago en sucursal sigue siendo:
+
+```http
+POST /api/v1/pagos/{referencia}/confirmar-en-sucursal/
+```
+
+Los listados administrativos exponen los campos necesarios:
+
+- `GET /api/v1/pedidos/pedidos/` incluye `metodo_pago`, motivo, administrador y
+  fecha de cancelacion.
+- `GET /api/v1/pagos/` incluye `metodo`, `estado`, `referencia`, `pedido` y
+  `monto`.
+
 ## Variables de entorno
 
 ```env
@@ -181,4 +244,6 @@ correo y el PDF adjunto se envian mediante la API HTTPS de Brevo.
 - No enviar correos ni direcciones alternativas desde el navegador.
 - Tratar respuestas `200` y `201` del inicio como exito.
 - Tras la confirmacion administrativa, refrescar el pedido y el inventario.
+- Tras cancelar un pendiente, retirar el pedido de acciones confirmables y
+  refrescar los agregados del resumen comercial.
 - Mantener el flujo actual de `/pagos/iniciar/` para pago en linea.

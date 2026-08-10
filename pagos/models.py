@@ -15,6 +15,7 @@ class Pago(models.Model):
         PENDIENTE = "pendiente", "Pendiente"
         APROBADO = "aprobado", "Aprobado"
         RECHAZADO = "rechazado", "Rechazado"
+        CANCELADO = "cancelado", "Cancelado"
 
     class Metodo(models.TextChoices):
         EN_LINEA = "en_linea", "Pago en linea"
@@ -177,6 +178,22 @@ class Pago(models.Model):
                 {"pago": "Los intentos de pago se conservan como historial."}
             )
         return super().delete(*args, **kwargs)
+
+    def cancelar_pendiente_administrativamente(self):
+        if self.estado == self.Estado.CANCELADO:
+            return False
+        if self.estado != self.Estado.PENDIENTE:
+            raise ValidationError(
+                {"estado": "Solo se puede cancelar un intento pendiente."}
+            )
+
+        self.estado = self.Estado.CANCELADO
+        self._transicion_controlada = True
+        try:
+            self.save(update_fields=["estado", "fecha_actualizacion"])
+        finally:
+            del self._transicion_controlada
+        return True
 
     @classmethod
     def obtener_o_crear_pendiente(

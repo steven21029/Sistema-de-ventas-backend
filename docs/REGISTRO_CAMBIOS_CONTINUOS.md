@@ -1595,3 +1595,68 @@ Verificacion:
   errores y la integracion con `send_mail()` de Django.
 - Las 196 pruebas del proyecto aprobaron contra SQLite temporal, sin consumir
   envios reales de Brevo.
+
+## 2026-08-10 - Pagos confirmados por metodo en el resumen comercial
+
+Estado: implementado y verificado.
+
+Cambios:
+
+- `GET /api/v1/reportes/resumen-ventas/` y su ruta compatible bajo `/api/`
+  incluyen `resumen.pagos_por_metodo` con las claves fijas `sucursal` y
+  `en_linea`.
+- Solo participan pagos con estado oficial `aprobado`. Los pagos pendientes y
+  rechazados se excluyen, y los pedidos pagados sin un pago confirmado no se
+  atribuyen artificialmente a ningun metodo.
+- Los pagos se limitan a la empresa autorizada y al rango de creacion del
+  pedido en `America/Tegucigalpa`, igual que el resto del resumen.
+- Cada pedido se cuenta y suma una sola vez aunque existan varios intentos o
+  datos historicos duplicados. Los montos usan `Decimal` y se devuelven con dos
+  decimales.
+- Se confirmo mediante contrato y pruebas que el listado de pedidos incluye
+  `metodo_pago` y el listado de pagos incluye `metodo`.
+
+Verificacion:
+
+- 3 pruebas nuevas cubren ambos metodos, valores cero, intentos duplicados,
+  pagos no confirmados, aislamiento multiempresa y rango de fechas.
+- Las 199 pruebas del proyecto aprobaron contra SQLite temporal.
+
+## 2026-08-10 - Gestion administrativa de pedidos pendientes
+
+Estado: implementado y verificado.
+
+Cambios:
+
+- `resumen.pendientes_por_metodo` separa pedidos pendientes entre `sucursal`,
+  `en_linea` y `sin_metodo`, siempre devuelve los tres grupos y usa montos
+  `Decimal` formateados con dos decimales.
+- El agregado usa pedidos unicos dentro de la empresa y rango autorizados,
+  conserva pedidos con intentos rechazados y excluye cualquiera con pago
+  aprobado.
+- Se creo `POST /api/v1/pedidos/pedidos/{id}/cancelar-pendiente/`, compatible
+  tambien con `/api/`, para superusuarios y personal administrativo autorizado
+  de la empresa.
+- La cancelacion bloquea pagos y pedido dentro de una transaccion, cambia solo
+  intentos pendientes al nuevo estado final `cancelado` y no ejecuta efectos de
+  inventario.
+- El pedido conserva motivo, administrador y fecha de cancelacion. Repetir la
+  accion devuelve la misma auditoria con `duplicado=true`.
+- Los pedidos pagados y los que tengan un pago aprobado se rechazan. La ruta
+  existente `confirmar-en-sucursal` permanece como unica confirmacion
+  administrativa presencial y conserva sus efectos transaccionales.
+- Los listados administrativos mantienen `metodo_pago` en pedidos y exponen
+  `metodo`, `estado`, `referencia`, `pedido` y `monto` en pagos.
+
+Persistencia:
+
+- `pedidos.0015` agrega `motivo_cancelacion`, `cancelado_por` y
+  `fecha_cancelacion`.
+- `pagos.0003` incorpora `cancelado` a los estados oficiales del pago.
+
+Verificacion:
+
+- 8 pruebas nuevas cubren separacion por metodo, intentos multiples, empresa,
+  rango, permisos, idempotencia, pedidos pagados, pagos aprobados, inventario y
+  compatibilidad de rutas.
+- Las 207 pruebas del proyecto aprobaron contra SQLite temporal.

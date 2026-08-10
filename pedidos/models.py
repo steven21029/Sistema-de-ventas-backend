@@ -308,6 +308,16 @@ class Pedido(models.Model):
     moneda = models.CharField(max_length=3, default="HNL")
     observaciones = models.TextField(blank=True)
     inventario_descontado = models.BooleanField(default=False)
+    motivo_cancelacion = models.TextField(blank=True)
+    cancelado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="pedidos_cancelados_administrativamente",
+        null=True,
+        blank=True,
+        editable=False,
+    )
+    fecha_cancelacion = models.DateTimeField(null=True, blank=True, editable=False)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
 
@@ -402,6 +412,20 @@ class Pedido(models.Model):
                 }
             )
 
+        cancelacion_modificada = (
+            self.motivo_cancelacion != original.motivo_cancelacion
+            or self.cancelado_por_id != original.cancelado_por_id
+            or self.fecha_cancelacion != original.fecha_cancelacion
+        )
+        if cancelacion_modificada and not getattr(
+            self,
+            "_cancelacion_administrativa_controlada",
+            False,
+        ):
+            raise ValidationError(
+                {"cancelacion": "La cancelacion solo se registra mediante su flujo."}
+            )
+
         metodo_modificado = (
             self.metodo_pago != original.metodo_pago
             or self.sucursal_pago_id != original.sucursal_pago_id
@@ -483,6 +507,45 @@ class Pedido(models.Model):
             )
         finally:
             del self._seleccion_metodo_controlada
+        return True
+
+    def cancelar_pendiente_administrativamente(self, administrador, motivo):
+        if (
+            self.estado_pago == self.EstadoPago.CANCELADO
+            and self.fecha_cancelacion
+            and self.cancelado_por_id
+        ):
+            return False
+        if self.estado_pago != self.EstadoPago.PENDIENTE:
+            raise ValidationError(
+                {"estado_pago": "Solo se puede cancelar un pedido pendiente."}
+            )
+        if self.inventario_descontado:
+            raise ValidationError(
+                {"inventario": "El pedido ya tiene efectos de inventario."}
+            )
+
+        motivo = str(motivo).strip()
+        if not motivo:
+            raise ValidationError({"motivo": "El motivo es obligatorio."})
+
+        self.estado_pago = self.EstadoPago.CANCELADO
+        self.motivo_cancelacion = motivo
+        self.cancelado_por = administrador
+        self.fecha_cancelacion = timezone.now()
+        self._cancelacion_administrativa_controlada = True
+        try:
+            self.save(
+                update_fields=[
+                    "estado_pago",
+                    "motivo_cancelacion",
+                    "cancelado_por",
+                    "fecha_cancelacion",
+                    "fecha_actualizacion",
+                ]
+            )
+        finally:
+            del self._cancelacion_administrativa_controlada
         return True
 
     def delete(self, *args, **kwargs):

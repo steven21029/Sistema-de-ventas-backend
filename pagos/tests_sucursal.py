@@ -330,6 +330,201 @@ class PagoEnSucursalAPITests(APITestCase):
         self.assertEqual(pago.proveedor, "proveedor_prueba")
         self.assertFalse(Prefactura.objects.filter(pedido=otro_pedido).exists())
 
+    def test_admin_cancela_pedido_e_intento_pendiente_sin_tocar_inventario(self):
+        creada = self._pago_sucursal()
+        referencia = creada.data["pago"]["referencia"]
+        self.client.force_authenticate(self.admin)
+
+        respuesta = self.client.post(
+            reverse(
+                "pedidos-pedidos-cancelar-pendiente",
+                args=[self.pedido.pk],
+            ),
+            {"motivo": "Pedido abandonado por el cliente"},
+            format="json",
+        )
+
+        self.assertEqual(respuesta.status_code, status.HTTP_200_OK)
+        self.assertFalse(respuesta.data["duplicado"])
+        self.assertEqual(respuesta.data["pedido"]["estado_pago"], "cancelado")
+        self.assertEqual(respuesta.data["pedido"]["cancelado_por"], self.admin.pk)
+        self.assertEqual(
+            respuesta.data["pedido"]["motivo_cancelacion"],
+            "Pedido abandonado por el cliente",
+        )
+        self.assertIsNotNone(respuesta.data["pedido"]["fecha_cancelacion"])
+        self.assertEqual(len(respuesta.data["pagos_cancelados"]), 1)
+        self.assertEqual(
+            respuesta.data["pagos_cancelados"][0]["referencia"],
+            referencia,
+        )
+        self.assertEqual(
+            respuesta.data["pagos_cancelados"][0]["estado"],
+            Pago.Estado.CANCELADO,
+        )
+        self.pedido.refresh_from_db()
+        self.producto.refresh_from_db()
+        self.assertFalse(self.pedido.inventario_descontado)
+        self.assertEqual(self.producto.existencia, 5)
+        self.assertFalse(MovimientoInventario.objects.exists())
+
+    def test_cancelacion_pendiente_es_idempotente(self):
+        self._pago_sucursal()
+        self.client.force_authenticate(self.admin)
+        url = reverse(
+            "pedidos-pedidos-cancelar-pendiente",
+            args=[self.pedido.pk],
+        )
+
+        primera = self.client.post(
+            url,
+            {"motivo": "Pedido abandonado"},
+            format="json",
+        )
+        segunda = self.client.post(
+            url,
+            {"motivo": "Motivo diferente que no debe reemplazar el original"},
+            format="json",
+        )
+
+        self.assertEqual(primera.status_code, status.HTTP_200_OK)
+        self.assertEqual(segunda.status_code, status.HTTP_200_OK)
+        self.assertFalse(primera.data["duplicado"])
+        self.assertTrue(segunda.data["duplicado"])
+        self.assertEqual(
+            primera.data["pedido"]["fecha_cancelacion"],
+            segunda.data["pedido"]["fecha_cancelacion"],
+        )
+        self.assertEqual(
+            segunda.data["pedido"]["motivo_cancelacion"],
+            "Pedido abandonado",
+        )
+        self.assertEqual(Pago.objects.filter(pedido=self.pedido).count(), 1)
+        self.assertEqual(
+            Pago.objects.get(pedido=self.pedido).estado,
+            Pago.Estado.CANCELADO,
+        )
+        self.assertFalse(MovimientoInventario.objects.exists())
+
+    def test_cancelacion_rechaza_comprador_y_administrador_de_otra_empresa(self):
+        self._pago_sucursal()
+        url = reverse(
+            "pedidos-pedidos-cancelar-pendiente",
+            args=[self.pedido.pk],
+        )
+
+        comprador = self.client.post(
+            url,
+            {"motivo": "Sin autorizacion"},
+            format="json",
+        )
+        self.client.force_authenticate(self.admin_otra)
+        administrador_ajeno = self.client.post(
+            url,
+            {"motivo": "Empresa incorrecta"},
+            format="json",
+        )
+
+        self.assertEqual(comprador.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(administrador_ajeno.status_code, status.HTTP_403_FORBIDDEN)
+        self.pedido.refresh_from_db()
+        self.assertEqual(self.pedido.estado_pago, Pedido.EstadoPago.PENDIENTE)
+        self.assertEqual(
+            Pago.objects.get(pedido=self.pedido).estado,
+            Pago.Estado.PENDIENTE,
+        )
+
+    def test_cancelacion_rechaza_pedido_pagado_o_con_pago_aprobado(self):
+        creada = self._pago_sucursal()
+        referencia = creada.data["pago"]["referencia"]
+        self.client.force_authenticate(self.admin)
+        confirmada = self.client.post(
+            reverse("pagos-confirmar-en-sucursal", args=[referencia])
+        )
+        self.assertEqual(confirmada.status_code, status.HTTP_200_OK)
+
+        pedido_pagado = self.client.post(
+            reverse(
+                "pedidos-pedidos-cancelar-pendiente",
+                args=[self.pedido.pk],
+            ),
+            {"motivo": "No debe cancelarse"},
+            format="json",
+        )
+
+        otro_pedido = self._crear_pedido(self.otro_comprador)
+        pago_aprobado = Pago.objects.create(
+            pedido=otro_pedido,
+            proveedor="prueba",
+            metodo=Pago.Metodo.EN_LINEA,
+        )
+        Pago.objects.filter(pk=pago_aprobado.pk).update(
+            estado=Pago.Estado.APROBADO,
+        )
+        inconsistente = self.client.post(
+            reverse(
+                "pedidos-pedidos-cancelar-pendiente",
+                args=[otro_pedido.pk],
+            ),
+            {"motivo": "Tampoco debe cancelarse"},
+            format="json",
+        )
+
+        self.assertEqual(pedido_pagado.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(inconsistente.status_code, status.HTTP_400_BAD_REQUEST)
+        otro_pedido.refresh_from_db()
+        self.assertEqual(otro_pedido.estado_pago, Pedido.EstadoPago.PENDIENTE)
+
+    def test_cancelacion_solo_cambia_intentos_que_siguen_pendientes(self):
+        self._pago_sucursal()
+        rechazado = Pago.objects.get(pedido=self.pedido)
+        Pago.objects.filter(pk=rechazado.pk).update(estado=Pago.Estado.RECHAZADO)
+        self._pago_sucursal()
+        pendiente = Pago.objects.get(
+            pedido=self.pedido,
+            estado=Pago.Estado.PENDIENTE,
+        )
+        self.client.force_authenticate(self.gerente)
+
+        respuesta = self.client.post(
+            reverse(
+                "pedidos-pedidos-cancelar-pendiente",
+                args=[self.pedido.pk],
+            ),
+            {"motivo": "Sin pago completado"},
+            format="json",
+        )
+
+        self.assertEqual(respuesta.status_code, status.HTTP_200_OK)
+        rechazado.refresh_from_db()
+        pendiente.refresh_from_db()
+        self.assertEqual(rechazado.estado, Pago.Estado.RECHAZADO)
+        self.assertEqual(pendiente.estado, Pago.Estado.CANCELADO)
+        self.assertEqual(
+            [item["id"] for item in respuesta.data["pagos_cancelados"]],
+            [pendiente.id],
+        )
+
+    def test_cancelacion_pendiente_funciona_en_api_y_api_v1(self):
+        pedido = self._crear_pedido(self.comprador)
+        self.client.force_authenticate(self.admin)
+
+        primera = self.client.post(
+            f"/api/pedidos/pedidos/{pedido.pk}/cancelar-pendiente/",
+            {"motivo": "Pedido abandonado"},
+            format="json",
+        )
+        segunda = self.client.post(
+            f"/api/v1/pedidos/pedidos/{pedido.pk}/cancelar-pendiente/",
+            {"motivo": "Pedido abandonado"},
+            format="json",
+        )
+
+        self.assertEqual(primera.status_code, status.HTTP_200_OK)
+        self.assertEqual(segunda.status_code, status.HTTP_200_OK)
+        self.assertFalse(primera.data["duplicado"])
+        self.assertTrue(segunda.data["duplicado"])
+
     def test_rutas_api_y_api_v1_son_compatibles(self):
         pedido = self._crear_pedido(self.comprador)
         respuesta_api = self.client.post(

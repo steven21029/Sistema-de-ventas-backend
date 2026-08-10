@@ -279,6 +279,197 @@ class ReportesVentasAPITests(APITestCase):
         self.assertEqual(resumen["envios"], "20.00")
         self.assertEqual(resumen["monto_pendiente"], "46.00")
         self.assertEqual(resumen["pedidos_pendientes"], 1)
+        self.assertEqual(
+            resumen["pendientes_por_metodo"],
+            {
+                "sucursal": {"cantidad": 0, "monto": "0.00"},
+                "en_linea": {"cantidad": 0, "monto": "0.00"},
+                "sin_metodo": {"cantidad": 2, "monto": "80.50"},
+            },
+        )
+
+    def test_pagos_por_metodo_cuenta_confirmados_y_deduplica_pedidos(self):
+        pago_sucursal = Pago.objects.create(
+            pedido=self.pagado,
+            proveedor="sucursal",
+            metodo=Pago.Metodo.SUCURSAL,
+        )
+        Pago.objects.filter(pk=pago_sucursal.pk).update(
+            estado=Pago.Estado.APROBADO,
+            fecha_confirmacion=self._utc(2026, 8, 5, 10, 5),
+        )
+        pago_duplicado = Pago.objects.create(
+            pedido=self.aprobado_por_pago,
+            proveedor="reintento",
+            metodo=Pago.Metodo.EN_LINEA,
+        )
+        Pago.objects.filter(pk=pago_duplicado.pk).update(
+            estado=Pago.Estado.APROBADO,
+            fecha_confirmacion=self._utc(2026, 8, 6, 11, 10),
+        )
+        Pago.objects.create(
+            pedido=self.pendiente,
+            proveedor="sucursal",
+            metodo=Pago.Metodo.SUCURSAL,
+        )
+
+        self.client.force_authenticate(self.admin)
+        respuesta = self.client.get(
+            reverse("reportes-resumen-ventas"),
+            self._parametros_resumen(),
+        )
+
+        self.assertEqual(respuesta.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            respuesta.data["resumen"]["pagos_por_metodo"],
+            {
+                "sucursal": {"cantidad": 1, "monto": "123.50"},
+                "en_linea": {"cantidad": 1, "monto": "57.50"},
+            },
+        )
+
+    def test_pagos_por_metodo_devuelve_ambos_en_cero_sin_pagos_confirmados(self):
+        Pedido.objects.filter(pk=self.pagado.pk).update(
+            metodo_pago=Pedido.MetodoPago.SUCURSAL,
+        )
+        self.client.force_authenticate(self.admin)
+        respuesta = self.client.get(
+            reverse("reportes-resumen-ventas"),
+            self._parametros_resumen(
+                fecha_desde="2026-08-05",
+                fecha_hasta="2026-08-05",
+                comparar_periodo_anterior="false",
+            ),
+        )
+
+        self.assertEqual(respuesta.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            respuesta.data["resumen"]["pagos_por_metodo"],
+            {
+                "sucursal": {"cantidad": 0, "monto": "0.00"},
+                "en_linea": {"cantidad": 0, "monto": "0.00"},
+            },
+        )
+
+    def test_pagos_por_metodo_respeta_empresa_y_rango_del_pedido(self):
+        for pedido, metodo in (
+            (self.pedido_otra, Pago.Metodo.SUCURSAL),
+            (self.fuera_rango, Pago.Metodo.EN_LINEA),
+        ):
+            pago = Pago.objects.create(
+                pedido=pedido,
+                proveedor="fuera-reporte",
+                metodo=metodo,
+            )
+            Pago.objects.filter(pk=pago.pk).update(
+                estado=Pago.Estado.APROBADO,
+                fecha_confirmacion=self._utc(2026, 8, 10, 10, 0),
+            )
+
+        self.client.force_authenticate(self.admin)
+        respuesta = self.client.get(
+            reverse("reportes-resumen-ventas"),
+            self._parametros_resumen(),
+        )
+
+        self.assertEqual(respuesta.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            respuesta.data["resumen"]["pagos_por_metodo"],
+            {
+                "sucursal": {"cantidad": 0, "monto": "0.00"},
+                "en_linea": {"cantidad": 1, "monto": "57.50"},
+            },
+        )
+
+    def test_pendientes_por_metodo_agrupa_pedidos_sin_duplicar_intentos(self):
+        pendiente_sucursal = self._crear_pedido(
+            self.analiza,
+            self.comprador,
+            datetime(2026, 8, 11, 10, 0, tzinfo=ZONA_HONDURAS),
+            total="70.00",
+        )
+        pendiente_linea = self._crear_pedido(
+            self.analiza,
+            self.comprador,
+            datetime(2026, 8, 12, 10, 0, tzinfo=ZONA_HONDURAS),
+            total="80.00",
+        )
+        Pedido.objects.filter(pk=pendiente_sucursal.pk).update(
+            metodo_pago=Pedido.MetodoPago.SUCURSAL,
+        )
+        Pedido.objects.filter(pk=pendiente_linea.pk).update(
+            metodo_pago=Pedido.MetodoPago.EN_LINEA,
+        )
+        Pago.objects.create(
+            pedido=pendiente_sucursal,
+            proveedor="sucursal",
+            metodo=Pago.Metodo.SUCURSAL,
+        )
+        intento_rechazado = Pago.objects.create(
+            pedido=pendiente_linea,
+            proveedor="primer-intento",
+            metodo=Pago.Metodo.EN_LINEA,
+        )
+        Pago.objects.filter(pk=intento_rechazado.pk).update(
+            estado=Pago.Estado.RECHAZADO,
+        )
+        Pago.objects.create(
+            pedido=pendiente_linea,
+            proveedor="segundo-intento",
+            metodo=Pago.Metodo.EN_LINEA,
+        )
+
+        self.client.force_authenticate(self.admin)
+        respuesta = self.client.get(
+            reverse("reportes-resumen-ventas"),
+            self._parametros_resumen(),
+        )
+
+        self.assertEqual(respuesta.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            respuesta.data["resumen"]["pendientes_por_metodo"],
+            {
+                "sucursal": {"cantidad": 1, "monto": "70.00"},
+                "en_linea": {"cantidad": 1, "monto": "80.00"},
+                "sin_metodo": {"cantidad": 2, "monto": "80.50"},
+            },
+        )
+
+    def test_pendientes_por_metodo_respeta_empresa_y_rango(self):
+        pendiente_otra = self._crear_pedido(
+            self.otra,
+            self.comprador_otra,
+            datetime(2026, 8, 15, 10, 0, tzinfo=ZONA_HONDURAS),
+            total="500.00",
+        )
+        pendiente_fuera = self._crear_pedido(
+            self.analiza,
+            self.comprador,
+            datetime(2026, 9, 2, 10, 0, tzinfo=ZONA_HONDURAS),
+            total="600.00",
+        )
+        Pedido.objects.filter(pk=pendiente_otra.pk).update(
+            metodo_pago=Pedido.MetodoPago.SUCURSAL,
+        )
+        Pedido.objects.filter(pk=pendiente_fuera.pk).update(
+            metodo_pago=Pedido.MetodoPago.EN_LINEA,
+        )
+
+        self.client.force_authenticate(self.admin)
+        respuesta = self.client.get(
+            reverse("reportes-resumen-ventas"),
+            self._parametros_resumen(),
+        )
+
+        self.assertEqual(respuesta.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            respuesta.data["resumen"]["pendientes_por_metodo"],
+            {
+                "sucursal": {"cantidad": 0, "monto": "0.00"},
+                "en_linea": {"cantidad": 0, "monto": "0.00"},
+                "sin_metodo": {"cantidad": 2, "monto": "80.50"},
+            },
+        )
 
     def test_desglosa_pagados_pendientes_rechazados_y_cancelados(self):
         self.client.force_authenticate(self.admin)

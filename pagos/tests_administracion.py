@@ -89,6 +89,13 @@ class PagosAdministrativosAPITests(APITestCase):
         ids = {item["id"] for item in respuesta.data}
         self.assertEqual(ids, {self.pago_uno.id, self.pago_dos.id})
         self.assertEqual(respuesta.data[0]["empresa_slug"], self.analiza.slug)
+        for item in respuesta.data:
+            self.assertTrue(
+                {"metodo", "estado", "referencia", "pedido", "monto"}.issubset(
+                    item
+                )
+            )
+            self.assertEqual(item["metodo"], "en_linea")
 
     def test_comprador_solo_ve_sus_pagos(self):
         self.client.force_authenticate(self.cliente_uno)

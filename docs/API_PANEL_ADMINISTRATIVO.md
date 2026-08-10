@@ -383,6 +383,10 @@ La confirmacion presencial es administrativa:
 
 - `POST /api/v1/pagos/{referencia}/confirmar-en-sucursal/`
 
+Los pedidos que continuan pendientes pueden cancelarse con auditoria mediante:
+
+- `POST /api/v1/pedidos/pedidos/{pedido_id}/cancelar-pendiente/`
+
 Todas las rutas tambien funcionan bajo `/api/`. El inicio es idempotente, no
 descuenta inventario y envia el PDF solamente al correo verificado del
 comprador. La confirmacion valida inventario y reutiliza los efectos

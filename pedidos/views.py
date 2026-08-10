@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from rest_framework import decorators, response, status, viewsets
 from rest_framework.exceptions import APIException, NotFound, PermissionDenied, ValidationError
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
 from catalogo.models import PaqueteCatalogo, Producto
@@ -17,13 +17,16 @@ from config.api import FiltroRangoFechasMixin, PaginacionAdministrativaOpcionalM
 from empresas.contexto import empresas_administrables, obtener_empresa_administrable
 from empresas.models import SucursalEmpresa
 from pagos.models import Pago
+from pagos.serializers import PagoSerializer
 from usuarios.models import PerfilUsuario
+from usuarios.permissions import IsAdministrativeUser
 from .models import Carrito, DetallePedido, ItemCarrito, Pedido, Prefactura, TarifaEntrega
 from .permissions import IsPedidoOwnerOrEmpresaManager, IsTarifaEntregaAdmin
 from .serializers import (
     AgregarArticuloCarritoSerializer,
     CalcularCarritoEntradaSerializer,
     CalcularCarritoSalidaSerializer,
+    CancelarPedidoPendienteSerializer,
     CarritoSerializer,
     CarritoClienteSerializer,
     DetallePedidoSerializer,
@@ -481,6 +484,11 @@ class PedidoViewSet(
     serializer_class = PedidoSerializer
     permission_classes = [IsPedidoOwnerOrEmpresaManager]
 
+    def get_permissions(self):
+        if self.action == "cancelar_pendiente":
+            return [IsAuthenticated(), IsAdministrativeUser()]
+        return super().get_permissions()
+
     def get_queryset(self):
         queryset = Pedido.objects.select_related(
             "empresa",
@@ -488,6 +496,7 @@ class PedidoViewSet(
             "usuario__perfil",
             "carrito_origen",
             "sucursal_pago",
+            "cancelado_por",
         ).prefetch_related(
             "detalles__producto",
             "detalles__paquete",
@@ -558,6 +567,94 @@ class PedidoViewSet(
             "-numero": ("-numero",),
         }
         return queryset.order_by(*ordenes.get(orden, ("-fecha_creacion", "-id")))
+
+    @decorators.action(
+        detail=True,
+        methods=["post"],
+        url_path="cancelar-pendiente",
+    )
+    def cancelar_pendiente(self, request, pk=None):
+        entrada = CancelarPedidoPendienteSerializer(data=request.data)
+        entrada.is_valid(raise_exception=True)
+        pedido_consultado = Pedido.objects.select_related("empresa").filter(pk=pk).first()
+        if not pedido_consultado:
+            raise NotFound("No existe el pedido solicitado.")
+        if not request.user.is_superuser and not empresas_administrables(
+            request.user
+        ).filter(pk=pedido_consultado.empresa_id).exists():
+            raise PermissionDenied("No puedes cancelar pedidos de otra empresa.")
+
+        try:
+            with transaction.atomic():
+                pagos = list(
+                    Pago.objects.select_for_update()
+                    .filter(pedido_id=pedido_consultado.pk)
+                    .order_by("id")
+                )
+                pedido = (
+                    Pedido.objects.select_for_update()
+                    .select_related(
+                        "empresa",
+                        "usuario",
+                        "cancelado_por",
+                        "sucursal_pago",
+                    )
+                    .prefetch_related(
+                        "detalles__producto",
+                        "detalles__paquete",
+                        "detalles__componentes__producto",
+                    )
+                    .get(pk=pedido_consultado.pk)
+                )
+                if any(pago.estado == Pago.Estado.APROBADO for pago in pagos):
+                    raise DjangoValidationError(
+                        {"pago": "El pedido tiene un pago aprobado."}
+                    )
+                es_reintento = bool(
+                    pedido.estado_pago == Pedido.EstadoPago.CANCELADO
+                    and pedido.fecha_cancelacion
+                    and pedido.cancelado_por_id
+                )
+                if es_reintento:
+                    pagos_cancelados = [
+                        pago for pago in pagos if pago.estado == Pago.Estado.CANCELADO
+                    ]
+                else:
+                    if pedido.estado_pago != Pedido.EstadoPago.PENDIENTE:
+                        raise DjangoValidationError(
+                            {
+                                "estado_pago": (
+                                    "Solo se puede cancelar un pedido pendiente."
+                                )
+                            }
+                        )
+                    pagos_cancelados = []
+                    for pago in pagos:
+                        if pago.estado != Pago.Estado.PENDIENTE:
+                            continue
+                        pago.cancelar_pendiente_administrativamente()
+                        pagos_cancelados.append(pago)
+                    pedido.cancelar_pendiente_administrativamente(
+                        administrador=request.user,
+                        motivo=entrada.validated_data["motivo"],
+                    )
+        except DjangoValidationError as exc:
+            raise ValidationError(self._normalizar_error(exc)) from exc
+
+        return response.Response(
+            {
+                "pedido": PedidoSerializer(
+                    pedido,
+                    context=self.get_serializer_context(),
+                ).data,
+                "pagos_cancelados": PagoSerializer(
+                    pagos_cancelados,
+                    many=True,
+                ).data,
+                "duplicado": es_reintento,
+            },
+            status=status.HTTP_200_OK,
+        )
 
     @decorators.action(detail=True, methods=["get"], url_path="prefactura")
     def prefactura(self, request, pk=None):
