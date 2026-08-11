@@ -1,3 +1,8 @@
+import re
+from decimal import Decimal
+from io import BytesIO
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.test import override_settings
@@ -5,11 +10,12 @@ from django.urls import reverse
 
 from rest_framework import status
 from rest_framework.test import APITestCase
+from PIL import Image as PILImage, ImageDraw
 
 from catalogo.models import Categoria, Familia, Producto
 from empresas.models import Empresa, SucursalEmpresa
 from inventario.models import MovimientoInventario
-from pedidos.models import Carrito, ItemCarrito, Pedido, Prefactura
+from pedidos.models import Carrito, DetallePedido, ItemCarrito, Pedido, Prefactura
 from usuarios.models import PerfilUsuario
 
 from .models import Pago
@@ -169,6 +175,13 @@ class PagoEnSucursalAPITests(APITestCase):
             respuesta.data["prefactura"]["correo_destino"],
             "c***@example.com",
         )
+        descarga = self.client.get(
+            reverse("pedidos-pedidos-prefactura-pdf", args=[self.pedido.pk])
+        )
+        self.assertEqual(
+            mail.outbox[0].attachments[0].content,
+            descarga.content,
+        )
 
     def test_solicitud_repetida_es_idempotente_y_no_reenvia_correo(self):
         primera = self._pago_sucursal()
@@ -235,6 +248,140 @@ class PagoEnSucursalAPITests(APITestCase):
         )
         self.assertTrue(respuesta.content.startswith(b"%PDF"))
         self.assertIn(b"PREFACTURA", respuesta.content)
+
+    def test_pdf_a4_usa_identidad_empresa_comprador_y_totales_oficiales(self):
+        self.empresa.nombre = "Empresa Dinamica"
+        self.empresa.telefono = "22334455"
+        self.empresa.correo = "ventas@empresa.test"
+        self.empresa.direccion = "Boulevard comercial 123"
+        self.empresa.sitio_web = "https://empresa.test"
+        self.empresa.color_principal = "#A51D2D"
+        self.empresa.color_secundario = "#D5A021"
+        self.empresa.color_acento = "#1F5A4A"
+        self.empresa.save()
+
+        self.comprador.first_name = "Maria"
+        self.comprador.last_name = "Lopez"
+        self.comprador.save(update_fields=["first_name", "last_name"])
+        perfil = self.comprador.perfil
+        perfil.numero_identidad = "0801199012345"
+        perfil.telefono = "99887766"
+        perfil.save(update_fields=["numero_identidad", "telefono"])
+
+        detalle = self.pedido.detalles.get()
+        DetallePedido.objects.filter(pk=detalle.pk).update(
+            precio_unitario=Decimal("100.00"),
+            cantidad=2,
+            subtotal=Decimal("200.00"),
+            porcentaje_descuento=10,
+            descuento_unitario=Decimal("10.00"),
+            precio_unitario_final=Decimal("90.00"),
+            descuento_total=Decimal("20.00"),
+            subtotal_final=Decimal("180.00"),
+        )
+        Pedido.objects.filter(pk=self.pedido.pk).update(
+            subtotal=Decimal("200.00"),
+            descuento_total=Decimal("20.00"),
+            impuesto=Decimal("27.00"),
+            envio=Decimal("25.00"),
+            total=Decimal("232.00"),
+        )
+        self.pedido.refresh_from_db()
+
+        self._pago_sucursal()
+        respuesta = self.client.get(
+            reverse("pedidos-pedidos-prefactura-pdf", args=[self.pedido.pk])
+        )
+
+        self.assertEqual(respuesta.status_code, status.HTTP_200_OK)
+        self.assertRegex(
+            respuesta.content,
+            rb"/MediaBox\s*\[\s*0\s+0\s+595\.2756\s+841\.8898\s*\]",
+        )
+        for texto in (
+            b"Empresa Dinamica",
+            b"22334455",
+            b"ventas@empresa.test",
+            b"Boulevard comercial 123",
+            b"Maria Lopez",
+            b"0801199012345",
+            b"99887766",
+            b"HNL 200.00",
+            b"HNL 20.00",
+            b"HNL 27.00",
+            b"HNL 25.00",
+            b"HNL 232.00",
+        ):
+            self.assertIn(texto, respuesta.content)
+
+    def test_pdf_admite_multiples_articulos(self):
+        producto_adicional = Producto.objects.create(
+            empresa=self.empresa,
+            familia=self.producto.familia,
+            categoria=self.producto.categoria,
+            tipo_item=Producto.TipoItem.SERVICIO,
+            codigo_barra="SUC-002",
+            nombre="Servicio adicional",
+            precio=Decimal("75.50"),
+        )
+        DetallePedido.objects.create(
+            pedido=self.pedido,
+            producto=producto_adicional,
+            cantidad=3,
+        )
+
+        self._pago_sucursal()
+        respuesta = self.client.get(
+            reverse("pedidos-pedidos-prefactura-pdf", args=[self.pedido.pk])
+        )
+
+        self.assertEqual(respuesta.status_code, status.HTTP_200_OK)
+        self.assertIn(b"SUC-001", respuesta.content)
+        self.assertIn(b"SUC-002", respuesta.content)
+        self.assertIn(b"Servicio adicional", respuesta.content)
+
+    def test_pdf_varias_paginas_repite_tabla_y_conserva_totales(self):
+        for indice in range(65):
+            DetallePedido.objects.create(
+                pedido=self.pedido,
+                producto=self.producto,
+                cantidad=1,
+                codigo_articulo=f"LARGO-{indice:03d}",
+                nombre_articulo=(
+                    f"Articulo de prueba para validar paginacion {indice:03d}"
+                ),
+            )
+
+        self._pago_sucursal()
+        respuesta = self.client.get(
+            reverse("pedidos-pedidos-prefactura-pdf", args=[self.pedido.pk])
+        )
+
+        paginas = re.findall(rb"/Type\s*/Page(?!s)", respuesta.content)
+        self.assertGreater(len(paginas), 1)
+        self.assertIn(b"LARGO-064", respuesta.content)
+        self.assertIn(b"TOTAL", respuesta.content)
+
+    def test_pdf_usa_logo_recortado_solo_como_identidad_visual(self):
+        imagen = PILImage.new("RGB", (840, 670), "white")
+        dibujo = ImageDraw.Draw(imagen)
+        dibujo.polygon([(145, 420), (195, 295), (245, 420)], fill="#D1393D")
+        dibujo.text((275, 320), "Empresa", fill="#2D4B77")
+        contenido = BytesIO()
+        imagen.save(contenido, format="PNG")
+
+        with patch(
+            "pedidos.prefacturas._contenido_logo_empresa",
+            return_value=contenido.getvalue(),
+        ):
+            self._pago_sucursal()
+            descarga = self.client.get(
+                reverse("pedidos-pedidos-prefactura-pdf", args=[self.pedido.pk])
+            )
+
+        adjunto = mail.outbox[0].attachments[0].content
+        self.assertIn(b"/Subtype /Image", descarga.content)
+        self.assertEqual(adjunto, descarga.content)
 
     def test_reenvio_solo_al_comprador_y_con_limite(self):
         self._pago_sucursal()

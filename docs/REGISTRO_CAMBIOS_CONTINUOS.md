@@ -1660,3 +1660,128 @@ Verificacion:
   rango, permisos, idempotencia, pedidos pagados, pagos aprobados, inventario y
   compatibilidad de rutas.
 - Las 207 pruebas del proyecto aprobaron contra SQLite temporal.
+
+## 2026-08-11 - Rediseno A4 del PDF de prefactura
+
+Estado: implementado y verificado.
+
+Cambios:
+
+- El PDF de `GET /api/v1/pedidos/pedidos/{id}/prefactura/pdf/` ahora usa A4
+  vertical y conserva la ruta, autenticacion, `Content-Type` y nombre de archivo
+  existentes.
+- Logo, nombre, colores, telefono, correo, direccion y sitio web se obtienen de
+  la empresa del pedido. Si el logo no esta disponible, el documento mantiene
+  la marca mediante el nombre de la empresa.
+- Se agregaron marca de agua repetida, datos completos de prefactura, pedido,
+  sucursal y comprador, tabla comercial con descuentos, resumen de totales y
+  codigo QR.
+- Las tablas repiten encabezado y dividen solamente entre filas. El bloque de
+  totales y cierre se conserva unido para evitar cortes entre paginas.
+- Cada pagina incluye contacto de la empresa y numeracion. Las paginas
+  posteriores muestran una referencia compacta de prefactura y pedido.
+- El generador es determinista y es compartido por descarga y correo, por lo
+  que ambos entregan exactamente el mismo PDF para los mismos datos.
+
+Verificacion:
+
+- 21 pruebas del flujo presencial aprobaron con SQLite temporal y aislado.
+- La cobertura incluye un articulo, multiples articulos, descuentos, impuesto,
+  envio, varias paginas y equivalencia binaria entre correo y descarga.
+- Las 210 pruebas del proyecto aprobaron contra SQLite temporal.
+
+Ajuste posterior:
+
+- Se retiro por completo la marca de agua para mantener limpio el contenido.
+- El logo real configurado en `empresa.logo` se conserva solo en el encabezado
+  y sus margenes blancos o transparentes se recortan en memoria.
+- Una prueba adicional valida logo, recorte y equivalencia entre correo y
+  descarga.
+
+## 2026-08-11 - Identidad visual compartida en reportes PDF
+
+Estado: implementado y verificado.
+
+Cambios:
+
+- Los PDF de `resumen`, `ventas`, `pagos` e `impuestos` ahora usan una
+  estructura visual coherente con la prefactura y no incluyen marca de agua.
+- Se adopto A4 horizontal para acomodar hasta diez columnas sin perder
+  legibilidad.
+- El encabezado usa dinamicamente logo, nombre, colores y contacto de la
+  empresa autorizada.
+- Se agregaron bloques de metadata y totales, tabla con anchos calculados por
+  contenido, encabezados repetidos y pie paginado.
+- Se conservaron endpoint, filtros, permisos, aislamiento, tipo de contenido y
+  nombre de archivo existentes.
+
+Verificacion:
+
+- Los cuatro tipos de PDF se validaron con identidad y estructura completa.
+- Una prueba multipagina cubre continuidad del detalle y numeracion de pagina.
+- Las 18 pruebas del modulo de reportes aprobaron con SQLite temporal.
+
+Ajuste posterior:
+
+- Se retiraron `empresa_slug` y `moneda` de JSON, CSV, XLSX y PDF.
+- `empresa_slug` permanece unicamente como parametro de seleccion y seguridad.
+- El slug tambien se retiro del nombre de los archivos descargados.
+- Los valores numericos `0` ya no se presentan como `No registrado`.
+- El detalle del reporte `resumen` ya no repite filas de estados; conserva
+  solamente los productos mas vendidos debajo de los totales superiores.
+
+## 2026-08-11 - Rediseno de reportes Excel y retiro de CSV
+
+Estado: implementado y verificado.
+
+Cambios:
+
+- Los Excel ahora usan logo, colores y contacto de la empresa, con una
+  estructura equivalente a la de los reportes PDF.
+- Se agregaron bloques de metadata y totales, formatos numericos reales,
+  autofiltro, panel congelado, filas alternas y anchos adaptativos.
+- La hoja esta preparada para impresion A4 horizontal, ajustada a una pagina de
+  ancho y con pie paginado.
+- `csv` se retiro de formatos admitidos, exportadores y documentacion. Las
+  solicitudes antiguas con `formato=csv` reciben `400 Bad Request`.
+
+## 2026-08-11 - Filtros segmentados y reportes por sucursal y familia
+
+Estado: implementado y verificado.
+
+Cambios:
+
+- El resumen y las exportaciones aceptan los filtros opcionales `ciudad`,
+  `sucursal_id`, `examen_id` y `familia_id`.
+- Los IDs se validan dentro de la empresa autorizada y los filtros se aplican
+  tambien a series, estados, metodos de pago, productos y comparaciones.
+- El resumen devuelve `filtros_aplicados` para que el frontend pueda conservar
+  el estado real de la consulta.
+- Se agregaron los tipos de exportacion `sucursales` y `familias` en XLSX y
+  PDF. El primero ordena por compradores unicos y selecciones de pago
+  presencial; el segundo agrupa ventas confirmadas e ingresos netos por
+  familia sin duplicar perfiles o combos.
+- `SucursalEmpresa` incorpora el campo estructurado `ciudad`, visible en API y
+  administracion. Su listado admite filtro, busqueda y orden por ciudad.
+- El Excel ahora presenta todos los filtros aplicados, incluso cuando ocupan
+  mas de una fila de metadata.
+
+Persistencia:
+
+- `empresas.0017` agrega `SucursalEmpresa.ciudad` sin inferir datos desde la
+  direccion libre. Las sucursales existentes deben completar este campo.
+
+Ajuste posterior:
+
+- El reporte `familias` dejo de consolidar una fila por familia. Ahora lista
+  cada producto o examen de la familia seleccionada, incluidos los que no
+  tuvieron ventas, con sus pedidos, unidades e ingresos directos.
+
+Verificacion:
+
+- Las 22 pruebas del modulo de reportes aprobaron contra SQLite temporal.
+- Se comprobaron filtros, aislamiento multiempresa, IDs incompatibles,
+  personas unicas, selecciones repetidas, ventas confirmadas, XLSX, PDF y rutas
+  `/api/` y `/api/v1/`.
+- `makemigrations --check --dry-run`, compilacion y la prueba publica de
+  sucursales finalizaron correctamente.

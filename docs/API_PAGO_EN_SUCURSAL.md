@@ -108,9 +108,27 @@ Content-Type: application/pdf
 Content-Disposition: attachment; filename="prefactura-PED-001.pdf"
 ```
 
-El PDF contiene la leyenda `PREFACTURA - NO ES COMPROBANTE FISCAL`, empresa,
-sucursal, comprador, pedido, productos o servicios, cantidades, precios,
-subtotal, descuentos, impuestos, envio, total, estado y vencimiento.
+El PDF se genera en formato A4 vertical y contiene la leyenda
+`PREFACTURA - NO ES COMPROBANTE FISCAL`. La identidad visual se obtiene de la
+empresa asociada al pedido: logo, nombre, colores, telefono, correo, direccion
+y sitio web. Ningun dato de marca esta fijado para una empresa particular.
+
+El documento incluye:
+
+- Logo de la empresa en el encabezado, con recorte automatico de margenes
+  vacios. El documento no incluye marca de agua.
+- Numeros de prefactura y pedido, fecha y hora, estado, vencimiento, metodo de
+  pago y sucursal seleccionada.
+- Nombre, identidad cuando exista, telefono y correo del comprador.
+- Codigo, articulo, cantidad, precio unitario, descuento y subtotal por linea.
+- Subtotal, descuentos, impuesto, envio y total oficiales del pedido.
+- Codigo QR que identifica la prefactura y el pedido.
+- Contacto de la empresa y numero de pagina en el pie.
+- Encabezados de tabla repetidos y filas indivisibles cuando hay varias paginas.
+
+El correo y la descarga usan el mismo generador determinista. Para una misma
+prefactura y datos de pedido, el archivo adjunto es exactamente igual al que
+devuelve este endpoint.
 
 ## Reenviar prefactura
 

@@ -157,6 +157,7 @@ class EmpresaActualAPITests(APITestCase):
         SucursalEmpresa.objects.create(
             empresa=self.empresa,
             nombre="Sucursal Centro",
+            ciudad="Tegucigalpa",
             direccion="Centro comercial",
             telefono="22222222",
             horario="Lunes a viernes",
@@ -181,12 +182,23 @@ class EmpresaActualAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]["nombre"], "Sucursal Centro")
+        self.assertEqual(response.data[0]["ciudad"], "Tegucigalpa")
         self.assertIsNone(response.data[0]["imagen_final"])
         self.assertNotIn("imagen_url", response.data[0])
         self.assertEqual(
             response.data[0]["id"],
             SucursalEmpresa.objects.get(nombre="Sucursal Centro").pk,
         )
+
+        por_ciudad = self.client.get(
+            reverse("empresas-sucursales"),
+            {
+                "empresa_slug": self.empresa.slug,
+                "ciudad": "tegucigalpa",
+            },
+        )
+        self.assertEqual(por_ciudad.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(por_ciudad.data), 1)
 
     def test_sucursales_usan_imagen_general_de_empresa(self):
         self.empresa.imagen_sucursales_url = "https://example.com/sucursales-general.jpg"

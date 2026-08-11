@@ -31,6 +31,7 @@ class SucursalEmpresaInline(admin.TabularInline):
     extra = 0
     fields = (
         "nombre",
+        "ciudad",
         "telefono",
         "horario",
         "google_maps_url",
@@ -235,13 +236,20 @@ class SucursalEmpresaAdmin(admin.ModelAdmin):
     list_display = (
         "nombre",
         "empresa",
+        "ciudad",
         "telefono",
         "horario",
         "orden",
         "activa",
     )
-    list_filter = ("empresa", "activa")
-    search_fields = ("nombre", "direccion", "telefono", "empresa__nombre")
+    list_filter = ("empresa", "ciudad", "activa")
+    search_fields = (
+        "nombre",
+        "ciudad",
+        "direccion",
+        "telefono",
+        "empresa__nombre",
+    )
     autocomplete_fields = ("empresa",)
     readonly_fields = ("fecha_creacion", "fecha_actualizacion")
     ordering = ("empresa__nombre", "orden", "nombre")

@@ -350,6 +350,7 @@ class SucursalEmpresaPublicaSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "nombre",
+            "ciudad",
             "direccion",
             "telefono",
             "horario",
@@ -386,6 +387,7 @@ class SucursalEmpresaAdminSerializer(serializers.ModelSerializer):
             "id",
             "empresa",
             "nombre",
+            "ciudad",
             "direccion",
             "telefono",
             "horario",

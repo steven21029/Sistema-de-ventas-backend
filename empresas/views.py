@@ -321,10 +321,15 @@ class SucursalEmpresaViewSet(viewsets.ModelViewSet):
         if buscar:
             queryset = queryset.filter(
                 Q(nombre__icontains=buscar)
+                | Q(ciudad__icontains=buscar)
                 | Q(direccion__icontains=buscar)
                 | Q(telefono__icontains=buscar)
                 | Q(horario__icontains=buscar)
             )
+
+        ciudad = self.request.query_params.get("ciudad", "").strip()
+        if ciudad:
+            queryset = queryset.filter(ciudad__iexact=ciudad)
 
         orden = self.request.query_params.get("orden", "").strip()
         ordenes = {
@@ -332,6 +337,8 @@ class SucursalEmpresaViewSet(viewsets.ModelViewSet):
             "-orden": ("-orden", "nombre"),
             "nombre": ("nombre",),
             "-nombre": ("-nombre",),
+            "ciudad": ("ciudad", "nombre"),
+            "-ciudad": ("-ciudad", "nombre"),
         }
         return queryset.order_by(*ordenes.get(orden, ("orden", "nombre")))
 

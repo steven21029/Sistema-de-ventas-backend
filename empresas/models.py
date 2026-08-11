@@ -512,6 +512,7 @@ class SucursalEmpresa(models.Model):
         related_name="sucursales",
     )
     nombre = models.CharField(max_length=150)
+    ciudad = models.CharField(max_length=120, blank=True, db_index=True)
     direccion = models.TextField()
     telefono = models.CharField(max_length=30, blank=True)
     horario = models.CharField(max_length=180, blank=True)
