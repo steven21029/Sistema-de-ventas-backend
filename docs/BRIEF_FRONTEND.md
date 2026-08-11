@@ -256,7 +256,8 @@ Payload:
 ```json
 {
   "email": "juan@example.com",
-  "password": "ClaveSegura123!"
+  "password": "ClaveSegura123!",
+  "recordarme": true
 }
 ```
 
@@ -270,10 +271,15 @@ Respuesta esperada:
 }
 ```
 
+`recordarme` es opcional. Debe conectarse a un checkbox "Recordarme" en el
+formulario de inicio de sesion del perfil. Sin `recordarme`, la cookie dura como
+maximo 5 horas. Con `recordarme: true`, el backend extiende la cookie protegida
+a la duracion configurada en `JWT_REMEMBER_ME_DAYS` (30 dias por defecto).
+
 El `refresh token` no se entrega al codigo React. El backend lo guarda en una
-cookie `HttpOnly` con duracion maxima de 5 horas. Todas las solicitudes de
-login, renovacion y cierre de sesion deben usar `credentials: "include"`.
-El `access token` dura 15 minutos y debe mantenerse solo en memoria.
+cookie `HttpOnly`. Todas las solicitudes de login, renovacion y cierre de
+sesion deben usar `credentials: "include"`. El `access token` dura 15 minutos y
+debe mantenerse solo en memoria.
 
 Si el usuario no verifico correo, no puede iniciar sesion.
 
@@ -1105,6 +1111,16 @@ Reglas:
 - `codigo_barra` continua aceptado temporalmente para compatibilidad.
 - Un visitante sin sesion puede usar almacenamiento temporal del navegador,
   pero debe iniciar sesion para persistir favoritos en la base de datos.
+
+Regla visual de la vista de Favoritos:
+
+- Las cards no deben recortarse por el contenedor padre.
+- Evitar `overflow: hidden` en la grilla/lista que contiene las cards, salvo en
+  la imagen interna.
+- La grilla debe usar `gap` y padding inferior suficientes para estados hover,
+  sombras y botones.
+- En movil, usar una sola columna con ancho `minmax(0, 1fr)` para que nombres,
+  precios y botones no desborden.
 
 ## 15. Inventario interno implementado
 

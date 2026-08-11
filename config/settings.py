@@ -243,6 +243,11 @@ SIMPLE_JWT = {
 JWT_SESSION_MAX_SECONDS = int(
     SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds()
 )
+JWT_REMEMBER_ME_SECONDS = config(
+    'JWT_REMEMBER_ME_DAYS',
+    default=30,
+    cast=int,
+) * 24 * 60 * 60
 JWT_REFRESH_COOKIE_NAME = config(
     'JWT_REFRESH_COOKIE_NAME',
 )

@@ -25,11 +25,13 @@ from .serializers import (
 )
 
 
-def guardar_refresh_cookie(respuesta, refresh):
+def guardar_refresh_cookie(respuesta, refresh, max_age=None):
     respuesta.set_cookie(
         key=settings.JWT_REFRESH_COOKIE_NAME,
         value=refresh,
-        max_age=settings.JWT_SESSION_MAX_SECONDS,
+        max_age=(
+            max_age if max_age is not None else settings.JWT_SESSION_MAX_SECONDS
+        ),
         path=settings.JWT_REFRESH_COOKIE_PATH,
         secure=settings.JWT_REFRESH_COOKIE_SECURE,
         httponly=True,
@@ -61,8 +63,9 @@ class LoginJWTView(views.APIView):
         serializer.is_valid(raise_exception=True)
         datos = dict(serializer.validated_data)
         refresh = datos.pop("refresh")
+        refresh_max_age = datos.pop("refresh_max_age")
         respuesta = response.Response(datos, status=status.HTTP_200_OK)
-        guardar_refresh_cookie(respuesta, refresh)
+        guardar_refresh_cookie(respuesta, refresh, max_age=refresh_max_age)
         return respuesta
 
 

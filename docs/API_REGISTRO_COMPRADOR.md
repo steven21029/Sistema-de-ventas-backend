@@ -70,6 +70,53 @@ solicitudes. Mostrar "Codigo reenviado" solamente despues de recibir `200`.
 Un `400` contiene una validacion por campo y un `503` indica que Brevo no
 confirmo el envio.
 
+## Inicio de sesion y recordarme
+
+```http
+POST /api/v1/usuarios/login/
+Content-Type: application/json
+
+{
+  "email": "maria@example.com",
+  "password": "ClaveSegura123!",
+  "recordarme": true
+}
+```
+
+`recordarme` es opcional. Si se envia como `true`, el backend extiende la cookie
+`HttpOnly` de refresh token a `JWT_REMEMBER_ME_DAYS` dias, 30 por defecto. El
+frontend tambien puede enviar `remember_me` si ya usa ese nombre internamente.
+
+## Recuperar contrasena
+
+Solicitar codigo:
+
+```http
+POST /api/v1/usuarios/solicitar-recuperacion-contrasena/
+Content-Type: application/json
+
+{
+  "email": "maria@example.com"
+}
+```
+
+Confirmar nueva contrasena:
+
+```http
+POST /api/v1/usuarios/confirmar-recuperacion-contrasena/
+Content-Type: application/json
+
+{
+  "email": "maria@example.com",
+  "codigo": "012345",
+  "password": "NuevaClave123!",
+  "password_confirmacion": "NuevaClave123!"
+}
+```
+
+El codigo vence a los 15 minutos y admite un maximo de cinco intentos. Al
+cambiar la contrasena, el backend revoca las sesiones abiertas del usuario.
+
 ## Controles del frontend
 
 Nombre completo:

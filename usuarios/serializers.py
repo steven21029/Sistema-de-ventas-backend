@@ -1,3 +1,6 @@
+from datetime import timedelta
+
+from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -7,6 +10,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import APIException, AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
+from rest_framework_simplejwt.utils import datetime_from_epoch
 
 from empresas.models import Empresa
 from .models import (
@@ -339,10 +343,17 @@ class UsuarioAdministrativoSerializer(serializers.ModelSerializer):
 class LoginJWTSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, trim_whitespace=False)
+    recordarme = serializers.BooleanField(
+        required=False,
+        default=False,
+        write_only=True,
+    )
+    remember_me = serializers.BooleanField(required=False, write_only=True)
 
     def validate(self, attrs):
         email = attrs["email"].strip()
         password = attrs["password"]
+        recordarme = bool(attrs.get("recordarme") or attrs.get("remember_me", False))
 
         user = User.objects.filter(email__iexact=email).first()
         if not user:
@@ -373,9 +384,22 @@ class LoginJWTSerializer(serializers.Serializer):
             raise AuthenticationFailed("Debes verificar tu correo antes de ingresar.")
 
         refresh = RefreshToken.for_user(user)
+        refresh_max_age = settings.JWT_SESSION_MAX_SECONDS
+        if recordarme:
+            refresh_max_age = settings.JWT_REMEMBER_ME_SECONDS
+            refresh.set_exp(
+                from_time=timezone.now(),
+                lifetime=timedelta(seconds=refresh_max_age),
+            )
+            token_pendiente, _created = refresh.outstand()
+            token_pendiente.token = str(refresh)
+            token_pendiente.expires_at = datetime_from_epoch(refresh["exp"])
+            token_pendiente.save(update_fields=["token", "expires_at"])
+
         return {
             "access": str(refresh.access_token),
             "refresh": str(refresh),
+            "refresh_max_age": refresh_max_age,
             "usuario": UsuarioBasicoSerializer(user).data,
             "perfil": PerfilUsuarioSerializer(perfil).data if perfil else None,
         }
@@ -818,6 +842,7 @@ class ConfirmarRecuperacionContrasenaSerializer(serializers.Serializer):
         usuario = self.validated_data["usuario"]
         usuario.set_password(self.validated_data["password"])
         usuario.save(update_fields=["password"])
+        revocar_sesiones_usuario(usuario)
         self.validated_data["codigo_obj"].marcar_como_usado()
         return {"usuario": usuario}
 

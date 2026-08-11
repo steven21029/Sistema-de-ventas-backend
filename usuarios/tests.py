@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
+from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
 
@@ -21,13 +22,15 @@ class AutenticacionJWTTests(TestCase):
         self.usuario.perfil.correo_verificado = True
         self.usuario.perfil.save(update_fields=["correo_verificado"])
 
-    def iniciar_sesion(self):
+    def iniciar_sesion(self, **extras):
+        datos = {
+            "email": self.usuario.email,
+            "password": self.password,
+        }
+        datos.update(extras)
         return self.client.post(
             "/api/usuarios/login/",
-            {
-                "email": self.usuario.email,
-                "password": self.password,
-            },
+            datos,
             format="json",
         )
 
@@ -54,6 +57,28 @@ class AutenticacionJWTTests(TestCase):
         refresh = RefreshToken(cookie.value)
         self.assertEqual(int(access["exp"]) - int(access["iat"]), 15 * 60)
         self.assertEqual(int(refresh["exp"]) - int(refresh["iat"]), 5 * 60 * 60)
+
+    def test_login_recordarme_extiende_cookie_y_refresh(self):
+        duracion_recordarme = 30 * 24 * 60 * 60
+
+        with self.settings(JWT_REMEMBER_ME_SECONDS=duracion_recordarme):
+            respuesta = self.iniciar_sesion(recordarme=True)
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertNotIn("refresh", respuesta.data)
+        cookie = respuesta.cookies[settings.JWT_REFRESH_COOKIE_NAME]
+        self.assertEqual(int(cookie["max-age"]), duracion_recordarme)
+
+        refresh = RefreshToken(cookie.value)
+        self.assertEqual(
+            int(refresh["exp"]) - int(refresh["iat"]),
+            duracion_recordarme,
+        )
+        token_pendiente = OutstandingToken.objects.get(jti=refresh["jti"])
+        self.assertEqual(
+            int(token_pendiente.expires_at.timestamp()),
+            int(refresh["exp"]),
+        )
 
     def test_refresh_se_lee_desde_cookie(self):
         login = self.iniciar_sesion()

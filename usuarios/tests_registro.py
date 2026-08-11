@@ -7,6 +7,8 @@ from django.test import override_settings
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from empresas.models import Empresa
 
@@ -143,6 +145,70 @@ class RegistroCompradorAPITests(APITestCase):
             User.objects.filter(email="nuevo-comprador@example.com").exists()
         )
         self.assertFalse(CodigoVerificacionCorreo.objects.exists())
+
+
+@override_settings(
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    DEFAULT_FROM_EMAIL="Analiza <no-reply@example.com>",
+)
+class RecuperacionContrasenaAPITests(APITestCase):
+    def setUp(self):
+        self.empresa = Empresa.objects.create(
+            nombre="Analiza recuperacion",
+            slug="analiza-recuperacion",
+            subdominio="analiza-recuperacion",
+        )
+        self.usuario = User.objects.create_user(
+            username="recupera@example.com",
+            email="recupera@example.com",
+            password="ClaveSegura123!",
+            is_active=True,
+        )
+        perfil = self.usuario.perfil
+        perfil.empresa = self.empresa
+        perfil.correo_verificado = True
+        perfil.activo = True
+        perfil.save()
+        self.url_solicitar = "/api/v1/usuarios/solicitar-recuperacion-contrasena/"
+        self.url_confirmar = "/api/v1/usuarios/confirmar-recuperacion-contrasena/"
+
+    def test_solicita_codigo_y_confirma_contrasena_revocando_sesiones(self):
+        refresh = RefreshToken.for_user(self.usuario)
+
+        respuesta = self.client.post(
+            self.url_solicitar,
+            {"email": self.usuario.email},
+            format="json",
+        )
+
+        self.assertEqual(respuesta.status_code, status.HTTP_200_OK)
+        codigo = CodigoVerificacionCorreo.objects.get(
+            usuario=self.usuario,
+            tipo=CodigoVerificacionCorreo.Tipo.RECUPERACION_CONTRASENA,
+            usado=False,
+        )
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(codigo.codigo, mail.outbox[0].body)
+
+        confirmacion = self.client.post(
+            self.url_confirmar,
+            {
+                "email": self.usuario.email,
+                "codigo": codigo.codigo,
+                "password": "NuevaClave123!",
+                "password_confirmacion": "NuevaClave123!",
+            },
+            format="json",
+        )
+
+        self.assertEqual(confirmacion.status_code, status.HTTP_200_OK)
+        self.usuario.refresh_from_db()
+        codigo.refresh_from_db()
+        self.assertTrue(self.usuario.check_password("NuevaClave123!"))
+        self.assertTrue(codigo.usado)
+        self.assertTrue(
+            BlacklistedToken.objects.filter(token__jti=refresh["jti"]).exists()
+        )
 
 
 class ValidacionesAdministrativasTests(APITestCase):
