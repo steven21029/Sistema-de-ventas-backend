@@ -8,6 +8,7 @@ class PerfilUsuarioAdmin(admin.ModelAdmin):
     list_display = (
         "usuario",
         "empresa",
+        "municipio",
         "rol",
         "telefono",
         "numero_identidad",
@@ -17,6 +18,8 @@ class PerfilUsuarioAdmin(admin.ModelAdmin):
     list_filter = (
         "rol",
         "empresa",
+        "municipio",
+        "municipio__departamento",
         "correo_verificado",
         "puede_crear_usuarios",
         "activo",
@@ -26,10 +29,12 @@ class PerfilUsuarioAdmin(admin.ModelAdmin):
         "usuario__email",
         "usuario__first_name",
         "usuario__last_name",
+        "municipio__nombre",
+        "municipio__departamento__nombre",
         "telefono",
         "numero_identidad",
     )
-    autocomplete_fields = ("empresa",)
+    autocomplete_fields = ("empresa", "municipio")
     readonly_fields = ("fecha_creacion", "fecha_actualizacion")
 
     fieldsets = (
@@ -39,6 +44,7 @@ class PerfilUsuarioAdmin(admin.ModelAdmin):
                 "fields": (
                     "usuario",
                     "empresa",
+                    "municipio",
                     "rol",
                 )
             },

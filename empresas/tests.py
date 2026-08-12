@@ -5,7 +5,14 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import Empresa, ItemMenuEmpresa, SobreNosotrosEmpresa, SucursalEmpresa
+from .models import (
+    Departamento,
+    Empresa,
+    ItemMenuEmpresa,
+    Municipio,
+    SobreNosotrosEmpresa,
+    SucursalEmpresa,
+)
 
 
 class EmpresaActualAPITests(APITestCase):
@@ -16,6 +23,8 @@ class EmpresaActualAPITests(APITestCase):
             subdominio="analiza",
             dominio_personalizado="tienda.analizahn.com",
         )
+        self.departamento = Departamento.objects.get(codigo="08")
+        self.municipio = Municipio.objects.get(codigo="0801")
 
     def test_resuelve_empresa_por_subdominio_localhost(self):
         response = self.client.get(
@@ -158,7 +167,7 @@ class EmpresaActualAPITests(APITestCase):
         SucursalEmpresa.objects.create(
             empresa=self.empresa,
             nombre="Sucursal Centro",
-            ciudad="Tegucigalpa",
+            municipio=self.municipio,
             direccion="Centro comercial",
             telefono="22222222",
             horario=(
@@ -187,7 +196,12 @@ class EmpresaActualAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]["nombre"], "Sucursal Centro")
-        self.assertEqual(response.data[0]["ciudad"], "Tegucigalpa")
+        self.assertEqual(response.data[0]["municipio_id"], self.municipio.pk)
+        self.assertEqual(response.data[0]["municipio"], "Distrito Central")
+        self.assertEqual(response.data[0]["departamento_id"], self.departamento.pk)
+        self.assertEqual(response.data[0]["departamento"], "Francisco Morazan")
+        self.assertEqual(response.data[0]["ciudad"], "Distrito Central")
+        self.assertEqual(response.data[0]["estado"], SucursalEmpresa.Estado.ACTIVA)
         self.assertEqual(
             response.data[0]["horario_lineas"],
             [
@@ -203,15 +217,15 @@ class EmpresaActualAPITests(APITestCase):
             SucursalEmpresa.objects.get(nombre="Sucursal Centro").pk,
         )
 
-        por_ciudad = self.client.get(
+        por_municipio = self.client.get(
             reverse("empresas-sucursales"),
             {
                 "empresa_slug": self.empresa.slug,
-                "ciudad": "tegucigalpa",
+                "municipio": "distrito central",
             },
         )
-        self.assertEqual(por_ciudad.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(por_ciudad.data), 1)
+        self.assertEqual(por_municipio.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(por_municipio.data), 1)
 
     def test_sucursales_usan_imagen_general_de_empresa(self):
         self.empresa.imagen_sucursales_url = "https://example.com/sucursales-general.jpg"

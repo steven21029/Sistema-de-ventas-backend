@@ -179,10 +179,13 @@ Payload:
 ```json
 {
   "empresa_slug": "Analiza",
-  "nombre_completo": "Juan Perez",
+  "nombre": "Juan",
+  "apellido": "Perez",
   "email": "juan@example.com",
   "telefono": "99999999",
   "numero_identidad": "0801199012345",
+  "departamento_id": 8,
+  "municipio_id": 80,
   "password": "ClaveSegura123!",
   "password_confirmacion": "ClaveSegura123!",
   "acepta_terminos": true,
@@ -195,6 +198,10 @@ Reglas:
 - La identidad hondurena debe tener exactamente 13 digitos.
 - Solo acepta numeros.
 - La misma identidad no puede repetirse dentro de la misma empresa.
+- `departamento_id` y `municipio_id` son obligatorios.
+- El backend valida que el municipio pertenezca al departamento.
+- `nombre_completo` sigue aceptandose temporalmente, pero el formulario nuevo
+  debe enviar `nombre` y `apellido`.
 - Al registrarse, el usuario queda inactivo hasta verificar correo.
 - El backend genera un codigo de verificacion.
 - Por ahora el correo sale por consola; Brevo queda preparado para despues.
@@ -582,12 +589,50 @@ Sucursales:
 
 ```text
 GET /api/empresas/sucursales/?empresa_slug=Analiza&buscar=texto
+GET /api/empresas/sucursales/zonas/?empresa_slug=Analiza
+GET /api/empresas/sucursales/cerca/?empresa_slug=Analiza
 ```
 
-Campos:
+Catalogo global de ubicaciones para selects dependientes:
+
+```text
+GET /api/ubicaciones/departamentos/
+GET /api/ubicaciones/municipios/?departamento_id=8
+GET /api/ubicaciones/municipios/?departamento_codigo=08&buscar=distrito
+```
+
+Campos de departamento:
+
+```text
+id
+codigo
+nombre
+orden
+activo
+```
+
+Campos de municipio:
+
+```text
+id
+codigo
+nombre
+departamento_id
+departamento
+departamento_codigo
+orden
+activo
+```
+
+Campos de sucursal:
 
 ```text
 nombre
+municipio_id
+municipio
+departamento_id
+departamento
+ciudad
 direccion
 telefono
 horario
@@ -597,6 +642,7 @@ imagen_final
 latitud
 longitud
 orden
+estado
 ```
 
 El frontend debe usar:
@@ -605,6 +651,86 @@ El frontend debe usar:
 - `google_maps_url` como enlace hacia Google Maps.
 - `horario_lineas` para pintar el horario en filas separadas. No mostrar el
   campo `horario` como una sola linea larga en las cards publicas.
+- `municipio_id` para filtrar o editar por catalogo.
+- `municipio` y `departamento` para mostrar nombres legibles.
+- `ciudad` como texto espejo temporal para reportes y pantallas existentes.
+- `estado`; publicamente solo se muestran sucursales con `estado="activa"`.
+
+Ejemplo de municipio:
+
+```json
+{
+  "id": 80,
+  "codigo": "0801",
+  "nombre": "Distrito Central",
+  "departamento_id": 8,
+  "departamento": "Francisco Morazan",
+  "departamento_codigo": "08",
+  "orden": 1,
+  "activo": true
+}
+```
+
+Ejemplo de sucursal:
+
+```json
+{
+  "id": 15,
+  "nombre": "TEG - Aeroplaza",
+  "municipio_id": 80,
+  "municipio": "Distrito Central",
+  "departamento_id": 8,
+  "departamento": "Francisco Morazan",
+  "ciudad": "Distrito Central",
+  "direccion": "Centro Comercial Aeroplaza",
+  "telefono": "22334455",
+  "horario": "Lunes a viernes: 6:00am-5:00pm; Sabado: 6:00am-1:00pm; Domingo: Cerrado",
+  "horario_lineas": [
+    "Lunes a viernes: 6:00am-5:00pm",
+    "Sabado: 6:00am-1:00pm",
+    "Domingo: Cerrado"
+  ],
+  "google_maps_url": "",
+  "imagen_final": null,
+  "latitud": null,
+  "longitud": null,
+  "orden": 1,
+  "estado": "activa"
+}
+```
+
+Para crear o editar sucursales desde el panel, enviar `municipio_id`; el
+backend mantiene `ciudad` como texto espejo. No permite municipios inactivos.
+Los municipios inactivos pueden seguir apareciendo en sucursales historicas,
+pero no se ofrecen para nuevas asignaciones.
+
+Si el panel llama `DELETE /api/empresas/sucursales/{id}/`, el backend no borra
+la fila; cambia la sucursal a `estado="inactiva"` y `activa=false`.
+
+Respuesta agrupada de zonas:
+
+```json
+[
+  {
+    "departamento_id": 8,
+    "departamento": "Francisco Morazan",
+    "departamento_codigo": "08",
+    "total_sucursales": 2,
+    "municipios": [
+      {
+        "municipio_id": 80,
+        "municipio": "Distrito Central",
+        "total_sucursales": 2,
+        "sucursales": []
+      }
+    ]
+  }
+]
+```
+
+`/empresas/sucursales/cerca/` requiere usuario autenticado. Devuelve
+`sucursales_municipio` primero y luego `sucursales_departamento` para el mismo
+departamento.
 
 Regla de imagen:
 
@@ -944,10 +1070,15 @@ Para envio local o nacional:
   "telefono_recibe": "99999999",
   "direccion_entrega": "Colonia Ejemplo, casa 123",
   "referencia_entrega": "Porton negro",
-  "departamento_entrega": "Francisco Morazan",
-  "municipio_entrega": "Tegucigalpa"
+  "departamento_entrega_id": 8,
+  "municipio_entrega_id": 80
 }
 ```
+
+Si se envian `departamento_entrega_id` y `municipio_entrega_id`, el backend
+valida la relacion y deriva `departamento_entrega` y `municipio_entrega` como
+texto congelado del pedido. Los campos de texto siguen aceptandose
+temporalmente para compatibilidad, pero el flujo nuevo debe usar IDs.
 
 Pedidos:
 
@@ -1271,6 +1402,8 @@ Direccion simple para envios:
 - `referencia_entrega`
 - `departamento_entrega`
 - `municipio_entrega`
+- `departamento_entrega_id`
+- `municipio_entrega_id`
 
 Regla:
 

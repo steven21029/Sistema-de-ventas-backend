@@ -178,7 +178,12 @@ class PerfilUsuarioViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsSuperUserOrReadOwnProfile]
 
     def get_queryset(self):
-        queryset = PerfilUsuario.objects.select_related("usuario", "empresa")
+        queryset = PerfilUsuario.objects.select_related(
+            "usuario",
+            "empresa",
+            "municipio",
+            "municipio__departamento",
+        )
 
         if self.request.user.is_superuser:
             return queryset
@@ -216,6 +221,8 @@ class UsuarioAdministrativoViewSet(
         queryset = PerfilUsuario.objects.select_related(
             "usuario",
             "empresa",
+            "municipio",
+            "municipio__departamento",
         ).prefetch_related("empresas_permitidas")
         user = self.request.user
         empresa_slug = self.request.query_params.get("empresa_slug", "").strip()
@@ -261,6 +268,8 @@ class UsuarioAdministrativoViewSet(
                 | Q(usuario__last_name__icontains=buscar)
                 | Q(telefono__icontains=buscar)
                 | Q(numero_identidad__icontains=buscar)
+                | Q(municipio__nombre__icontains=buscar)
+                | Q(municipio__departamento__nombre__icontains=buscar)
             )
 
         rol = self.request.query_params.get("rol", "").strip()

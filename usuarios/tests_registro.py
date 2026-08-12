@@ -10,7 +10,7 @@ from rest_framework.test import APITestCase
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from empresas.models import Empresa
+from empresas.models import Departamento, Empresa, Municipio
 
 from .models import CodigoVerificacionCorreo, PerfilUsuario
 
@@ -29,16 +29,23 @@ class RegistroCompradorAPITests(APITestCase):
             slug="analiza-registro",
             subdominio="analiza-registro",
         )
+        self.departamento = Departamento.objects.get(codigo="08")
+        self.municipio = Municipio.objects.get(codigo="0801")
+        self.departamento_cortes = Departamento.objects.get(codigo="05")
+        self.municipio_cortes = Municipio.objects.get(codigo="0501")
         self.url_registro = "/api/v1/usuarios/registro-comprador/"
         self.url_reenvio = "/api/v1/usuarios/reenviar-verificacion/"
 
     def datos_validos(self, **cambios):
         datos = {
             "empresa_slug": self.empresa.slug,
-            "nombre_completo": "Jose Maria Rivera",
+            "nombre": "Jose Maria",
+            "apellido": "Rivera",
             "email": "nuevo-comprador@example.com",
             "telefono": "99999999",
             "numero_identidad": "0801199912345",
+            "departamento_id": self.departamento.pk,
+            "municipio_id": self.municipio.pk,
             "password": "ClaveSegura123!",
             "password_confirmacion": "ClaveSegura123!",
             "acepta_terminos": True,
@@ -50,13 +57,13 @@ class RegistroCompradorAPITests(APITestCase):
     def test_rechaza_nombre_con_numeros(self):
         respuesta = self.client.post(
             self.url_registro,
-            self.datos_validos(nombre_completo="Oscar161"),
+            self.datos_validos(nombre="Oscar161"),
             format="json",
         )
 
         self.assertEqual(respuesta.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("nombre_completo", respuesta.data)
-        self.assertIn("letras", str(respuesta.data["nombre_completo"][0]))
+        self.assertIn("nombre", respuesta.data)
+        self.assertIn("letras", str(respuesta.data["nombre"][0]))
 
     def test_rechaza_telefono_con_caracteres_no_numericos(self):
         respuesta = self.client.post(
@@ -82,7 +89,7 @@ class RegistroCompradorAPITests(APITestCase):
     def test_registro_normaliza_nombre_y_envia_codigo(self):
         respuesta = self.client.post(
             self.url_registro,
-            self.datos_validos(nombre_completo="Jose   Maria Rivera"),
+            self.datos_validos(nombre="Jose   Maria", apellido="Rivera"),
             format="json",
         )
 
@@ -90,15 +97,31 @@ class RegistroCompradorAPITests(APITestCase):
         usuario = User.objects.get(email="nuevo-comprador@example.com")
         perfil = usuario.perfil
         codigo = CodigoVerificacionCorreo.objects.get(usuario=usuario, usado=False)
-        self.assertEqual(usuario.first_name, "Jose")
-        self.assertEqual(usuario.last_name, "Maria Rivera")
+        self.assertEqual(usuario.first_name, "Jose Maria")
+        self.assertEqual(usuario.last_name, "Rivera")
         self.assertFalse(usuario.is_active)
         self.assertFalse(perfil.correo_verificado)
         self.assertEqual(perfil.telefono, "99999999")
+        self.assertEqual(perfil.municipio_id, self.municipio.pk)
+        self.assertEqual(respuesta.data["perfil"]["municipio"], "Distrito Central")
+        self.assertEqual(respuesta.data["perfil"]["departamento"], "Francisco Morazan")
         self.assertTrue(codigo.puede_usarse)
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, [usuario.email])
         self.assertIn(codigo.codigo, mail.outbox[0].body)
+
+    def test_registro_valida_que_municipio_pertenezca_al_departamento(self):
+        respuesta = self.client.post(
+            self.url_registro,
+            self.datos_validos(
+                departamento_id=self.departamento.pk,
+                municipio_id=self.municipio_cortes.pk,
+            ),
+            format="json",
+        )
+
+        self.assertEqual(respuesta.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("municipio_id", respuesta.data)
 
     def test_reenvio_crea_codigo_nuevo_y_envia_otro_correo(self):
         self.client.post(

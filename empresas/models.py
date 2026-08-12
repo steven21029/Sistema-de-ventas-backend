@@ -1,4 +1,5 @@
 from urllib.parse import urlparse
+import unicodedata
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -27,6 +28,12 @@ dominio_validator = RegexValidator(
 )
 
 SUBDOMINIOS_RESERVADOS = {"admin", "api", "app", "media", "static", "www"}
+
+
+def normalizar_nombre_catalogo(value):
+    texto = unicodedata.normalize("NFKD", value or "")
+    texto = "".join(caracter for caracter in texto if not unicodedata.combining(caracter))
+    return " ".join(texto.strip().lower().split())
 
 
 def _validar_url_red_social(value, dominios_permitidos, nombre_red):
@@ -640,7 +647,130 @@ class SobreNosotrosEmpresa(models.Model):
         ]
 
 
+class Departamento(models.Model):
+    codigo = models.CharField(max_length=2, unique=True)
+    nombre = models.CharField(max_length=120)
+    orden = models.PositiveIntegerField(default=0)
+    activo = models.BooleanField(default=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["orden", "nombre"]
+        verbose_name = "departamento"
+        verbose_name_plural = "departamentos"
+        indexes = [
+            models.Index(fields=["activo", "orden"]),
+        ]
+
+    def __str__(self):
+        return self.nombre
+
+    def save(self, *args, **kwargs):
+        self.nombre = (self.nombre or "").strip()
+        self.codigo = (self.codigo or "").strip()
+        if not self.orden and self.codigo.isdigit():
+            self.orden = int(self.codigo)
+        super().save(*args, **kwargs)
+
+
+class Municipio(models.Model):
+    departamento = models.ForeignKey(
+        Departamento,
+        on_delete=models.PROTECT,
+        related_name="municipios",
+    )
+    codigo = models.CharField(max_length=4, unique=True)
+    nombre = models.CharField(max_length=120)
+    nombre_normalizado = models.CharField(max_length=120, editable=False)
+    orden = models.PositiveIntegerField(default=0)
+    activo = models.BooleanField(default=True)
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+    fecha_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["departamento__orden", "orden", "nombre"]
+        verbose_name = "municipio"
+        verbose_name_plural = "municipios"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["departamento", "nombre_normalizado"],
+                name="municipio_nombre_normalizado_unico_por_departamento",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["departamento", "activo", "orden"]),
+            models.Index(fields=["departamento", "nombre_normalizado"]),
+        ]
+
+    def __str__(self):
+        return f"{self.nombre}, {self.departamento.nombre}"
+
+    @property
+    def departamento_nombre(self):
+        return self.departamento.nombre
+
+    def clean(self):
+        super().clean()
+        self.nombre = (self.nombre or "").strip()
+        self.nombre_normalizado = normalizar_nombre_catalogo(self.nombre)
+        self.codigo = (self.codigo or "").strip()
+        if not self.nombre:
+            raise ValidationError({"nombre": "El nombre del municipio es obligatorio."})
+
+        if self.departamento_id and self.codigo:
+            prefijo_departamento = self.codigo[:2]
+            if self.departamento.codigo != prefijo_departamento:
+                raise ValidationError(
+                    {
+                        "codigo": (
+                            "El codigo del municipio debe iniciar con el codigo "
+                            "del departamento."
+                        )
+                    }
+                )
+
+        repetido = Municipio.objects.filter(
+            departamento=self.departamento,
+            nombre_normalizado=self.nombre_normalizado,
+        )
+        if self.pk:
+            repetido = repetido.exclude(pk=self.pk)
+        if repetido.exists():
+            raise ValidationError(
+                {
+                    "nombre": (
+                        "Ya existe un municipio con este nombre en el departamento."
+                    )
+                }
+            )
+
+    def save(self, *args, **kwargs):
+        self.nombre = (self.nombre or "").strip()
+        self.codigo = (self.codigo or "").strip()
+        self.nombre_normalizado = normalizar_nombre_catalogo(self.nombre)
+        if not self.nombre:
+            raise ValidationError({"nombre": "El nombre del municipio es obligatorio."})
+
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            kwargs["update_fields"] = set(update_fields) | {"nombre_normalizado"}
+
+        super().save(*args, **kwargs)
+
+        if update_fields is None or {"nombre", "nombre_normalizado"} & set(update_fields):
+            self.sucursales.update(ciudad=self.nombre)
+
+
 class SucursalEmpresa(models.Model):
+    class Estado(models.TextChoices):
+        ACTIVA = "activa", "Activa"
+        TEMPORALMENTE_CERRADA = (
+            "temporalmente_cerrada",
+            "Temporalmente cerrada",
+        )
+        INACTIVA = "inactiva", "Inactiva"
+
     empresa = models.ForeignKey(
         Empresa,
         on_delete=models.CASCADE,
@@ -648,6 +778,13 @@ class SucursalEmpresa(models.Model):
     )
     nombre = models.CharField(max_length=150)
     ciudad = models.CharField(max_length=120, blank=True, db_index=True)
+    municipio = models.ForeignKey(
+        Municipio,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sucursales",
+    )
     direccion = models.TextField()
     telefono = models.CharField(max_length=30, blank=True)
     horario = models.CharField(max_length=180, blank=True)
@@ -675,6 +812,12 @@ class SucursalEmpresa(models.Model):
     )
     orden = models.PositiveIntegerField(default=0)
     activa = models.BooleanField(default=True)
+    estado = models.CharField(
+        max_length=30,
+        choices=Estado.choices,
+        default=Estado.ACTIVA,
+        db_index=True,
+    )
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_actualizacion = models.DateTimeField(auto_now=True)
 
@@ -683,7 +826,9 @@ class SucursalEmpresa(models.Model):
         verbose_name = "sucursal de empresa"
         verbose_name_plural = "sucursales de empresa"
         indexes = [
+            models.Index(fields=["empresa", "estado", "orden"]),
             models.Index(fields=["empresa", "activa", "orden"]),
+            models.Index(fields=["municipio", "estado"]),
         ]
 
     def __str__(self):
@@ -699,7 +844,46 @@ class SucursalEmpresa(models.Model):
 
         return None
 
+    @property
+    def municipio_nombre(self):
+        if self.municipio_id:
+            return self.municipio.nombre
+        return self.ciudad
+
+    @property
+    def departamento(self):
+        if not self.municipio_id:
+            return None
+        return self.municipio.departamento
+
     def save(self, *args, **kwargs):
+        update_fields = kwargs.get("update_fields")
+
+        if self.estado == self.Estado.ACTIVA and not self.activa:
+            self.estado = self.Estado.INACTIVA
+
+        self.activa = self.estado == self.Estado.ACTIVA
+
+        if self.municipio_id:
+            if "municipio" in self._state.fields_cache:
+                self.ciudad = self.municipio.nombre
+            else:
+                self.ciudad = (
+                    Municipio.objects.filter(pk=self.municipio_id)
+                    .values_list("nombre", flat=True)
+                    .first()
+                    or self.ciudad
+                )
+
+            if update_fields is not None:
+                kwargs["update_fields"] = set(update_fields) | {
+                    "ciudad",
+                    "activa",
+                    "estado",
+                }
+        elif update_fields is not None:
+            kwargs["update_fields"] = set(update_fields) | {"activa", "estado"}
+
         if not self.pk and self.orden == 0:
             ultimo_orden = (
                 SucursalEmpresa.objects.filter(empresa=self.empresa)

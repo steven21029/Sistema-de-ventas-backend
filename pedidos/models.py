@@ -9,7 +9,7 @@ from django.db import models, transaction
 from django.utils import timezone
 
 from catalogo.models import PaqueteCatalogo, Producto
-from empresas.models import Empresa, SucursalEmpresa
+from empresas.models import Empresa, Municipio, SucursalEmpresa
 
 
 ISV_RATE = Decimal("0.15")
@@ -221,6 +221,7 @@ class Pedido(models.Model):
         "referencia_entrega",
         "departamento_entrega",
         "municipio_entrega",
+        "municipio_entrega_catalogo_id",
         "subtotal",
         "descuento_total",
         "impuesto",
@@ -276,6 +277,13 @@ class Pedido(models.Model):
     referencia_entrega = models.TextField(blank=True)
     departamento_entrega = models.CharField(max_length=120, blank=True)
     municipio_entrega = models.CharField(max_length=120, blank=True)
+    municipio_entrega_catalogo = models.ForeignKey(
+        Municipio,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="pedidos_entrega",
+    )
     estado_pago = models.CharField(
         max_length=20,
         choices=EstadoPago.choices,
@@ -331,6 +339,7 @@ class Pedido(models.Model):
 
     def clean(self):
         super().clean()
+        self._sincronizar_ubicacion_entrega()
         self._validar_metodo_pago()
         if self.pk:
             try:
@@ -355,6 +364,7 @@ class Pedido(models.Model):
             return
 
         if self._state.adding:
+            self._sincronizar_ubicacion_entrega()
             if self.empresa_id:
                 self.aplica_impuesto = self.empresa.cobra_impuesto
                 self.tasa_impuesto = (
@@ -386,6 +396,24 @@ class Pedido(models.Model):
             if debe_descontar_inventario:
                 self.descontar_inventario_por_pago()
                 Prefactura.obtener_o_crear_para_pedido(self)
+
+    def _sincronizar_ubicacion_entrega(self):
+        if not self.municipio_entrega_catalogo_id:
+            return
+
+        if "municipio_entrega_catalogo" in self._state.fields_cache:
+            municipio = self.municipio_entrega_catalogo
+        else:
+            municipio = (
+                Municipio.objects.select_related("departamento")
+                .filter(pk=self.municipio_entrega_catalogo_id)
+                .first()
+            )
+        if not municipio:
+            return
+
+        self.municipio_entrega = municipio.nombre
+        self.departamento_entrega = municipio.departamento.nombre
 
     def _validar_fotografia_inmutable(self, original):
         modificados = [

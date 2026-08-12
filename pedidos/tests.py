@@ -11,7 +11,7 @@ from catalogo.models import (
     PaqueteProducto,
     Producto,
 )
-from empresas.models import Empresa
+from empresas.models import Empresa, Municipio
 from inventario.models import MovimientoInventario
 from promociones.models import DescuentoProducto, DescuentoPromocional
 from usuarios.models import PerfilUsuario
@@ -806,6 +806,36 @@ class CarritoPaquetesPersistentesTests(APITestCase):
         pedido.estado_pago = Pedido.EstadoPago.PENDIENTE
         with self.assertRaises(ValidationError):
             pedido.save()
+
+    def test_pedido_conserva_municipio_de_entrega_catalogado(self):
+        self.empresa.tiene_envios = True
+        self.empresa.save(update_fields=["tiene_envios", "fecha_actualizacion"])
+        TarifaEntrega.objects.create(
+            empresa=self.empresa,
+            tipo_entrega=Pedido.TipoEntrega.ENVIO_LOCAL,
+            monto="25.00",
+        )
+        municipio = Municipio.objects.select_related("departamento").get(codigo="0801")
+        ItemCarrito.objects.create(
+            carrito=self.carrito,
+            producto=self.servicio,
+            cantidad=1,
+        )
+
+        pedido = Pedido.generar_desde_carrito(
+            carrito=self.carrito,
+            tipo_entrega=Pedido.TipoEntrega.ENVIO_LOCAL,
+            datos_entrega={
+                "nombre_recibe": "Cliente",
+                "telefono_recibe": "99999999",
+                "direccion_entrega": "Direccion",
+                "municipio_entrega_catalogo": municipio,
+            },
+        )
+
+        self.assertEqual(pedido.municipio_entrega_catalogo_id, municipio.pk)
+        self.assertEqual(pedido.municipio_entrega, "Distrito Central")
+        self.assertEqual(pedido.departamento_entrega, "Francisco Morazan")
 
     def test_fotografia_no_se_puede_editar_ni_eliminar(self):
         ItemCarrito.objects.create(

@@ -1,8 +1,10 @@
 from django.contrib import admin
 
 from .models import (
+    Departamento,
     Empresa,
     ItemMenuEmpresa,
+    Municipio,
     SobreNosotrosEmpresa,
     SucursalEmpresa,
 )
@@ -31,13 +33,16 @@ class SucursalEmpresaInline(admin.TabularInline):
     extra = 0
     fields = (
         "nombre",
+        "municipio",
         "ciudad",
         "telefono",
         "horario",
         "google_maps_url",
         "orden",
+        "estado",
         "activa",
     )
+    readonly_fields = ("ciudad",)
 
 
 @admin.register(Empresa)
@@ -248,26 +253,62 @@ class SobreNosotrosEmpresaAdmin(admin.ModelAdmin):
         return False
 
 
+@admin.register(Departamento)
+class DepartamentoAdmin(admin.ModelAdmin):
+    list_display = (
+        "nombre",
+        "codigo",
+        "orden",
+        "activo",
+        "fecha_actualizacion",
+    )
+    list_filter = ("activo",)
+    search_fields = ("nombre", "codigo")
+    readonly_fields = ("fecha_creacion", "fecha_actualizacion")
+    ordering = ("orden", "nombre")
+
+
+@admin.register(Municipio)
+class MunicipioAdmin(admin.ModelAdmin):
+    list_display = (
+        "nombre",
+        "departamento",
+        "codigo",
+        "orden",
+        "activo",
+        "fecha_actualizacion",
+    )
+    list_filter = ("departamento", "activo")
+    search_fields = ("nombre", "codigo", "departamento__nombre")
+    autocomplete_fields = ("departamento",)
+    readonly_fields = ("nombre_normalizado", "fecha_creacion", "fecha_actualizacion")
+    ordering = ("departamento__orden", "nombre")
+
+
 @admin.register(SucursalEmpresa)
 class SucursalEmpresaAdmin(admin.ModelAdmin):
     exclude = ("imagen", "imagen_url")
     list_display = (
         "nombre",
         "empresa",
+        "municipio",
         "ciudad",
         "telefono",
         "horario",
         "orden",
+        "estado",
         "activa",
     )
-    list_filter = ("empresa", "ciudad", "activa")
+    list_filter = ("empresa", "municipio", "municipio__departamento", "estado", "activa")
     search_fields = (
         "nombre",
         "ciudad",
+        "municipio__nombre",
+        "municipio__departamento__nombre",
         "direccion",
         "telefono",
         "empresa__nombre",
     )
-    autocomplete_fields = ("empresa",)
+    autocomplete_fields = ("empresa", "municipio")
     readonly_fields = ("fecha_creacion", "fecha_actualizacion")
     ordering = ("empresa__nombre", "orden", "nombre")

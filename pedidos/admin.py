@@ -64,6 +64,7 @@ class PedidoAdmin(admin.ModelAdmin):
         "usuario",
         "empresa",
         "tipo_entrega",
+        "municipio_entrega_catalogo",
         "metodo_pago",
         "sucursal_pago",
         "estado_pago",
@@ -79,6 +80,7 @@ class PedidoAdmin(admin.ModelAdmin):
     list_filter = (
         "empresa",
         "tipo_entrega",
+        "municipio_entrega_catalogo",
         "metodo_pago",
         "sucursal_pago",
         "estado_pago",
@@ -101,6 +103,7 @@ class PedidoAdmin(admin.ModelAdmin):
         "referencia_entrega",
         "departamento_entrega",
         "municipio_entrega",
+        "municipio_entrega_catalogo",
         "subtotal",
         "descuento_total",
         "impuesto",

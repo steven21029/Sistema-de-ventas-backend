@@ -4,7 +4,7 @@ from django.db.models.functions import Lower
 from rest_framework import serializers
 
 from catalogo.models import PaqueteCatalogo, PaqueteProducto, Producto
-from empresas.models import Empresa
+from empresas.models import Departamento, Empresa, Municipio
 
 from .models import (
     Carrito,
@@ -310,6 +310,11 @@ class PedidoSerializer(serializers.ModelSerializer):
     detalles = DetallePedidoSerializer(many=True, read_only=True)
     empresa_nombre = serializers.CharField(source="empresa.nombre", read_only=True)
     usuario_nombre = serializers.CharField(source="usuario.username", read_only=True)
+    municipio_entrega_id = serializers.IntegerField(
+        source="municipio_entrega_catalogo_id",
+        read_only=True,
+    )
+    departamento_entrega_id = serializers.SerializerMethodField()
     cancelado_por_email = serializers.EmailField(
         source="cancelado_por.email",
         read_only=True,
@@ -332,7 +337,9 @@ class PedidoSerializer(serializers.ModelSerializer):
             "direccion_entrega",
             "referencia_entrega",
             "departamento_entrega",
+            "departamento_entrega_id",
             "municipio_entrega",
+            "municipio_entrega_id",
             "estado_pago",
             "metodo_pago",
             "sucursal_pago",
@@ -356,6 +363,11 @@ class PedidoSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = fields
 
+    def get_departamento_entrega_id(self, obj):
+        if not obj.municipio_entrega_catalogo_id:
+            return None
+        return obj.municipio_entrega_catalogo.departamento_id
+
 
 class GenerarPedidoDesdeCarritoSerializer(serializers.Serializer):
     tipo_entrega = serializers.ChoiceField(choices=Pedido.TipoEntrega.choices)
@@ -370,6 +382,50 @@ class GenerarPedidoDesdeCarritoSerializer(serializers.Serializer):
     referencia_entrega = serializers.CharField(required=False, allow_blank=True, default="")
     departamento_entrega = serializers.CharField(required=False, allow_blank=True, default="")
     municipio_entrega = serializers.CharField(required=False, allow_blank=True, default="")
+    departamento_entrega_id = serializers.PrimaryKeyRelatedField(
+        source="departamento_entrega_catalogo",
+        queryset=Departamento.objects.filter(activo=True),
+        required=False,
+        allow_null=True,
+        write_only=True,
+    )
+    municipio_entrega_id = serializers.PrimaryKeyRelatedField(
+        source="municipio_entrega_catalogo",
+        queryset=Municipio.objects.filter(activo=True, departamento__activo=True),
+        required=False,
+        allow_null=True,
+        write_only=True,
+    )
+
+    def validate(self, attrs):
+        departamento = attrs.pop("departamento_entrega_catalogo", None)
+        municipio = attrs.get("municipio_entrega_catalogo")
+        if departamento or municipio:
+            if not departamento:
+                raise serializers.ValidationError(
+                    {
+                        "departamento_entrega_id": (
+                            "Selecciona el departamento de entrega."
+                        )
+                    }
+                )
+            if not municipio:
+                raise serializers.ValidationError(
+                    {"municipio_entrega_id": "Selecciona el municipio de entrega."}
+                )
+            if municipio.departamento_id != departamento.pk:
+                raise serializers.ValidationError(
+                    {
+                        "municipio_entrega_id": (
+                            "El municipio seleccionado no pertenece al departamento."
+                        )
+                    }
+                )
+
+            attrs["departamento_entrega"] = municipio.departamento.nombre
+            attrs["municipio_entrega"] = municipio.nombre
+
+        return attrs
 
 
 class PagoEnSucursalSerializer(serializers.Serializer):

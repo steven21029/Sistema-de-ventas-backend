@@ -12,7 +12,7 @@ from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 from rest_framework_simplejwt.utils import datetime_from_epoch
 
-from empresas.models import Empresa
+from empresas.models import Departamento, Empresa, Municipio
 from .models import (
     CodigoVerificacionCorreo,
     ErrorEnvioCodigoCorreo,
@@ -65,6 +65,15 @@ class UsuarioBasicoSerializer(serializers.ModelSerializer):
 class PerfilUsuarioSerializer(serializers.ModelSerializer):
     usuario_detalle = UsuarioBasicoSerializer(source="usuario", read_only=True)
     empresa_nombre = serializers.CharField(source="empresa.nombre", read_only=True)
+    municipio_id = serializers.PrimaryKeyRelatedField(
+        source="municipio",
+        queryset=Municipio.objects.filter(activo=True, departamento__activo=True),
+        required=False,
+        allow_null=True,
+    )
+    municipio = serializers.CharField(source="municipio.nombre", read_only=True)
+    departamento_id = serializers.SerializerMethodField()
+    departamento = serializers.SerializerMethodField()
     rol_nombre = serializers.CharField(source="get_rol_display", read_only=True)
     empresas_permitidas_detalle = serializers.SerializerMethodField()
 
@@ -78,6 +87,10 @@ class PerfilUsuarioSerializer(serializers.ModelSerializer):
             "empresa_nombre",
             "empresas_permitidas",
             "empresas_permitidas_detalle",
+            "municipio_id",
+            "municipio",
+            "departamento_id",
+            "departamento",
             "rol",
             "rol_nombre",
             "telefono",
@@ -93,6 +106,9 @@ class PerfilUsuarioSerializer(serializers.ModelSerializer):
             "usuario_detalle",
             "empresa_nombre",
             "empresas_permitidas_detalle",
+            "municipio",
+            "departamento_id",
+            "departamento",
             "rol_nombre",
             "fecha_creacion",
             "fecha_actualizacion",
@@ -103,6 +119,16 @@ class PerfilUsuarioSerializer(serializers.ModelSerializer):
             {"id": empresa.id, "nombre": empresa.nombre, "slug": empresa.slug}
             for empresa in obj.empresas_permitidas.all().order_by("nombre")
         ]
+
+    def get_departamento_id(self, obj):
+        if not obj.municipio_id:
+            return None
+        return obj.municipio.departamento_id
+
+    def get_departamento(self, obj):
+        if not obj.municipio_id:
+            return None
+        return obj.municipio.departamento.nombre
 
 
 class UsuarioAdministrativoSerializer(serializers.ModelSerializer):
@@ -127,6 +153,15 @@ class UsuarioAdministrativoSerializer(serializers.ModelSerializer):
         trim_whitespace=False,
     )
     empresa_nombre = serializers.CharField(source="empresa.nombre", read_only=True)
+    municipio_id = serializers.PrimaryKeyRelatedField(
+        source="municipio",
+        queryset=Municipio.objects.filter(activo=True, departamento__activo=True),
+        required=False,
+        allow_null=True,
+    )
+    municipio = serializers.CharField(source="municipio.nombre", read_only=True)
+    departamento_id = serializers.SerializerMethodField()
+    departamento = serializers.SerializerMethodField()
     rol_nombre = serializers.CharField(source="get_rol_display", read_only=True)
     empresas_permitidas_detalle = serializers.SerializerMethodField()
 
@@ -144,6 +179,10 @@ class UsuarioAdministrativoSerializer(serializers.ModelSerializer):
             "empresa_nombre",
             "empresas_permitidas",
             "empresas_permitidas_detalle",
+            "municipio_id",
+            "municipio",
+            "departamento_id",
+            "departamento",
             "rol",
             "rol_nombre",
             "telefono",
@@ -159,6 +198,9 @@ class UsuarioAdministrativoSerializer(serializers.ModelSerializer):
             "usuario_id",
             "empresa_nombre",
             "empresas_permitidas_detalle",
+            "municipio",
+            "departamento_id",
+            "departamento",
             "rol_nombre",
             "fecha_creacion",
             "fecha_actualizacion",
@@ -169,6 +211,16 @@ class UsuarioAdministrativoSerializer(serializers.ModelSerializer):
             {"id": empresa.id, "nombre": empresa.nombre, "slug": empresa.slug}
             for empresa in obj.empresas_permitidas.all().order_by("nombre")
         ]
+
+    def get_departamento_id(self, obj):
+        if not obj.municipio_id:
+            return None
+        return obj.municipio.departamento_id
+
+    def get_departamento(self, obj):
+        if not obj.municipio_id:
+            return None
+        return obj.municipio.departamento.nombre
 
     def validate_first_name(self, value):
         return normalizar_nombre_persona(value, "El nombre")
@@ -421,7 +473,13 @@ class SesionLimitadaTokenRefreshSerializer(TokenRefreshSerializer):
 
 class RegistroCompradorSerializer(serializers.Serializer):
     empresa_slug = serializers.CharField(write_only=True)
-    nombre_completo = serializers.CharField(max_length=180)
+    nombre = serializers.CharField(max_length=80, required=False, allow_blank=True)
+    apellido = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    nombre_completo = serializers.CharField(
+        max_length=180,
+        required=False,
+        allow_blank=True,
+    )
     email = serializers.EmailField()
     telefono = serializers.RegexField(
         regex=r"^\d+$",
@@ -436,12 +494,34 @@ class RegistroCompradorSerializer(serializers.Serializer):
             "invalid": "El numero de identidad debe tener exactamente 13 digitos.",
         },
     )
+    departamento_id = serializers.PrimaryKeyRelatedField(
+        source="departamento",
+        queryset=Departamento.objects.filter(activo=True),
+        write_only=True,
+    )
+    municipio_id = serializers.PrimaryKeyRelatedField(
+        source="municipio",
+        queryset=Municipio.objects.filter(activo=True, departamento__activo=True),
+        write_only=True,
+    )
     password = serializers.CharField(write_only=True, trim_whitespace=False)
     password_confirmacion = serializers.CharField(write_only=True, trim_whitespace=False)
     acepta_terminos = serializers.BooleanField(write_only=True)
     acepta_privacidad = serializers.BooleanField(write_only=True)
 
+    def validate_nombre(self, value):
+        if not value.strip():
+            return ""
+        return normalizar_nombre_persona(value, "El nombre")
+
+    def validate_apellido(self, value):
+        if not value.strip():
+            return ""
+        return normalizar_nombre_persona(value, "El apellido")
+
     def validate_nombre_completo(self, value):
+        if not value.strip():
+            return ""
         return normalizar_nombre_persona(value, "El nombre")
 
     def validate_email(self, value):
@@ -468,6 +548,37 @@ class RegistroCompradorSerializer(serializers.Serializer):
     def validate(self, attrs):
         empresa = attrs["empresa_slug"]
         numero_identidad = attrs["numero_identidad"]
+        departamento = attrs["departamento"]
+        municipio = attrs["municipio"]
+
+        if municipio.departamento_id != departamento.pk:
+            raise serializers.ValidationError(
+                {
+                    "municipio_id": (
+                        "El municipio seleccionado no pertenece al departamento."
+                    )
+                }
+            )
+
+        nombre = attrs.get("nombre", "").strip()
+        apellido = attrs.get("apellido", "").strip()
+        nombre_completo = attrs.get("nombre_completo", "").strip()
+        if nombre_completo and (not nombre or not apellido):
+            partes = nombre_completo.split(" ", 1)
+            nombre = nombre or partes[0]
+            if len(partes) > 1:
+                apellido = apellido or partes[1]
+
+        errores_nombre = {}
+        if not nombre:
+            errores_nombre["nombre"] = "El nombre es obligatorio."
+        if not apellido:
+            errores_nombre["apellido"] = "El apellido es obligatorio."
+        if errores_nombre:
+            raise serializers.ValidationError(errores_nombre)
+
+        attrs["nombre"] = normalizar_nombre_persona(nombre, "El nombre")
+        attrs["apellido"] = normalizar_nombre_persona(apellido, "El apellido")
 
         if PerfilUsuario.objects.filter(
             empresa=empresa,
@@ -510,10 +621,9 @@ class RegistroCompradorSerializer(serializers.Serializer):
     @transaction.atomic
     def create(self, validated_data):
         empresa = validated_data["empresa_slug"]
-        nombre_completo = " ".join(validated_data["nombre_completo"].split())
-        partes_nombre = nombre_completo.split(" ", 1)
-        nombres = partes_nombre[0]
-        apellidos = partes_nombre[1] if len(partes_nombre) > 1 else ""
+        municipio = validated_data["municipio"]
+        nombres = validated_data["nombre"]
+        apellidos = validated_data["apellido"]
 
         usuario = User.objects.create_user(
             username=validated_data["email"],
@@ -526,6 +636,7 @@ class RegistroCompradorSerializer(serializers.Serializer):
 
         perfil, _created = PerfilUsuario.objects.get_or_create(usuario=usuario)
         perfil.empresa = empresa
+        perfil.municipio = municipio
         perfil.rol = PerfilUsuario.Rol.COMPRADOR
         perfil.telefono = validated_data["telefono"].strip()
         perfil.numero_identidad = validated_data["numero_identidad"]

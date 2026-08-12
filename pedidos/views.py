@@ -408,6 +408,9 @@ class CarritoViewSet(EmpresaUsuarioMixin, viewsets.ModelViewSet):
                         "municipio_entrega",
                         "",
                     ),
+                    "municipio_entrega_catalogo": entrada_serializer.validated_data.get(
+                        "municipio_entrega_catalogo",
+                    ),
                 },
             )
         except DjangoValidationError as exc:

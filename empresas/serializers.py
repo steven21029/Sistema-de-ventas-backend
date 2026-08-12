@@ -2,9 +2,11 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from .models import (
+    Departamento,
     Empresa,
     MENU_PREDETERMINADO,
     ItemMenuEmpresa,
+    Municipio,
     SobreNosotrosEmpresa,
     SucursalEmpresa,
 )
@@ -147,6 +149,105 @@ class SobreNosotrosEmpresaPublicoSerializer(SobreNosotrosEmpresaSerializer):
             "imagen_final",
         ]
         read_only_fields = fields
+
+
+class DepartamentoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Departamento
+        fields = [
+            "id",
+            "codigo",
+            "nombre",
+            "orden",
+            "activo",
+        ]
+        read_only_fields = ["id"]
+
+    def validate_codigo(self, value):
+        codigo = value.strip()
+        if not codigo.isdigit() or len(codigo) != 2:
+            raise serializers.ValidationError(
+                "El codigo del departamento debe tener 2 digitos."
+            )
+        return codigo
+
+    def validate_nombre(self, value):
+        nombre = value.strip()
+        if not nombre:
+            raise serializers.ValidationError("El nombre es obligatorio.")
+        return nombre
+
+    def _guardar_con_validacion(self, instance):
+        try:
+            instance.full_clean()
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.message_dict) from exc
+        instance.save()
+        return instance
+
+    def create(self, validated_data):
+        return self._guardar_con_validacion(Departamento(**validated_data))
+
+    def update(self, instance, validated_data):
+        for campo, valor in validated_data.items():
+            setattr(instance, campo, valor)
+        return self._guardar_con_validacion(instance)
+
+
+class MunicipioSerializer(serializers.ModelSerializer):
+    departamento_id = serializers.PrimaryKeyRelatedField(
+        source="departamento",
+        queryset=Departamento.objects.all(),
+    )
+    departamento = serializers.CharField(source="departamento.nombre", read_only=True)
+    departamento_codigo = serializers.CharField(
+        source="departamento.codigo",
+        read_only=True,
+    )
+
+    class Meta:
+        model = Municipio
+        fields = [
+            "id",
+            "codigo",
+            "nombre",
+            "departamento_id",
+            "departamento",
+            "departamento_codigo",
+            "orden",
+            "activo",
+        ]
+        read_only_fields = ["id", "departamento", "departamento_codigo"]
+
+    def validate_codigo(self, value):
+        codigo = value.strip()
+        if not codigo.isdigit() or len(codigo) != 4:
+            raise serializers.ValidationError(
+                "El codigo del municipio debe tener 4 digitos."
+            )
+        return codigo
+
+    def validate_nombre(self, value):
+        nombre = value.strip()
+        if not nombre:
+            raise serializers.ValidationError("El nombre es obligatorio.")
+        return nombre
+
+    def _guardar_con_validacion(self, instance):
+        try:
+            instance.full_clean()
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.message_dict) from exc
+        instance.save()
+        return instance
+
+    def create(self, validated_data):
+        return self._guardar_con_validacion(Municipio(**validated_data))
+
+    def update(self, instance, validated_data):
+        for campo, valor in validated_data.items():
+            setattr(instance, campo, valor)
+        return self._guardar_con_validacion(instance)
 
 
 class EmpresaSerializer(serializers.ModelSerializer):
@@ -444,12 +545,20 @@ class EmpresaPublicaSerializer(serializers.ModelSerializer):
 class SucursalEmpresaPublicaSerializer(serializers.ModelSerializer):
     imagen_final = serializers.SerializerMethodField()
     horario_lineas = serializers.SerializerMethodField()
+    municipio_id = serializers.IntegerField(read_only=True)
+    municipio = serializers.SerializerMethodField()
+    departamento_id = serializers.SerializerMethodField()
+    departamento = serializers.SerializerMethodField()
 
     class Meta:
         model = SucursalEmpresa
         fields = [
             "id",
             "nombre",
+            "municipio_id",
+            "municipio",
+            "departamento_id",
+            "departamento",
             "ciudad",
             "direccion",
             "telefono",
@@ -460,6 +569,7 @@ class SucursalEmpresaPublicaSerializer(serializers.ModelSerializer):
             "latitud",
             "longitud",
             "orden",
+            "estado",
         ]
         read_only_fields = fields
 
@@ -479,11 +589,34 @@ class SucursalEmpresaPublicaSerializer(serializers.ModelSerializer):
     def get_horario_lineas(self, obj):
         return dividir_horario_en_lineas(obj.horario)
 
+    def get_municipio(self, obj):
+        if not obj.municipio_id:
+            return None
+        return obj.municipio.nombre
+
+    def get_departamento_id(self, obj):
+        if not obj.municipio_id:
+            return None
+        return obj.municipio.departamento_id
+
+    def get_departamento(self, obj):
+        if not obj.municipio_id:
+            return None
+        return obj.municipio.departamento.nombre
+
 
 class SucursalEmpresaAdminSerializer(serializers.ModelSerializer):
     empresa = serializers.PrimaryKeyRelatedField(read_only=True)
     imagen_final = serializers.SerializerMethodField()
     horario_lineas = serializers.SerializerMethodField()
+    municipio_id = serializers.PrimaryKeyRelatedField(
+        source="municipio",
+        queryset=Municipio.objects.filter(activo=True, departamento__activo=True),
+        required=False,
+    )
+    municipio = serializers.SerializerMethodField()
+    departamento_id = serializers.SerializerMethodField()
+    departamento = serializers.SerializerMethodField()
     orden = serializers.IntegerField(min_value=1, required=False)
 
     class Meta:
@@ -492,6 +625,10 @@ class SucursalEmpresaAdminSerializer(serializers.ModelSerializer):
             "id",
             "empresa",
             "nombre",
+            "municipio_id",
+            "municipio",
+            "departamento_id",
+            "departamento",
             "ciudad",
             "direccion",
             "telefono",
@@ -504,6 +641,7 @@ class SucursalEmpresaAdminSerializer(serializers.ModelSerializer):
             "latitud",
             "longitud",
             "orden",
+            "estado",
             "activa",
             "fecha_creacion",
             "fecha_actualizacion",
@@ -511,7 +649,12 @@ class SucursalEmpresaAdminSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id",
             "empresa",
+            "municipio",
+            "departamento_id",
+            "departamento",
+            "ciudad",
             "imagen_final",
+            "horario_lineas",
             "fecha_creacion",
             "fecha_actualizacion",
         ]
@@ -530,3 +673,33 @@ class SucursalEmpresaAdminSerializer(serializers.ModelSerializer):
 
     def get_horario_lineas(self, obj):
         return dividir_horario_en_lineas(obj.horario)
+
+    def get_municipio(self, obj):
+        if not obj.municipio_id:
+            return None
+        return obj.municipio.nombre
+
+    def get_departamento_id(self, obj):
+        if not obj.municipio_id:
+            return None
+        return obj.municipio.departamento_id
+
+    def get_departamento(self, obj):
+        if not obj.municipio_id:
+            return None
+        return obj.municipio.departamento.nombre
+
+    def validate(self, attrs):
+        if not self.instance and not attrs.get("municipio"):
+            raise serializers.ValidationError(
+                {"municipio_id": "Selecciona el municipio de la sucursal."}
+            )
+
+        if "activa" in attrs and "estado" not in attrs:
+            attrs["estado"] = (
+                SucursalEmpresa.Estado.ACTIVA
+                if attrs["activa"]
+                else SucursalEmpresa.Estado.INACTIVA
+            )
+
+        return attrs

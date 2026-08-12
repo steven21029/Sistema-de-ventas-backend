@@ -98,7 +98,7 @@ Respuesta paginada:
 }
 ```
 
-Menu, sucursales administrativas, catalogo administrativo, paquetes y
+Menu, ubicaciones, sucursales administrativas, catalogo administrativo, paquetes y
 usuarios siempre se paginan. Promociones, contactos, pedidos y pagos conservan
 la lista anterior salvo que se envie `paginar=true`.
 
@@ -110,6 +110,8 @@ la lista anterior salvo que se envie `paginar=true`.
 | `GET`, `PATCH` | `/api/empresas/mi-empresa/` | Branding y configuracion de la empresa actual |
 | `GET` | `/api/empresas/items-menu/` | Listar modulos oficiales del menu |
 | `GET`, `PUT`, `PATCH` | `/api/empresas/items-menu/{id}/` | Cambiar texto, orden o estado |
+| CRUD | `/api/ubicaciones/departamentos/` | Catalogo global de departamentos |
+| CRUD | `/api/ubicaciones/municipios/` | Catalogo global de municipios |
 | CRUD | `/api/empresas/sucursales/` | Sucursales |
 | CRUD | `/api/empresas/` | Solo superusuario; crear y administrar empresas |
 | `GET` | `/api/empresas/sobre-nosotros/` | Contenido publico por empresa |
@@ -193,6 +195,118 @@ Sucursales devuelve `horario` por compatibilidad y `horario_lineas` como un
 arreglo listo para renderizar en el frontend. En las cards publicas usar
 `horario_lineas` para mostrar lunes a viernes, sabado y domingo en filas
 separadas.
+
+Catalogo global de ubicaciones:
+
+```http
+GET /api/ubicaciones/departamentos/?buscar=francisco
+POST /api/ubicaciones/departamentos/
+GET /api/ubicaciones/departamentos/{id}/
+PATCH /api/ubicaciones/departamentos/{id}/
+DELETE /api/ubicaciones/departamentos/{id}/
+
+GET /api/ubicaciones/municipios/?departamento_id=8&buscar=distrito
+POST /api/ubicaciones/municipios/
+GET /api/ubicaciones/municipios/{id}/
+PATCH /api/ubicaciones/municipios/{id}/
+DELETE /api/ubicaciones/municipios/{id}/
+```
+
+Tambien funciona bajo `/api/v1/`. Los listados aceptan `buscar`,
+`activo=true|false`, `incluir_inactivos=true`, `orden`, `paginar=true|false`,
+`page` y `tamano_pagina`. Municipios acepta ademas `departamento_id` y
+`departamento_codigo`.
+
+Payload de departamento:
+
+```json
+{
+  "codigo": "08",
+  "nombre": "Francisco Morazan",
+  "orden": 8,
+  "activo": true
+}
+```
+
+Payload de municipio:
+
+```json
+{
+  "codigo": "0801",
+  "nombre": "Distrito Central",
+  "departamento_id": 8,
+  "orden": 1,
+  "activo": true
+}
+```
+
+Respuesta de municipio:
+
+```json
+{
+  "id": 80,
+  "codigo": "0801",
+  "nombre": "Distrito Central",
+  "departamento_id": 8,
+  "departamento": "Francisco Morazan",
+  "departamento_codigo": "08",
+  "orden": 1,
+  "activo": true
+}
+```
+
+Reglas:
+
+- El catalogo es global para Honduras, no por empresa.
+- Mutaciones de departamentos y municipios solo las realiza el superusuario.
+- No se permiten municipios duplicados dentro del mismo departamento, aunque
+  cambien mayusculas o tildes.
+- `GET` publico devuelve solo departamentos/municipios activos; usuarios
+  administrativos pueden usar `activo` e `incluir_inactivos`.
+- Municipios inactivos no pueden asignarse a nuevas sucursales ni registros.
+- Un municipio vinculado a sucursales no se elimina: `DELETE` responde `409`.
+  Debe desactivarse con `PATCH {"activo": false}`.
+
+Sucursales usa el catalogo con `municipio_id`:
+
+```json
+{
+  "nombre": "TEG - Aeroplaza",
+  "municipio_id": 80,
+  "direccion": "Centro Comercial Aeroplaza",
+  "telefono": "22334455",
+  "horario": "Lunes a viernes: 6:00am-5:00pm; Sabado: 6:00am-1:00pm; Domingo: Cerrado",
+  "orden": 1,
+  "estado": "activa"
+}
+```
+
+La respuesta de sucursales incluye `municipio_id`, `municipio`,
+`departamento_id`, `departamento`, `ciudad` y `estado`. `ciudad` se conserva
+como texto legible por compatibilidad con reportes y frontend existente. El
+backend rechaza municipios inactivos.
+
+`DELETE /api/empresas/sucursales/{id}/` no borra la fila: marca la sucursal
+como `estado="inactiva"` y `activa=false` para conservar historial.
+
+Estados de sucursal:
+
+```text
+activa
+temporalmente_cerrada
+inactiva
+```
+
+Rutas publicas de sucursales:
+
+```http
+GET /api/empresas/sucursales/?empresa_slug=analiza&municipio_id=80
+GET /api/empresas/sucursales/zonas/?empresa_slug=analiza&buscar=centro
+GET /api/empresas/sucursales/cerca/?empresa_slug=analiza
+```
+
+`zonas` agrupa solamente sucursales activas con municipio activo. `cerca`
+requiere autenticacion y usa el municipio guardado en el perfil del usuario.
 
 Contenido publico de Sobre nosotros:
 

@@ -8,7 +8,7 @@ from django.core.validators import RegexValidator
 from django.db import models
 from django.utils import timezone
 
-from empresas.models import Empresa
+from empresas.models import Empresa, Municipio
 
 
 numero_identidad_validator = RegexValidator(
@@ -42,6 +42,13 @@ class PerfilUsuario(models.Model):
     )
     empresa = models.ForeignKey(
         Empresa,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="perfiles_usuario",
+    )
+    municipio = models.ForeignKey(
+        Municipio,
         on_delete=models.PROTECT,
         null=True,
         blank=True,
@@ -129,6 +136,12 @@ class PerfilUsuario(models.Model):
     @property
     def es_comprador(self):
         return self.rol == self.Rol.COMPRADOR
+
+    @property
+    def departamento(self):
+        if not self.municipio_id:
+            return None
+        return self.municipio.departamento
 
 
 class CodigoVerificacionCorreo(models.Model):

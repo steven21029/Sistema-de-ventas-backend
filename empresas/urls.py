@@ -2,6 +2,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
+    DepartamentoViewSet,
     EmpresaActualView,
     EmpresaMenuView,
     EmpresaPublicaView,
@@ -10,7 +11,10 @@ from .views import (
     ItemMenuEmpresaViewSet,
     MiEmpresaView,
     MiSobreNosotrosEmpresaView,
+    MunicipioViewSet,
     SobreNosotrosEmpresaPublicoView,
+    SucursalesCercanasView,
+    SucursalesZonasView,
     SucursalEmpresaViewSet,
 )
 
@@ -26,6 +30,24 @@ sucursales_lista = SucursalEmpresaViewSet.as_view(
     {"get": "list", "post": "create"}
 )
 sucursales_detalle = SucursalEmpresaViewSet.as_view(
+    {
+        "get": "retrieve",
+        "put": "update",
+        "patch": "partial_update",
+        "delete": "destroy",
+    }
+)
+departamentos_lista = DepartamentoViewSet.as_view({"get": "list", "post": "create"})
+departamentos_detalle = DepartamentoViewSet.as_view(
+    {
+        "get": "retrieve",
+        "put": "update",
+        "patch": "partial_update",
+        "delete": "destroy",
+    }
+)
+municipios_lista = MunicipioViewSet.as_view({"get": "list", "post": "create"})
+municipios_detalle = MunicipioViewSet.as_view(
     {
         "get": "retrieve",
         "put": "update",
@@ -57,6 +79,36 @@ urlpatterns = [
         "empresas/mi-sobre-nosotros/",
         MiSobreNosotrosEmpresaView.as_view(),
         name="empresas-mi-sobre-nosotros",
+    ),
+    path(
+        "ubicaciones/departamentos/",
+        departamentos_lista,
+        name="ubicaciones-departamentos",
+    ),
+    path(
+        "ubicaciones/departamentos/<int:pk>/",
+        departamentos_detalle,
+        name="ubicaciones-departamentos-detalle",
+    ),
+    path(
+        "ubicaciones/municipios/",
+        municipios_lista,
+        name="ubicaciones-municipios",
+    ),
+    path(
+        "ubicaciones/municipios/<int:pk>/",
+        municipios_detalle,
+        name="ubicaciones-municipios-detalle",
+    ),
+    path(
+        "empresas/sucursales/zonas/",
+        SucursalesZonasView.as_view(),
+        name="empresas-sucursales-zonas",
+    ),
+    path(
+        "empresas/sucursales/cerca/",
+        SucursalesCercanasView.as_view(),
+        name="empresas-sucursales-cerca",
     ),
     path(
         "empresas/sucursales/",

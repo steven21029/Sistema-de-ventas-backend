@@ -5,7 +5,14 @@ from rest_framework.test import APITestCase
 
 from usuarios.models import PerfilUsuario
 
-from .models import Empresa, ItemMenuEmpresa, SobreNosotrosEmpresa, SucursalEmpresa
+from .models import (
+    Departamento,
+    Empresa,
+    ItemMenuEmpresa,
+    Municipio,
+    SobreNosotrosEmpresa,
+    SucursalEmpresa,
+)
 
 
 User = get_user_model()
@@ -23,6 +30,10 @@ class ContextoAdministrativoAPITests(APITestCase):
             slug="otra",
             subdominio="otra",
         )
+        self.departamento = Departamento.objects.get(codigo="08")
+        self.departamento_cortes = Departamento.objects.get(codigo="05")
+        self.municipio = Municipio.objects.get(codigo="0801")
+        self.choloma = Municipio.objects.get(codigo="0502")
         self.superuser = User.objects.create_superuser(
             username="root",
             email="root@example.com",
@@ -215,6 +226,289 @@ class ContextoAdministrativoAPITests(APITestCase):
 
 
 class ContenidoEmpresaAdministrativoAPITests(ContextoAdministrativoAPITests):
+    def test_admin_gestiona_departamentos_con_paginacion_y_filtros(self):
+        self.client.force_authenticate(self.superuser)
+        creada = self.client.post(
+            reverse("ubicaciones-departamentos"),
+            {
+                "codigo": "99",
+                "nombre": "Departamento prueba",
+                "orden": 99,
+                "activo": True,
+            },
+            format="json",
+        )
+
+        self.assertEqual(creada.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(creada.data["codigo"], "99")
+        self.assertEqual(creada.data["nombre"], "Departamento prueba")
+
+        inactivo = Departamento.objects.get(codigo="06")
+        inactivo.activo = False
+        inactivo.save(update_fields=["activo", "fecha_actualizacion"])
+        listado = self.client.get(
+            reverse("ubicaciones-departamentos"),
+            {
+                "incluir_inactivos": "true",
+                "buscar": "prueba",
+                "orden": "nombre",
+            },
+        )
+
+        self.assertEqual(listado.status_code, status.HTTP_200_OK)
+        self.assertIn("results", listado.data)
+        self.assertEqual(listado.data["results"][0]["id"], creada.data["id"])
+
+        inactivas = self.client.get(
+            reverse("ubicaciones-departamentos"),
+            {"activo": "false", "paginar": "false"},
+        )
+        self.assertEqual(inactivas.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(inactivas.data), 1)
+        self.assertEqual(inactivas.data[0]["id"], inactivo.pk)
+
+        actualizada = self.client.patch(
+            reverse("ubicaciones-departamentos-detalle", args=[creada.data["id"]]),
+            {"nombre": "Departamento prueba norte", "activo": False},
+            format="json",
+        )
+        self.assertEqual(actualizada.status_code, status.HTTP_200_OK)
+        self.assertEqual(actualizada.data["nombre"], "Departamento prueba norte")
+        self.assertFalse(actualizada.data["activo"])
+
+        eliminada = self.client.delete(
+            reverse("ubicaciones-departamentos-detalle", args=[creada.data["id"]])
+        )
+        self.assertEqual(eliminada.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_municipios_publicos_devuelven_solo_activos_sin_paginar(self):
+        departamento = Departamento.objects.create(
+            codigo="99",
+            nombre="Departamento prueba",
+            orden=99,
+        )
+        activo = Municipio.objects.create(
+            departamento=departamento,
+            codigo="9901",
+            nombre="Municipio activo",
+        )
+        Municipio.objects.create(
+            departamento=departamento,
+            codigo="9902",
+            nombre="Municipio inactivo",
+            activo=False,
+        )
+
+        response = self.client.get(
+            reverse("ubicaciones-municipios"),
+            {"departamento_id": departamento.pk},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsInstance(response.data, list)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["id"], activo.pk)
+        self.assertEqual(response.data[0]["departamento_id"], departamento.pk)
+
+        inactivas_publicas = self.client.get(
+            reverse("ubicaciones-municipios"),
+            {
+                "departamento_id": departamento.pk,
+                "activo": "false",
+                "incluir_inactivos": "true",
+            },
+        )
+        self.assertEqual(inactivas_publicas.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(inactivas_publicas.data), 1)
+        self.assertEqual(inactivas_publicas.data[0]["id"], activo.pk)
+
+    def test_ubicaciones_funcionan_en_api_y_api_v1(self):
+        for ruta in ("/api/ubicaciones/municipios/", "/api/v1/ubicaciones/municipios/"):
+            with self.subTest(ruta=ruta):
+                response = self.client.get(
+                    ruta,
+                    {"departamento_id": self.departamento.pk},
+                )
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                self.assertEqual(response.data[0]["nombre"], "Distrito Central")
+
+    def test_municipios_respetan_permisos_administrativos(self):
+        self.client.force_authenticate(self.admin_empresa)
+        denegada = self.client.post(
+            reverse("ubicaciones-municipios"),
+            {
+                "codigo": "0899",
+                "nombre": "Municipio Prueba Denegado",
+                "departamento_id": self.departamento.pk,
+            },
+            format="json",
+        )
+        self.assertEqual(denegada.status_code, status.HTTP_403_FORBIDDEN)
+
+        self.client.force_authenticate(self.superuser)
+        response = self.client.post(
+            reverse("ubicaciones-municipios"),
+            {
+                "codigo": "0898",
+                "nombre": "Municipio Prueba",
+                "departamento_id": self.departamento.pk,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_municipios_rechazan_duplicados_sin_mayusculas_ni_tildes(self):
+        Municipio.objects.create(
+            departamento=self.departamento,
+            codigo="0897",
+            nombre="Comayaguela",
+        )
+
+        self.client.force_authenticate(self.superuser)
+        response = self.client.post(
+            reverse("ubicaciones-municipios"),
+            {
+                "codigo": "0896",
+                "nombre": "  Comayagüela  ",
+                "departamento_id": self.departamento.pk,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("nombre", response.data)
+
+    def test_sucursales_asignan_municipio_activo(self):
+        inactivo = Municipio.objects.create(
+            departamento=self.departamento,
+            codigo="0895",
+            nombre="Municipio Inactivo Test",
+            activo=False,
+        )
+
+        self.client.force_authenticate(self.admin_empresa)
+        creada = self.client.post(
+            reverse("empresas-sucursales"),
+            {
+                "nombre": "Sucursal Centro",
+                "municipio_id": self.municipio.pk,
+                "direccion": "Centro",
+            },
+            format="json",
+        )
+
+        self.assertEqual(creada.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(creada.data["municipio_id"], self.municipio.pk)
+        self.assertEqual(creada.data["municipio"], "Distrito Central")
+        self.assertEqual(creada.data["departamento_id"], self.departamento.pk)
+        self.assertEqual(creada.data["ciudad"], "Distrito Central")
+        sucursal = SucursalEmpresa.objects.get(pk=creada.data["id"])
+        self.assertEqual(sucursal.municipio_id, self.municipio.pk)
+        self.assertEqual(sucursal.ciudad, "Distrito Central")
+
+        response = self.client.post(
+            reverse("empresas-sucursales"),
+            {
+                "nombre": "Sucursal inactiva",
+                "municipio_id": inactivo.pk,
+                "direccion": "Direccion",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("municipio_id", response.data)
+
+    def test_municipio_vinculado_no_se_elimina_y_puede_desactivarse(self):
+        SucursalEmpresa.objects.create(
+            empresa=self.analiza,
+            municipio=self.municipio,
+            nombre="Sucursal Centro",
+            direccion="Centro",
+        )
+
+        self.client.force_authenticate(self.superuser)
+        eliminada = self.client.delete(
+            reverse("ubicaciones-municipios-detalle", args=[self.municipio.pk])
+        )
+        self.assertEqual(eliminada.status_code, status.HTTP_409_CONFLICT)
+        self.assertTrue(Municipio.objects.filter(pk=self.municipio.pk).exists())
+
+        desactivada = self.client.patch(
+            reverse("ubicaciones-municipios-detalle", args=[self.municipio.pk]),
+            {"activo": False},
+            format="json",
+        )
+        self.assertEqual(desactivada.status_code, status.HTTP_200_OK)
+        self.assertFalse(desactivada.data["activo"])
+
+    def test_zonas_publicas_muestran_solo_sucursales_activas_agrupadas(self):
+        SucursalEmpresa.objects.create(
+            empresa=self.analiza,
+            municipio=self.municipio,
+            nombre="Sucursal Centro",
+            direccion="Centro",
+        )
+        SucursalEmpresa.objects.create(
+            empresa=self.analiza,
+            municipio=self.choloma,
+            nombre="Sucursal Cerrada",
+            direccion="Cortes",
+            estado=SucursalEmpresa.Estado.TEMPORALMENTE_CERRADA,
+        )
+
+        response = self.client.get(
+            reverse("empresas-sucursales-zonas"),
+            {"empresa_slug": "analiza"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["departamento"], "Francisco Morazan")
+        self.assertEqual(response.data[0]["total_sucursales"], 1)
+        self.assertEqual(
+            response.data[0]["municipios"][0]["municipio"],
+            "Distrito Central",
+        )
+
+    def test_sucursales_cerca_prioriza_municipio_y_departamento_del_usuario(self):
+        valle = Municipio.objects.create(
+            departamento=self.departamento,
+            codigo="0894",
+            nombre="Municipio Vecino Test",
+            orden=1022,
+        )
+        self.comprador.perfil.municipio = self.municipio
+        self.comprador.perfil.save(update_fields=["municipio", "fecha_actualizacion"])
+        SucursalEmpresa.objects.create(
+            empresa=self.analiza,
+            municipio=self.municipio,
+            nombre="Sucursal local",
+            direccion="Centro",
+        )
+        SucursalEmpresa.objects.create(
+            empresa=self.analiza,
+            municipio=valle,
+            nombre="Sucursal departamental",
+            direccion="Valle",
+        )
+
+        self.client.force_authenticate(self.comprador)
+        response = self.client.get(
+            reverse("empresas-sucursales-cerca"),
+            {"empresa_slug": "analiza"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["municipio_id"], self.municipio.pk)
+        self.assertEqual(
+            response.data["sucursales_municipio"][0]["nombre"],
+            "Sucursal local",
+        )
+        self.assertEqual(
+            response.data["sucursales_departamento"][0]["nombre"],
+            "Sucursal departamental",
+        )
+
     def test_admin_no_puede_crear_items_de_menu(self):
         self.client.force_authenticate(self.admin_empresa)
         response = self.client.post(
@@ -358,6 +652,7 @@ class ContenidoEmpresaAdministrativoAPITests(ContextoAdministrativoAPITests):
             {
                 "nombre": "Sucursal Norte",
                 "direccion": "Colonia Norte",
+                "municipio_id": self.municipio.pk,
                 "latitud": "14.083697123456789",
                 "longitud": "-87.206811987654321",
                 "activa": False,
@@ -381,3 +676,21 @@ class ContenidoEmpresaAdministrativoAPITests(ContextoAdministrativoAPITests):
         )
         self.assertEqual(actualizada.status_code, status.HTTP_200_OK)
         self.assertTrue(actualizada.data["activa"])
+
+    def test_delete_sucursal_la_marca_inactiva_sin_eliminarla(self):
+        sucursal = SucursalEmpresa.objects.create(
+            empresa=self.analiza,
+            municipio=self.municipio,
+            nombre="Sucursal historica",
+            direccion="Centro",
+        )
+
+        self.client.force_authenticate(self.admin_empresa)
+        response = self.client.delete(
+            reverse("empresas-sucursales-detalle", args=[sucursal.pk])
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        sucursal.refresh_from_db()
+        self.assertEqual(sucursal.estado, SucursalEmpresa.Estado.INACTIVA)
+        self.assertFalse(sucursal.activa)
