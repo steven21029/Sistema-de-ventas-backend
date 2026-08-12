@@ -462,6 +462,14 @@ class PagoEnSucursalAPITests(APITestCase):
         self.assertFalse(MovimientoInventario.objects.exists())
 
     def test_pago_en_linea_existente_conserva_su_flujo(self):
+        self.empresa.pago_en_linea_activo = True
+        self.empresa.pago_en_linea_proveedor = Empresa.ProveedorPagoEnLinea.SIMULADO
+        self.empresa.save(
+            update_fields=[
+                "pago_en_linea_activo",
+                "pago_en_linea_proveedor",
+            ]
+        )
         otro_pedido = self._crear_pedido(self.comprador)
         respuesta = self.client.post(
             reverse("pagos-iniciar"),
@@ -474,7 +482,7 @@ class PagoEnSucursalAPITests(APITestCase):
         pago = Pago.objects.get(pedido=otro_pedido)
         self.assertEqual(otro_pedido.metodo_pago, Pedido.MetodoPago.EN_LINEA)
         self.assertEqual(pago.metodo, Pago.Metodo.EN_LINEA)
-        self.assertEqual(pago.proveedor, "proveedor_prueba")
+        self.assertEqual(pago.proveedor, Empresa.ProveedorPagoEnLinea.SIMULADO)
         self.assertFalse(Prefactura.objects.filter(pedido=otro_pedido).exists())
 
     def test_admin_cancela_pedido_e_intento_pendiente_sin_tocar_inventario(self):

@@ -591,6 +591,7 @@ nombre
 direccion
 telefono
 horario
+horario_lineas
 google_maps_url
 imagen_final
 latitud
@@ -602,6 +603,8 @@ El frontend debe usar:
 
 - `imagen_final` para mostrar la imagen de la sucursal.
 - `google_maps_url` como enlace hacia Google Maps.
+- `horario_lineas` para pintar el horario en filas separadas. No mostrar el
+  campo `horario` como una sola linea larga en las cards publicas.
 
 Regla de imagen:
 
@@ -1000,6 +1003,11 @@ El frontend no debe enviar monto, moneda, empresa ni cliente. El backend los
 toma de la fotografia inmutable del pedido. Repetir la solicitud devuelve el
 mismo pago pendiente y no crea duplicados.
 
+Antes de mostrar el boton "Pago en linea", leer la empresa publica
+(`/api/empresas/actual/` o `/api/empresas/publica/`) y revisar
+`pago_en_linea_disponible`. Si es `false`, ocultar esa opcion y dejar solo los
+metodos disponibles, como pago en sucursal cuando aplique.
+
 Respuesta principal:
 
 ```json
@@ -1025,6 +1033,7 @@ GET /api/pagos/{referencia}/
 Reglas para el frontend:
 
 - Solo puede iniciar pagos del cliente autenticado.
+- Solo mostrar pago en linea cuando `pago_en_linea_disponible` sea `true`.
 - Un rechazo permite iniciar un intento nuevo.
 - Un pago aprobado marca el pedido como pagado mediante webhook.
 - El frontend nunca marca un pago ni un pedido como aprobado.
@@ -1032,6 +1041,18 @@ Reglas para el frontend:
 - `url_pago` se usara para redirigir cuando se conecte la pasarela real.
 - La configuracion `simulado` actual no cobra dinero real ni devuelve una URL.
 - No se envian ni almacenan numeros de tarjeta, CVV o credenciales bancarias.
+
+Ajustes de empresa:
+
+- Usar un checkbox para `pago_en_linea_activo`.
+- Mostrar selector de `pago_en_linea_proveedor`: `simulado`, `paypal`,
+  `stripe`, `bac` u `otro`.
+- Mostrar `pago_en_linea_modo`: `pruebas` o `produccion`.
+- Enviar credenciales con `pago_en_linea_credencial_publica`,
+  `pago_en_linea_credencial_secreta` y `pago_en_linea_webhook_secreto`.
+- No esperar que el backend devuelva las claves secretas; usar
+  `pago_en_linea_credencial_secreta_configurada` y
+  `pago_en_linea_webhook_secreto_configurado` para mostrar estado.
 
 ## 14. Favoritos implementados
 

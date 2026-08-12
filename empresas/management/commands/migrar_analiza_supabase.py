@@ -281,6 +281,36 @@ class Command(BaseCommand):
             "tiktok_url": source_company.tiktok_url,
             "tiene_envios": source_company.tiene_envios,
             "cobra_impuesto": source_company.cobra_impuesto,
+            "pago_en_linea_activo": getattr(
+                source_company,
+                "pago_en_linea_activo",
+                False,
+            ),
+            "pago_en_linea_proveedor": getattr(
+                source_company,
+                "pago_en_linea_proveedor",
+                "",
+            ),
+            "pago_en_linea_modo": getattr(
+                source_company,
+                "pago_en_linea_modo",
+                Empresa.ModoPagoEnLinea.PRUEBAS,
+            ),
+            "pago_en_linea_credencial_publica": getattr(
+                source_company,
+                "pago_en_linea_credencial_publica",
+                "",
+            ),
+            "pago_en_linea_credencial_secreta": getattr(
+                source_company,
+                "pago_en_linea_credencial_secreta",
+                "",
+            ),
+            "pago_en_linea_webhook_secreto": getattr(
+                source_company,
+                "pago_en_linea_webhook_secreto",
+                "",
+            ),
             "productos_con_imagen": source_company.productos_con_imagen,
             "modo_inventario": source_company.modo_inventario,
             "activa": source_company.activa,

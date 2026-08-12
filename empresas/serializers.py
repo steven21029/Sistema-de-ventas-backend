@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from .models import (
@@ -7,6 +8,14 @@ from .models import (
     SobreNosotrosEmpresa,
     SucursalEmpresa,
 )
+
+
+def dividir_horario_en_lineas(horario):
+    if not horario:
+        return []
+
+    partes = horario.replace("\r\n", "\n").replace("\r", "\n").replace(";", "\n")
+    return [linea.strip() for linea in partes.splitlines() if linea.strip()]
 
 
 class ItemMenuEmpresaSerializer(serializers.ModelSerializer):
@@ -147,6 +156,29 @@ class EmpresaSerializer(serializers.ModelSerializer):
         source="get_modo_inventario_display",
         read_only=True,
     )
+    pago_en_linea_proveedor_nombre = serializers.CharField(
+        source="get_pago_en_linea_proveedor_display",
+        read_only=True,
+    )
+    pago_en_linea_modo_nombre = serializers.CharField(
+        source="get_pago_en_linea_modo_display",
+        read_only=True,
+    )
+    pago_en_linea_disponible = serializers.BooleanField(read_only=True)
+    pago_en_linea_credencial_secreta = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=True,
+        trim_whitespace=True,
+    )
+    pago_en_linea_webhook_secreto = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=True,
+        trim_whitespace=True,
+    )
+    pago_en_linea_credencial_secreta_configurada = serializers.SerializerMethodField()
+    pago_en_linea_webhook_secreto_configurado = serializers.SerializerMethodField()
     permite_productos_fisicos = serializers.BooleanField(read_only=True)
     permite_servicios = serializers.BooleanField(read_only=True)
     imagen_sucursales_final = serializers.SerializerMethodField()
@@ -178,6 +210,17 @@ class EmpresaSerializer(serializers.ModelSerializer):
             "tiktok_url",
             "tiene_envios",
             "cobra_impuesto",
+            "pago_en_linea_activo",
+            "pago_en_linea_disponible",
+            "pago_en_linea_proveedor",
+            "pago_en_linea_proveedor_nombre",
+            "pago_en_linea_modo",
+            "pago_en_linea_modo_nombre",
+            "pago_en_linea_credencial_publica",
+            "pago_en_linea_credencial_secreta",
+            "pago_en_linea_credencial_secreta_configurada",
+            "pago_en_linea_webhook_secreto",
+            "pago_en_linea_webhook_secreto_configurado",
             "productos_con_imagen",
             "opciones_entrega_disponibles",
             "modo_inventario",
@@ -189,6 +232,12 @@ class EmpresaSerializer(serializers.ModelSerializer):
             "fecha_creacion",
             "fecha_actualizacion",
         ]
+
+    def get_pago_en_linea_credencial_secreta_configurada(self, obj):
+        return bool((obj.pago_en_linea_credencial_secreta or "").strip())
+
+    def get_pago_en_linea_webhook_secreto_configurado(self, obj):
+        return bool((obj.pago_en_linea_webhook_secreto or "").strip())
 
     def get_imagen_sucursales_final(self, obj):
         if obj.imagen_sucursales_url:
@@ -202,6 +251,37 @@ class EmpresaSerializer(serializers.ModelSerializer):
             return request.build_absolute_uri(obj.imagen_sucursales.url)
 
         return obj.imagen_sucursales.url
+
+    def validate(self, attrs):
+        valores = {}
+        for campo in [
+            "pago_en_linea_activo",
+            "pago_en_linea_proveedor",
+            "pago_en_linea_credencial_publica",
+            "pago_en_linea_credencial_secreta",
+            "pago_en_linea_webhook_secreto",
+        ]:
+            if campo in attrs:
+                valores[campo] = attrs[campo]
+            elif self.instance:
+                valores[campo] = getattr(self.instance, campo)
+            else:
+                valores[campo] = Empresa._meta.get_field(campo).get_default()
+
+        try:
+            Empresa.validar_configuracion_pago_en_linea(
+                activo=valores["pago_en_linea_activo"],
+                proveedor=valores["pago_en_linea_proveedor"],
+                credencial_publica=valores["pago_en_linea_credencial_publica"],
+                credencial_secreta=valores["pago_en_linea_credencial_secreta"],
+                webhook_secreto=valores["pago_en_linea_webhook_secreto"],
+            )
+        except DjangoValidationError as exc:
+            if hasattr(exc, "message_dict"):
+                raise serializers.ValidationError(exc.message_dict) from exc
+            raise serializers.ValidationError(exc.messages) from exc
+
+        return attrs
 
 
 class EmpresaMiEmpresaSerializer(EmpresaSerializer):
@@ -231,6 +311,17 @@ class EmpresaMiEmpresaSerializer(EmpresaSerializer):
             "tiktok_url",
             "tiene_envios",
             "cobra_impuesto",
+            "pago_en_linea_activo",
+            "pago_en_linea_disponible",
+            "pago_en_linea_proveedor",
+            "pago_en_linea_proveedor_nombre",
+            "pago_en_linea_modo",
+            "pago_en_linea_modo_nombre",
+            "pago_en_linea_credencial_publica",
+            "pago_en_linea_credencial_secreta",
+            "pago_en_linea_credencial_secreta_configurada",
+            "pago_en_linea_webhook_secreto",
+            "pago_en_linea_webhook_secreto_configurado",
             "productos_con_imagen",
             "opciones_entrega_disponibles",
             "modo_inventario",
@@ -247,6 +338,11 @@ class EmpresaMiEmpresaSerializer(EmpresaSerializer):
             "subdominio",
             "dominio_personalizado",
             "imagen_sucursales_final",
+            "pago_en_linea_disponible",
+            "pago_en_linea_proveedor_nombre",
+            "pago_en_linea_modo_nombre",
+            "pago_en_linea_credencial_secreta_configurada",
+            "pago_en_linea_webhook_secreto_configurado",
             "opciones_entrega_disponibles",
             "modo_inventario",
             "modo_inventario_nombre",
@@ -264,6 +360,7 @@ class EmpresaPublicaSerializer(serializers.ModelSerializer):
         source="get_modo_inventario_display",
         read_only=True,
     )
+    pago_en_linea_disponible = serializers.BooleanField(read_only=True)
     permite_productos_fisicos = serializers.BooleanField(read_only=True)
     permite_servicios = serializers.BooleanField(read_only=True)
     menu = serializers.SerializerMethodField()
@@ -292,6 +389,8 @@ class EmpresaPublicaSerializer(serializers.ModelSerializer):
             "redes_sociales",
             "tiene_envios",
             "cobra_impuesto",
+            "pago_en_linea_disponible",
+            "pago_en_linea_proveedor",
             "productos_con_imagen",
             "opciones_entrega_disponibles",
             "modo_inventario",
@@ -344,6 +443,7 @@ class EmpresaPublicaSerializer(serializers.ModelSerializer):
 
 class SucursalEmpresaPublicaSerializer(serializers.ModelSerializer):
     imagen_final = serializers.SerializerMethodField()
+    horario_lineas = serializers.SerializerMethodField()
 
     class Meta:
         model = SucursalEmpresa
@@ -354,6 +454,7 @@ class SucursalEmpresaPublicaSerializer(serializers.ModelSerializer):
             "direccion",
             "telefono",
             "horario",
+            "horario_lineas",
             "google_maps_url",
             "imagen_final",
             "latitud",
@@ -375,10 +476,14 @@ class SucursalEmpresaPublicaSerializer(serializers.ModelSerializer):
 
         return None
 
+    def get_horario_lineas(self, obj):
+        return dividir_horario_en_lineas(obj.horario)
+
 
 class SucursalEmpresaAdminSerializer(serializers.ModelSerializer):
     empresa = serializers.PrimaryKeyRelatedField(read_only=True)
     imagen_final = serializers.SerializerMethodField()
+    horario_lineas = serializers.SerializerMethodField()
     orden = serializers.IntegerField(min_value=1, required=False)
 
     class Meta:
@@ -391,6 +496,7 @@ class SucursalEmpresaAdminSerializer(serializers.ModelSerializer):
             "direccion",
             "telefono",
             "horario",
+            "horario_lineas",
             "google_maps_url",
             "imagen",
             "imagen_url",
@@ -421,3 +527,6 @@ class SucursalEmpresaAdminSerializer(serializers.ModelSerializer):
         if request:
             return request.build_absolute_uri(obj.imagen_final)
         return obj.imagen_final
+
+    def get_horario_lineas(self, obj):
+        return dividir_horario_en_lineas(obj.horario)

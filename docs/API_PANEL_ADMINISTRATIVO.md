@@ -117,9 +117,9 @@ la lista anterior salvo que se envie `paginar=true`.
 
 `mi-empresa` permite cambiar nombre, logo, imagen general de sucursales,
 colores, telefono, correo, direccion, sitio web, redes sociales, envios,
-impuesto e imagenes de productos. `slug`, dominio, subdominio, modo de
-inventario y estado activo son de solo lectura en esta ruta y los controla el
-superusuario.
+impuesto, pago en linea e imagenes de productos. `slug`, dominio, subdominio,
+modo de inventario y estado activo son de solo lectura en esta ruta y los
+controla el superusuario.
 
 Campos editables de redes sociales:
 
@@ -134,6 +134,28 @@ Campos editables de redes sociales:
 
 Todos son opcionales, deben usar HTTPS y pertenecer al dominio oficial de la
 red correspondiente. No existen endpoints separados para redes sociales.
+
+Campos de pago en linea en `mi-empresa`:
+
+```json
+{
+  "pago_en_linea_activo": true,
+  "pago_en_linea_proveedor": "paypal",
+  "pago_en_linea_modo": "pruebas",
+  "pago_en_linea_credencial_publica": "CLIENT_ID_O_MERCHANT_ID",
+  "pago_en_linea_credencial_secreta": "SECRETO_PRIVADO",
+  "pago_en_linea_webhook_secreto": "SECRETO_WEBHOOK"
+}
+```
+
+`pago_en_linea_credencial_secreta` y `pago_en_linea_webhook_secreto` son
+campos de escritura: el backend los acepta pero nunca los devuelve. La respuesta
+usa `pago_en_linea_credencial_secreta_configurada`,
+`pago_en_linea_webhook_secreto_configurado` y `pago_en_linea_disponible`.
+
+Para `simulado`, no hacen falta credenciales. Para proveedores reales, activar
+`pago_en_linea_activo` exige proveedor, credencial publica, credencial secreta
+y secreto de webhook. Si falta algo, el backend responde `400`.
 
 Item de menu:
 
@@ -166,6 +188,11 @@ sucursales         /sucursales
 contacto           /contacto
 sobre_nosotros     /sobre-nosotros
 ```
+
+Sucursales devuelve `horario` por compatibilidad y `horario_lineas` como un
+arreglo listo para renderizar en el frontend. En las cards publicas usar
+`horario_lineas` para mostrar lunes a viernes, sabado y domingo en filas
+separadas.
 
 Contenido publico de Sobre nosotros:
 
@@ -302,6 +329,10 @@ Pedidos y pagos son fotografias historicas de solo lectura. Sus estados de
 pago solo cambian mediante el flujo controlado y webhook firmado. El backend
 ya evita dos pagos pendientes para el mismo pedido y procesa webhooks de forma
 idempotente.
+
+`POST /api/pagos/iniciar/` solo funciona cuando la empresa del pedido tiene
+`pago_en_linea_disponible=true`. Si la empresa desactiva pago en linea o falta
+configuracion, la API devuelve `400` con la clave `pago_en_linea`.
 
 ## 10. Imagenes
 

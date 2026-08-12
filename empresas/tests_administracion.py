@@ -115,6 +115,50 @@ class ContextoAdministrativoAPITests(APITestCase):
         )
         self.assertEqual(self.analiza.whatsapp_url, "https://wa.me/50499999999")
 
+    def test_administrador_configura_pago_en_linea_sin_exponer_secretos(self):
+        self.client.force_authenticate(self.admin_empresa)
+        response = self.client.patch(
+            reverse("empresas-mi-empresa"),
+            {
+                "pago_en_linea_activo": True,
+                "pago_en_linea_proveedor": "paypal",
+                "pago_en_linea_modo": "pruebas",
+                "pago_en_linea_credencial_publica": "cliente-paypal",
+                "pago_en_linea_credencial_secreta": "secreto-paypal",
+                "pago_en_linea_webhook_secreto": "webhook-paypal",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.analiza.refresh_from_db()
+        self.assertTrue(self.analiza.pago_en_linea_disponible)
+        self.assertEqual(self.analiza.pago_en_linea_proveedor, "paypal")
+        self.assertEqual(
+            response.data["pago_en_linea_credencial_publica"],
+            "cliente-paypal",
+        )
+        self.assertTrue(response.data["pago_en_linea_credencial_secreta_configurada"])
+        self.assertTrue(response.data["pago_en_linea_webhook_secreto_configurado"])
+        self.assertNotIn("pago_en_linea_credencial_secreta", response.data)
+        self.assertNotIn("pago_en_linea_webhook_secreto", response.data)
+
+    def test_pago_en_linea_activo_exige_configuracion_completa(self):
+        self.client.force_authenticate(self.admin_empresa)
+        response = self.client.patch(
+            reverse("empresas-mi-empresa"),
+            {
+                "pago_en_linea_activo": True,
+                "pago_en_linea_proveedor": "paypal",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("pago_en_linea_credencial_publica", response.data)
+        self.assertIn("pago_en_linea_credencial_secreta", response.data)
+        self.assertIn("pago_en_linea_webhook_secreto", response.data)
+
     def test_red_social_rechaza_dominio_incorrecto(self):
         self.client.force_authenticate(self.admin_empresa)
         response = self.client.patch(

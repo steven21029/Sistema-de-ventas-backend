@@ -52,6 +52,8 @@ class EmpresaAdmin(admin.ModelAdmin):
         "modo_inventario",
         "tiene_envios",
         "cobra_impuesto",
+        "pago_en_linea_activo",
+        "pago_en_linea_proveedor",
         "productos_con_imagen",
         "activa",
         "fecha_creacion",
@@ -60,6 +62,9 @@ class EmpresaAdmin(admin.ModelAdmin):
         "modo_inventario",
         "tiene_envios",
         "cobra_impuesto",
+        "pago_en_linea_activo",
+        "pago_en_linea_proveedor",
+        "pago_en_linea_modo",
         "productos_con_imagen",
         "activa",
         "fecha_creacion",
@@ -140,6 +145,19 @@ class EmpresaAdmin(admin.ModelAdmin):
                     "tiene_envios",
                     "cobra_impuesto",
                     "productos_con_imagen",
+                )
+            },
+        ),
+        (
+            "Pagos en linea",
+            {
+                "fields": (
+                    "pago_en_linea_activo",
+                    "pago_en_linea_proveedor",
+                    "pago_en_linea_modo",
+                    "pago_en_linea_credencial_publica",
+                    "pago_en_linea_credencial_secreta",
+                    "pago_en_linea_webhook_secreto",
                 )
             },
         ),

@@ -27,6 +27,7 @@ class EmpresaActualAPITests(APITestCase):
         self.assertEqual(response.data["slug"], self.empresa.slug)
         self.assertEqual(response.data["subdominio"], "analiza")
         self.assertEqual(len(response.data["menu"]), 8)
+        self.assertFalse(response.data["pago_en_linea_disponible"])
 
     def test_resuelve_empresa_por_dominio_personalizado(self):
         response = self.client.get(
@@ -160,7 +161,11 @@ class EmpresaActualAPITests(APITestCase):
             ciudad="Tegucigalpa",
             direccion="Centro comercial",
             telefono="22222222",
-            horario="Lunes a viernes",
+            horario=(
+                "Lunes a viernes: 6:30am-5:00pm; "
+                "Sabado: 6:30am-1:00pm; "
+                "Domingo: Cerrado"
+            ),
             google_maps_url="https://maps.google.com/example",
             imagen_url="https://example.com/sucursal-centro.jpg",
         )
@@ -183,6 +188,14 @@ class EmpresaActualAPITests(APITestCase):
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]["nombre"], "Sucursal Centro")
         self.assertEqual(response.data[0]["ciudad"], "Tegucigalpa")
+        self.assertEqual(
+            response.data[0]["horario_lineas"],
+            [
+                "Lunes a viernes: 6:30am-5:00pm",
+                "Sabado: 6:30am-1:00pm",
+                "Domingo: Cerrado",
+            ],
+        )
         self.assertIsNone(response.data[0]["imagen_final"])
         self.assertNotIn("imagen_url", response.data[0])
         self.assertEqual(

@@ -85,6 +85,17 @@ class Empresa(models.Model):
         SIN_INVENTARIO = "sin_inventario", "Sin inventario (servicios)"
         MIXTO = "mixto", "Mixto"
 
+    class ProveedorPagoEnLinea(models.TextChoices):
+        SIMULADO = "simulado", "Simulado"
+        PAYPAL = "paypal", "PayPal"
+        STRIPE = "stripe", "Stripe"
+        BAC = "bac", "BAC Credomatic"
+        OTRO = "otro", "Otro proveedor"
+
+    class ModoPagoEnLinea(models.TextChoices):
+        PRUEBAS = "pruebas", "Pruebas"
+        PRODUCCION = "produccion", "Produccion"
+
     nombre = models.CharField(max_length=150, unique=True)
     slug = models.SlugField(max_length=170, unique=True, blank=True)
     subdominio = models.CharField(
@@ -175,6 +186,41 @@ class Empresa(models.Model):
         default=True,
         help_text="Si esta activo, las ventas calcularan el 15% de ISV.",
     )
+    pago_en_linea_activo = models.BooleanField(
+        default=False,
+        help_text="Si esta activo, el checkout puede ofrecer pago en linea.",
+    )
+    pago_en_linea_proveedor = models.CharField(
+        max_length=50,
+        choices=ProveedorPagoEnLinea.choices,
+        blank=True,
+        default="",
+        help_text="Proveedor que procesara los cobros en linea de esta empresa.",
+    )
+    pago_en_linea_modo = models.CharField(
+        max_length=20,
+        choices=ModoPagoEnLinea.choices,
+        default=ModoPagoEnLinea.PRUEBAS,
+        help_text="Modo de operacion del proveedor de pago en linea.",
+    )
+    pago_en_linea_credencial_publica = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Clave publica, merchant ID o identificador visible del proveedor.",
+    )
+    pago_en_linea_credencial_secreta = models.CharField(
+        max_length=500,
+        blank=True,
+        default="",
+        help_text="Clave secreta o token privado del proveedor. No se expone por API.",
+    )
+    pago_en_linea_webhook_secreto = models.CharField(
+        max_length=500,
+        blank=True,
+        default="",
+        help_text="Secreto usado para validar webhooks del proveedor.",
+    )
     productos_con_imagen = models.BooleanField(
         default=True,
         help_text=(
@@ -240,10 +286,42 @@ class Empresa(models.Model):
 
         return None
 
+    @property
+    def credenciales_pago_en_linea_configuradas(self):
+        proveedor = (self.pago_en_linea_proveedor or "").strip()
+        if not proveedor:
+            return False
+
+        if proveedor == self.ProveedorPagoEnLinea.SIMULADO:
+            return True
+
+        return all(
+            [
+                (self.pago_en_linea_credencial_publica or "").strip(),
+                (self.pago_en_linea_credencial_secreta or "").strip(),
+                (self.pago_en_linea_webhook_secreto or "").strip(),
+            ]
+        )
+
+    @property
+    def pago_en_linea_disponible(self):
+        return (
+            self.pago_en_linea_activo
+            and self.credenciales_pago_en_linea_configuradas
+        )
+
     def clean(self):
         super().clean()
         self._normalizar_dominios()
+        self._normalizar_pago_en_linea()
         self._validar_cambio_modo_inventario()
+        self.validar_configuracion_pago_en_linea(
+            activo=self.pago_en_linea_activo,
+            proveedor=self.pago_en_linea_proveedor,
+            credencial_publica=self.pago_en_linea_credencial_publica,
+            credencial_secreta=self.pago_en_linea_credencial_secreta,
+            webhook_secreto=self.pago_en_linea_webhook_secreto,
+        )
 
         if self.subdominio in SUBDOMINIOS_RESERVADOS:
             raise ValidationError(
@@ -253,6 +331,7 @@ class Empresa(models.Model):
     def save(self, *args, **kwargs):
         es_nueva = self.pk is None
         self._normalizar_dominios()
+        self._normalizar_pago_en_linea()
         self._validar_cambio_modo_inventario()
         if not self.slug:
             self.slug = self._generar_slug_unico()
@@ -322,6 +401,62 @@ class Empresa(models.Model):
         self.dominio_personalizado = (
             self.normalizar_host(self.dominio_personalizado) or None
         )
+
+    def _normalizar_pago_en_linea(self):
+        self.pago_en_linea_proveedor = (
+            self.pago_en_linea_proveedor or ""
+        ).strip().lower()
+        self.pago_en_linea_modo = (
+            self.pago_en_linea_modo or self.ModoPagoEnLinea.PRUEBAS
+        ).strip().lower()
+        for campo in [
+            "pago_en_linea_credencial_publica",
+            "pago_en_linea_credencial_secreta",
+            "pago_en_linea_webhook_secreto",
+        ]:
+            setattr(self, campo, (getattr(self, campo) or "").strip())
+
+    @classmethod
+    def validar_configuracion_pago_en_linea(
+        cls,
+        *,
+        activo,
+        proveedor,
+        credencial_publica,
+        credencial_secreta,
+        webhook_secreto,
+    ):
+        proveedor = (proveedor or "").strip()
+        if not activo:
+            return
+
+        if not proveedor:
+            raise ValidationError(
+                {
+                    "pago_en_linea_proveedor": (
+                        "Selecciona un proveedor para activar pago en linea."
+                    )
+                }
+            )
+
+        if proveedor == cls.ProveedorPagoEnLinea.SIMULADO:
+            return
+
+        errores = {}
+        if not (credencial_publica or "").strip():
+            errores["pago_en_linea_credencial_publica"] = (
+                "Agrega la credencial publica del proveedor."
+            )
+        if not (credencial_secreta or "").strip():
+            errores["pago_en_linea_credencial_secreta"] = (
+                "Agrega la credencial secreta del proveedor."
+            )
+        if not (webhook_secreto or "").strip():
+            errores["pago_en_linea_webhook_secreto"] = (
+                "Agrega el secreto de webhook del proveedor."
+            )
+        if errores:
+            raise ValidationError(errores)
 
     def _validar_cambio_modo_inventario(self):
         if not self.pk:

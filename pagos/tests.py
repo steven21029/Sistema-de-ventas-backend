@@ -29,6 +29,8 @@ class PagosAPITests(APITestCase):
             nombre="Empresa pagos",
             slug="empresa-pagos",
             modo_inventario=Empresa.ModoInventario.MIXTO,
+            pago_en_linea_activo=True,
+            pago_en_linea_proveedor=Empresa.ProveedorPagoEnLinea.SIMULADO,
         )
         familia = Familia.objects.create(
             empresa=self.empresa,
@@ -100,7 +102,7 @@ class PagosAPITests(APITestCase):
         return self.client.post(
             reverse(
                 "pagos-webhook",
-                kwargs={"proveedor": "proveedor_prueba"},
+                kwargs={"proveedor": self.empresa.pago_en_linea_proveedor},
             ),
             data=cuerpo,
             content_type="application/json",
@@ -126,6 +128,16 @@ class PagosAPITests(APITestCase):
         self.assertEqual(primera.data["monto"], f"{self.pedido.total:.2f}")
         self.assertEqual(primera.data["moneda"], self.pedido.moneda)
         self.assertEqual(Pago.objects.filter(pedido=self.pedido).count(), 1)
+
+    def test_inicio_rechaza_empresa_sin_pago_en_linea(self):
+        self.empresa.pago_en_linea_activo = False
+        self.empresa.save(update_fields=["pago_en_linea_activo"])
+
+        respuesta = self._iniciar_pago()
+
+        self.assertEqual(respuesta.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("pago_en_linea", respuesta.data)
+        self.assertFalse(Pago.objects.exists())
 
     def test_webhook_con_firma_invalida_no_modifica_el_pago(self):
         pago = Pago.objects.get(referencia=self._iniciar_pago().data["referencia"])

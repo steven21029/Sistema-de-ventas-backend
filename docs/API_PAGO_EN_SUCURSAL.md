@@ -17,6 +17,9 @@ gerente de la empresa del pago.
 
 ## Pago en linea existente
 
+El checkout debe mostrar esta opcion solo si la empresa publica devuelve
+`pago_en_linea_disponible=true`.
+
 ```http
 POST /api/v1/pagos/iniciar/
 Content-Type: application/json
@@ -27,7 +30,9 @@ Content-Type: application/json
 ```
 
 La ruta, el cuerpo y la integracion actual se conservan. Los nuevos intentos
-quedan identificados con `metodo="en_linea"`.
+quedan identificados con `metodo="en_linea"`. Si la empresa no tiene pago en
+linea activo o le faltan credenciales, la API responde `400` con la clave
+`pago_en_linea`.
 
 ## Iniciar pago en sucursal
 

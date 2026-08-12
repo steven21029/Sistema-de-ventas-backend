@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import json
 
 from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -107,9 +108,7 @@ class PagoViewSet(
         entrada = IniciarPagoSerializer(data=request.data)
         entrada.is_valid(raise_exception=True)
         pedido = self._obtener_pedido_pagable(entrada.validated_data["pedido_id"])
-        proveedor = settings.PAGOS_PROVEEDOR_DEFAULT.strip()
-        if not proveedor:
-            raise APIException("No hay un proveedor de pagos configurado.")
+        proveedor = self._obtener_proveedor_pago_en_linea(pedido)
 
         try:
             with transaction.atomic():
@@ -128,6 +127,34 @@ class PagoViewSet(
             salida.data,
             status=status.HTTP_201_CREATED if creado else status.HTTP_200_OK,
         )
+
+    def _obtener_proveedor_pago_en_linea(self, pedido):
+        empresa = pedido.empresa
+        if not empresa.pago_en_linea_activo:
+            raise ValidationError(
+                {
+                    "pago_en_linea": (
+                        "Esta empresa no tiene activo el pago en linea."
+                    )
+                }
+            )
+
+        if not empresa.pago_en_linea_disponible:
+            raise ValidationError(
+                {
+                    "pago_en_linea": (
+                        "Configura el proveedor y las credenciales de pago en linea "
+                        "antes de cobrar."
+                    )
+                }
+            )
+
+        proveedor = (empresa.pago_en_linea_proveedor or "").strip()
+        if not proveedor:
+            proveedor = settings.PAGOS_PROVEEDOR_DEFAULT.strip()
+        if not proveedor:
+            raise APIException("No hay un proveedor de pagos configurado.")
+        return proveedor
 
     @decorators.action(
         detail=True,
@@ -197,7 +224,12 @@ class WebhookPagoView(APIView):
 
     def post(self, request, proveedor):
         payload_crudo = request.body
-        self._validar_firma(payload_crudo, request.headers.get("X-Pago-Signature", ""))
+        secreto = self._resolver_secreto_webhook(proveedor, payload_crudo)
+        self._validar_firma(
+            payload_crudo,
+            request.headers.get("X-Pago-Signature", ""),
+            secreto,
+        )
 
         entrada = WebhookPagoSerializer(data=request.data)
         entrada.is_valid(raise_exception=True)
@@ -268,8 +300,28 @@ class WebhookPagoView(APIView):
             status=status.HTTP_200_OK,
         )
 
-    def _validar_firma(self, payload, firma_recibida):
-        secreto = settings.PAGOS_WEBHOOK_SECRET
+    def _resolver_secreto_webhook(self, proveedor, payload):
+        secreto_global = settings.PAGOS_WEBHOOK_SECRET
+        try:
+            datos = json.loads(payload.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return secreto_global
+
+        referencia = datos.get("referencia")
+        if not referencia:
+            return secreto_global
+
+        pago = (
+            Pago.objects.select_related("empresa")
+            .filter(referencia=referencia, proveedor=proveedor)
+            .first()
+        )
+        if not pago:
+            return secreto_global
+
+        return pago.empresa.pago_en_linea_webhook_secreto or secreto_global
+
+    def _validar_firma(self, payload, firma_recibida, secreto):
         if not secreto:
             error = APIException("El secreto de webhooks de pagos no esta configurado.")
             error.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
