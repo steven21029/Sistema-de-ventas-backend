@@ -1777,6 +1777,19 @@ Ajuste posterior:
   cada producto o examen de la familia seleccionada, incluidos los que no
   tuvieron ventas, con sus pedidos, unidades e ingresos directos.
 
+## 2026-08-13 - Directorio oficial de sucursales Analiza
+
+Estado: implementado.
+
+- Se incorporo el comando idempotente `importar_sucursales_analiza` a partir
+  del documento `docs/Sucursales con toda la info actual (1).pdf`.
+- El directorio contiene 33 sucursales con municipio oficial, direccion,
+  telefono, horario, estado y orden.
+- `Centro` se actualiza como `Centro Tegucigalpa` y `Nova Oriente` como
+  `Plaza Nova`, conservando mapas, coordenadas e imagenes ya registradas.
+- El comando acepta `--dry-run` y puede ejecutarse varias veces sin crear
+  duplicados.
+
 Verificacion:
 
 - Las 22 pruebas del modulo de reportes aprobaron contra SQLite temporal.
@@ -1785,3 +1798,30 @@ Verificacion:
   `/api/` y `/api/v1/`.
 - `makemigrations --check --dry-run`, compilacion y la prueba publica de
   sucursales finalizaron correctamente.
+
+## 2026-08-13 - Vencimiento de prefacturas a las 72 horas
+
+Estado: implementado y verificado.
+
+- Las prefacturas para pago en sucursal vencen 72 horas despues de su emision.
+- Al vencer, pedido e intentos pendientes pasan a `rechazado` con el codigo
+  `PREFACTURA_VENCIDA`, sin descontar ni modificar inventario.
+- La confirmacion administrativa valida y confirma dentro de una sola
+  transaccion para evitar aprobaciones posteriores al vencimiento.
+- Los listados de pedidos y pagos, los reportes y las acciones de prefactura
+  procesan vencimientos antes de responder.
+- El PDF vencido se conserva como historial, pero el correo y la confirmacion
+  quedan bloqueados con respuesta `400`.
+- La respuesta expone fecha de vencimiento, vigencia y mensaje oficial para el
+  frontend. El correo y el PDF incluyen la misma advertencia formal.
+- Se agrego el comando idempotente `vencer_prefacturas_sucursal` para su
+  ejecucion periodica en produccion.
+- La migracion `pedidos.0017` amplia a 72 horas los pendientes existentes y
+  rechaza los que ya superaron ese plazo sin tener pagos aprobados.
+
+Verificacion:
+
+- Las 25 pruebas del flujo de pago en sucursal aprobaron con SQLite temporal.
+- Las 23 pruebas de reportes aprobaron y se agrego cobertura de exclusion de
+  prefacturas vencidas en los pendientes.
+- `manage.py check` y `makemigrations --check --dry-run` no reportaron errores.

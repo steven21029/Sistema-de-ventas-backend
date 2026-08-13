@@ -1,12 +1,15 @@
 import re
+from datetime import timedelta
 from decimal import Decimal
 from io import BytesIO
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core import mail
+from django.core.management import call_command
 from django.test import override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -28,7 +31,7 @@ User = get_user_model()
     EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
     PAGOS_PROVEEDOR_DEFAULT="proveedor_prueba",
     PREFACTURA_MAX_INTENTOS_CORREO=3,
-    PREFACTURA_VIGENCIA_HORAS=48,
+    PREFACTURA_VIGENCIA_HORAS=72,
 )
 class PagoEnSucursalAPITests(APITestCase):
     def setUp(self):
@@ -167,6 +170,12 @@ class PagoEnSucursalAPITests(APITestCase):
         self.assertEqual(respuesta.data["pedido"]["metodo_pago"], "sucursal")
         self.assertEqual(respuesta.data["pago"]["metodo"], "sucursal")
         self.assertTrue(respuesta.data["prefactura"]["correo_enviado"])
+        self.assertEqual(respuesta.data["prefactura"]["vigencia_horas"], 72)
+        self.assertTrue(respuesta.data["prefactura"]["vigente"])
+        self.assertIn("72 horas", respuesta.data["prefactura"]["mensaje_vigencia"])
+        vigencia = prefactura.fecha_vencimiento - prefactura.fecha_creacion
+        self.assertGreater(vigencia, timedelta(hours=71, minutes=59))
+        self.assertLessEqual(vigencia, timedelta(hours=72))
         self.assertEqual(
             respuesta.data["prefactura"]["url_pdf"],
             f"/api/v1/pedidos/pedidos/{self.pedido.pk}/prefactura/pdf/",
@@ -201,6 +210,74 @@ class PagoEnSucursalAPITests(APITestCase):
         self.assertEqual(Prefactura.objects.filter(pedido=self.pedido).count(), 1)
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(Prefactura.objects.get(pedido=self.pedido).intentos_correo, 1)
+
+    def test_vencimiento_rechaza_pedido_y_pago_sin_tocar_inventario(self):
+        self._pago_sucursal()
+        Prefactura.objects.filter(pedido=self.pedido).update(
+            fecha_vencimiento=timezone.now() - timedelta(seconds=1)
+        )
+
+        call_command("vencer_prefacturas_sucursal")
+        call_command("vencer_prefacturas_sucursal")
+
+        self.pedido.refresh_from_db()
+        self.producto.refresh_from_db()
+        pago = Pago.objects.get(pedido=self.pedido)
+        self.assertEqual(self.pedido.estado_pago, Pedido.EstadoPago.RECHAZADO)
+        self.assertEqual(pago.estado, Pago.Estado.RECHAZADO)
+        self.assertEqual(pago.codigo_respuesta, "PREFACTURA_VENCIDA")
+        self.assertIsNotNone(pago.fecha_confirmacion)
+        self.assertFalse(self.pedido.inventario_descontado)
+        self.assertEqual(self.producto.existencia, 5)
+        self.assertFalse(MovimientoInventario.objects.exists())
+        self.assertEqual(Pago.objects.filter(pedido=self.pedido).count(), 1)
+
+    def test_prefactura_vencida_no_se_puede_confirmar_ni_reenviar(self):
+        creada = self._pago_sucursal()
+        Prefactura.objects.filter(pedido=self.pedido).update(
+            fecha_vencimiento=timezone.now() - timedelta(seconds=1)
+        )
+
+        reenvio = self.client.post(
+            reverse(
+                "pedidos-pedidos-reenviar-correo-prefactura",
+                args=[self.pedido.pk],
+            )
+        )
+        self.client.force_authenticate(self.admin)
+        confirmacion = self.client.post(
+            reverse(
+                "pagos-confirmar-en-sucursal",
+                args=[creada.data["pago"]["referencia"]],
+            )
+        )
+
+        self.assertEqual(reenvio.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("prefactura", reenvio.data)
+        self.assertEqual(confirmacion.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("prefactura", confirmacion.data)
+        self.assertEqual(len(mail.outbox), 1)
+        self.pedido.refresh_from_db()
+        pago = Pago.objects.get(pedido=self.pedido)
+        self.assertEqual(self.pedido.estado_pago, Pedido.EstadoPago.RECHAZADO)
+        self.assertEqual(pago.estado, Pago.Estado.RECHAZADO)
+        self.assertFalse(self.pedido.inventario_descontado)
+
+    def test_pdf_vencido_se_conserva_como_historial_rechazado(self):
+        self._pago_sucursal()
+        Prefactura.objects.filter(pedido=self.pedido).update(
+            fecha_vencimiento=timezone.now() - timedelta(seconds=1)
+        )
+
+        respuesta = self.client.get(
+            reverse("pedidos-pedidos-prefactura-pdf", args=[self.pedido.pk])
+        )
+
+        self.assertEqual(respuesta.status_code, status.HTTP_200_OK)
+        self.assertIn(b"Rechazado por vencimiento", respuesta.content)
+        self.assertIn(b"72 horas", respuesta.content)
+        self.pedido.refresh_from_db()
+        self.assertEqual(self.pedido.estado_pago, Pedido.EstadoPago.RECHAZADO)
 
     def test_rechaza_sucursal_inactiva_o_de_otra_empresa(self):
         inactiva = self._pago_sucursal(sucursal=self.sucursal_inactiva)

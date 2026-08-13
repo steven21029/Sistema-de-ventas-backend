@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 import re
 from decimal import Decimal
 from io import BytesIO
@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+from django.utils import timezone
 from openpyxl import load_workbook
 from PIL import Image as PILImage
 from rest_framework import status
@@ -15,7 +16,7 @@ from rest_framework.test import APITestCase
 from catalogo.models import Categoria, Familia, Producto
 from empresas.models import Empresa, SucursalEmpresa
 from pagos.models import Pago
-from pedidos.models import DetallePedido, Pedido
+from pedidos.models import DetallePedido, Pedido, Prefactura
 from usuarios.models import PerfilUsuario
 
 
@@ -503,6 +504,48 @@ class ReportesVentasAPITests(APITestCase):
                 "sin_metodo": {"cantidad": 2, "monto": "80.50"},
             },
         )
+
+    def test_reporte_vence_prefactura_y_la_excluye_de_pendientes(self):
+        pendiente_sucursal = self._crear_pedido(
+            self.analiza,
+            self.comprador,
+            datetime(2026, 8, 11, 10, 0, tzinfo=ZONA_HONDURAS),
+            total="70.00",
+        )
+        pendiente_sucursal.seleccionar_metodo_pago(
+            Pedido.MetodoPago.SUCURSAL,
+            sucursal=self.sucursal_centro,
+        )
+        pago = Pago.objects.create(
+            pedido=pendiente_sucursal,
+            proveedor="sucursal",
+            metodo=Pago.Metodo.SUCURSAL,
+        )
+        prefactura = Prefactura.obtener_o_crear_para_pedido(pendiente_sucursal)
+        Prefactura.objects.filter(pk=prefactura.pk).update(
+            fecha_vencimiento=timezone.now() - timedelta(seconds=1)
+        )
+
+        self.client.force_authenticate(self.admin)
+        respuesta = self.client.get(
+            reverse("reportes-resumen-ventas"),
+            self._parametros_resumen(),
+        )
+
+        self.assertEqual(respuesta.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            respuesta.data["resumen"]["pendientes_por_metodo"]["sucursal"],
+            {"cantidad": 0, "monto": "0.00"},
+        )
+        estados = {item["estado"]: item for item in respuesta.data["estados"]}
+        self.assertEqual(estados["rechazado"]["cantidad"], 2)
+        pendiente_sucursal.refresh_from_db()
+        pago.refresh_from_db()
+        self.assertEqual(
+            pendiente_sucursal.estado_pago,
+            Pedido.EstadoPago.RECHAZADO,
+        )
+        self.assertEqual(pago.estado, Pago.Estado.RECHAZADO)
 
     def test_desglosa_pagados_pendientes_rechazados_y_cancelados(self):
         self.client.force_authenticate(self.admin)

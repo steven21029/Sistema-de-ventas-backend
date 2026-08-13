@@ -37,6 +37,10 @@ class ErrorEnvioCorreoPrefactura(Exception):
     pass
 
 
+class PrefacturaVencida(Exception):
+    pass
+
+
 def correo_comprador_verificado(pedido):
     perfil = getattr(pedido.usuario, "perfil", None)
     correo = pedido.usuario.email.strip()
@@ -370,12 +374,18 @@ def generar_pdf_prefactura(prefactura):
     telefono_comprador = (
         (perfil.telefono if perfil else "") or pedido.telefono_recibe
     )
-    estado = (
-        "Pendiente de pago en sucursal"
-        if pedido.estado_pago == Pedido.EstadoPago.PENDIENTE
+    if (
+        pedido.estado_pago == Pedido.EstadoPago.RECHAZADO
         and pedido.metodo_pago == Pedido.MetodoPago.SUCURSAL
-        else pedido.get_estado_pago_display()
-    )
+    ):
+        estado = "Rechazado por vencimiento de prefactura"
+    elif (
+        pedido.estado_pago == Pedido.EstadoPago.PENDIENTE
+        and pedido.metodo_pago == Pedido.MetodoPago.SUCURSAL
+    ):
+        estado = "Pendiente de pago en sucursal"
+    else:
+        estado = pedido.get_estado_pago_display()
     metodo_pago = pedido.get_metodo_pago_display()
     nombre_sucursal = sucursal.nombre if sucursal else "No aplica"
     direccion_sucursal = sucursal.direccion if sucursal else "No aplica"
@@ -641,8 +651,12 @@ def generar_pdf_prefactura(prefactura):
                     Paragraph(escape(estado), estilos["Estado"]),
                     Spacer(1, 2 * mm),
                     Paragraph(
-                        "Presenta esta prefactura en la sucursal seleccionada "
-                        "antes de su vencimiento.",
+                        "Esta prefactura es valida durante "
+                        f"{settings.PREFACTURA_VIGENCIA_HORAS} horas desde su "
+                        "emision. Durante ese plazo se respetaran los precios y "
+                        "el total indicados. Si el pago no es confirmado en la "
+                        "sucursal antes del vencimiento, el pedido sera rechazado "
+                        "automaticamente y debera realizarse una nueva compra.",
                         estilos["Nota"],
                     ),
                     Spacer(1, 2 * mm),
@@ -709,6 +723,20 @@ def generar_pdf_prefactura(prefactura):
 
 
 def enviar_prefactura_por_correo(prefactura, es_reenvio=False):
+    from .vencimientos import vencer_prefactura_sucursal
+
+    vencimiento = vencer_prefactura_sucursal(prefactura.pedido_id)
+    if vencimiento.vencida:
+        raise PrefacturaVencida(
+            "La prefactura vencio y el pedido fue rechazado. "
+            "Debe realizar una nueva compra."
+        )
+
+    prefactura = Prefactura.objects.select_related(
+        "pedido__usuario__perfil",
+        "pedido__empresa",
+        "pedido__sucursal_pago",
+    ).prefetch_related("pedido__detalles").get(pk=prefactura.pk)
     correo = correo_comprador_verificado(prefactura.pedido)
     with transaction.atomic():
         bloqueada = Prefactura.objects.select_for_update().get(pk=prefactura.pk)
@@ -734,7 +762,11 @@ def enviar_prefactura_por_correo(prefactura, es_reenvio=False):
         subject=f"Prefactura para pago en sucursal {prefactura.pedido.numero}",
         body=(
             "Adjuntamos la prefactura de tu pedido para pagar en la sucursal "
-            "seleccionada. Este documento no es un comprobante fiscal."
+            "seleccionada. Esta disponible durante "
+            f"{settings.PREFACTURA_VIGENCIA_HORAS} horas desde su emision; "
+            "durante ese plazo se respetaran los precios y el total indicados. "
+            "Si el pago no se confirma antes del vencimiento, el pedido sera "
+            "rechazado automaticamente. Este documento no es un comprobante fiscal."
         ),
         from_email=None,
         to=[correo],

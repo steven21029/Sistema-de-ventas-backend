@@ -280,7 +280,7 @@ PAGOS_WEBHOOK_SECRET = config(
 )
 PREFACTURA_VIGENCIA_HORAS = config(
     'PREFACTURA_VIGENCIA_HORAS',
-    default=48,
+    default=72,
     cast=int,
 )
 PREFACTURA_MAX_INTENTOS_CORREO = config(

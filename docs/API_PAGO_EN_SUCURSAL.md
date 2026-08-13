@@ -82,7 +82,11 @@ flujo de forma idempotente:
     "numero": "PF-PED-001",
     "url_pdf": "/api/v1/pedidos/pedidos/123/prefactura/pdf/",
     "correo_enviado": true,
-    "correo_destino": "s***@correo.com"
+    "correo_destino": "s***@correo.com",
+    "fecha_vencimiento": "2026-08-16T10:30:00-06:00",
+    "vigencia_horas": 72,
+    "vigente": true,
+    "mensaje_vigencia": "Esta prefactura estara disponible durante 72 horas..."
   }
 }
 ```
@@ -90,6 +94,32 @@ flujo de forma idempotente:
 Repetir la solicitud no crea otro pedido, pago ni prefactura, y tampoco envia
 de nuevo el correo inicial. El pedido y el pago permanecen pendientes. El
 inventario no cambia hasta la confirmacion administrativa.
+
+## Vigencia y rechazo automatico
+
+La prefactura permanece vigente durante 72 horas contadas desde su emision.
+Durante ese plazo se respetan los precios y el total historico del pedido. Si
+el personal autorizado no confirma el pago antes de `fecha_vencimiento`, el
+backend cambia automaticamente:
+
+- `pedido.estado_pago` de `pendiente` a `rechazado`.
+- Todo intento relacionado que siga pendiente a `estado=rechazado`.
+- `pago.codigo_respuesta` a `PREFACTURA_VENCIDA`.
+
+El vencimiento es idempotente y no descuenta ni modifica inventario. Una
+prefactura vencida conserva su PDF como documento historico, claramente
+marcado como rechazado, pero no puede reenviarse ni confirmarse. El comprador
+debe realizar una nueva compra.
+
+Los listados de pedidos y pagos, los reportes y las acciones de prefactura
+actualizan los vencimientos antes de responder. En produccion tambien debe
+programarse periodicamente:
+
+```powershell
+python manage.py vencer_prefacturas_sucursal
+```
+
+Puede limitarse a una empresa con `--empresa-slug=Analiza`.
 
 Errores principales:
 
@@ -153,7 +183,8 @@ verificado de la cuenta propietaria.
 ```
 
 Devuelve `429 Too Many Requests` al alcanzar el limite configurado y `503` si
-falla el envio. El limite total incluye el correo inicial.
+falla el envio. Una prefactura vencida devuelve `400`. El limite total incluye
+el correo inicial.
 
 ## Confirmar pago en sucursal
 
@@ -186,6 +217,9 @@ comercial usado por los pagos aprobados en linea. Una segunda confirmacion
 devuelve `200 OK`, `duplicado=true` y no repite el movimiento de inventario.
 Si falta inventario, responde `400` y la transaccion conserva pago y pedido
 como pendientes.
+
+Cuando las 72 horas ya finalizaron, responde `400`; antes de responder deja el
+pedido y el intento en `rechazado`, sin ejecutar efectos de inventario.
 
 ## Cancelar un pedido pendiente
 
@@ -253,7 +287,7 @@ Los listados administrativos exponen los campos necesarios:
 ## Variables de entorno
 
 ```env
-PREFACTURA_VIGENCIA_HORAS=48
+PREFACTURA_VIGENCIA_HORAS=72
 PREFACTURA_MAX_INTENTOS_CORREO=4
 ```
 
@@ -263,6 +297,10 @@ correo y el PDF adjunto se envian mediante la API HTTPS de Brevo.
 ## Integracion del frontend
 
 - Para pago en sucursal, enviar solo `sucursal_id` y usar la respuesta oficial.
+- Mostrar `prefactura.mensaje_vigencia`, `fecha_vencimiento` y un contador
+  informativo calculado en la zona horaria del navegador.
+- Considerar siempre `estado_pago=rechazado` como no pagable; no habilitar
+  confirmacion ni reenvio y solicitar una nueva compra.
 - Mostrar `prefactura.url_pdf` como descarga autenticada.
 - No enviar correos ni direcciones alternativas desde el navegador.
 - Tratar respuestas `200` y `201` del inicio como exito.

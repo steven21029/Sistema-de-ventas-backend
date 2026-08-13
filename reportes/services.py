@@ -407,6 +407,8 @@ class ReporteVentasService:
             return "pagado"
         if pedido.estado_pago == Pedido.EstadoPago.CANCELADO:
             return "cancelado"
+        if pedido.estado_pago == Pedido.EstadoPago.RECHAZADO:
+            return "rechazado"
         if pedido.tiene_pago_pendiente:
             return "pendiente"
         if pedido.tiene_pago_rechazado:

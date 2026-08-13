@@ -67,7 +67,7 @@ BREVO_API_URL=https://api.brevo.com/v3/smtp/email
 BREVO_API_TIMEOUT=15
 DEFAULT_FROM_EMAIL=Sistema de Ventas <REMITENTE_VERIFICADO_EN_BREVO>
 PAGOS_PROVEEDOR_DEFAULT=simulado
-PREFACTURA_VIGENCIA_HORAS=48
+PREFACTURA_VIGENCIA_HORAS=72
 PREFACTURA_MAX_INTENTOS_CORREO=4
 DJANGO_SUPERUSER_USERNAME=admin
 DJANGO_SUPERUSER_EMAIL=correo-administrativo@example.com
@@ -91,6 +91,11 @@ una solicitud HTTPS y no abre una conexion SMTP.
 `PREFACTURA_VIGENCIA_HORAS` define por cuanto tiempo puede presentarse una
 prefactura para pago en sucursal. `PREFACTURA_MAX_INTENTOS_CORREO` incluye el
 envio inicial y los reenvios solicitados por el comprador.
+
+Programar `python manage.py vencer_prefacturas_sucursal` para ejecutarse cada
+5 o 10 minutos. Las APIs tambien aplican el vencimiento al consultar o intentar
+confirmar una prefactura, pero la ejecucion periodica mantiene el estado de la
+base actualizado aun cuando no haya solicitudes.
 
 Las variables `R2_*` son obligatorias cuando `R2_STORAGE_ENABLED=True`. Las
 credenciales deben pertenecer a un token limitado al bucket de medios.

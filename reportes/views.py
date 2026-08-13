@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 from empresas.contexto import obtener_empresa_administrable
 from empresas.models import SucursalEmpresa
 from catalogo.models import Familia, Producto
+from pedidos.vencimientos import vencer_prefacturas_sucursal
 from usuarios.permissions import IsAdministrativeUser
 
 from .serializers import (
@@ -76,6 +77,7 @@ class ResumenVentasView(ReporteAdministrativoAPIView):
         entrada.is_valid(raise_exception=True)
         datos = entrada.validated_data
         empresa = self.obtener_empresa(request, datos["empresa_slug"])
+        vencer_prefacturas_sucursal(empresa_ids=[empresa.pk])
         self.validar_filtros(empresa, datos)
         servicio = ReporteVentasService(
             empresa=empresa,
@@ -105,6 +107,7 @@ class ExportarVentasView(ReporteAdministrativoAPIView):
         entrada.is_valid(raise_exception=True)
         datos = entrada.validated_data
         empresa = self.obtener_empresa(request, datos["empresa_slug"])
+        vencer_prefacturas_sucursal(empresa_ids=[empresa.pk])
         self.validar_filtros(empresa, datos)
         servicio = ReporteVentasService(
             empresa=empresa,

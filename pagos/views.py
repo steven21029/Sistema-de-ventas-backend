@@ -14,6 +14,10 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
 from pedidos.models import Pedido
+from pedidos.vencimientos import (
+    confirmar_pago_sucursal_transaccional,
+    vencer_prefacturas_sucursal,
+)
 from config.api import FiltroRangoFechasMixin, PaginacionAdministrativaOpcionalMixin
 from empresas.contexto import empresas_administrables, obtener_empresa_administrable
 from usuarios.permissions import IsAdministrativeUser
@@ -38,6 +42,7 @@ class PagoViewSet(
         return super().get_permissions()
 
     def get_queryset(self):
+        self._actualizar_vencimientos_visibles()
         queryset = Pago.objects.select_related("pedido", "empresa", "usuario")
         user = self.request.user
         empresa_slug = self.request.query_params.get("empresa_slug", "").strip()
@@ -169,17 +174,24 @@ class PagoViewSet(
             )
 
         try:
-            pago, cambio = Pago.procesar_resultado(
-                referencia=pago.referencia,
-                proveedor="sucursal",
-                estado=Pago.Estado.APROBADO,
-                identificador_externo=f"SUC-{pago.referencia}",
-                codigo_respuesta="CONFIRMADO_SUCURSAL",
+            pago, cambio, prefactura_vencida = (
+                confirmar_pago_sucursal_transaccional(pago.referencia)
             )
         except (DjangoValidationError, Pago.DoesNotExist) as exc:
             if isinstance(exc, Pago.DoesNotExist):
                 raise NotFound("No existe el pago solicitado.") from exc
             raise ValidationError(self._normalizar_error(exc)) from exc
+
+        if prefactura_vencida:
+            raise ValidationError(
+                {
+                    "prefactura": (
+                        "La prefactura vencio despues de "
+                        f"{settings.PREFACTURA_VIGENCIA_HORAS} horas y el pedido "
+                        "fue rechazado. No se puede confirmar este pago."
+                    )
+                }
+            )
 
         pago.pedido.refresh_from_db()
         return response.Response(
@@ -211,6 +223,26 @@ class PagoViewSet(
             empresa=perfil.empresa,
             usuario=user,
         )
+
+    def _actualizar_vencimientos_visibles(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return
+        if user.is_superuser:
+            vencer_prefacturas_sucursal()
+            return
+
+        perfil = getattr(user, "perfil", None)
+        if not perfil or not perfil.activo:
+            return
+        if perfil.es_administrador_maestro:
+            empresa_ids = empresas_administrables(user).values_list("id", flat=True)
+            vencer_prefacturas_sucursal(empresa_ids=empresa_ids)
+            return
+        if (perfil.es_administrador_empresa or perfil.es_gerente) and perfil.empresa_id:
+            vencer_prefacturas_sucursal(empresa_ids=[perfil.empresa_id])
+            return
+        vencer_prefacturas_sucursal(usuario_id=user.pk)
 
     def _normalizar_error(self, error):
         if hasattr(error, "message_dict"):

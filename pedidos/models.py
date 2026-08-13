@@ -241,6 +241,7 @@ class Pedido(models.Model):
     class EstadoPago(models.TextChoices):
         PENDIENTE = "pendiente", "Pendiente"
         PAGADO = "pagado", "Pagado"
+        RECHAZADO = "rechazado", "Rechazado"
         CANCELADO = "cancelado", "Cancelado"
 
     class MetodoPago(models.TextChoices):
@@ -574,6 +575,34 @@ class Pedido(models.Model):
             )
         finally:
             del self._cancelacion_administrativa_controlada
+        return True
+
+    def rechazar_por_vencimiento_prefactura(self):
+        if self.estado_pago == self.EstadoPago.RECHAZADO:
+            return False
+        if self.estado_pago != self.EstadoPago.PENDIENTE:
+            raise ValidationError(
+                {
+                    "estado_pago": (
+                        "Solo se puede rechazar por vencimiento un pedido pendiente."
+                    )
+                }
+            )
+        if self.metodo_pago != self.MetodoPago.SUCURSAL:
+            raise ValidationError(
+                {
+                    "metodo_pago": (
+                        "El vencimiento de prefactura solo aplica al pago en sucursal."
+                    )
+                }
+            )
+        if self.inventario_descontado:
+            raise ValidationError(
+                {"inventario": "El pedido ya tiene efectos de inventario."}
+            )
+
+        self.estado_pago = self.EstadoPago.RECHAZADO
+        self.save(update_fields=["estado_pago", "fecha_actualizacion"])
         return True
 
     def delete(self, *args, **kwargs):
@@ -1289,7 +1318,10 @@ class Prefactura(models.Model):
     )
     numero = models.CharField(max_length=30, unique=True, editable=False)
     leyenda = models.CharField(max_length=180, default=LEYENDA)
-    fecha_vencimiento = models.DateTimeField(default=fecha_vencimiento_prefactura)
+    fecha_vencimiento = models.DateTimeField(
+        default=fecha_vencimiento_prefactura,
+        db_index=True,
+    )
     intentos_correo = models.PositiveSmallIntegerField(default=0)
     fecha_ultimo_intento_correo = models.DateTimeField(null=True, blank=True)
     correo_enviado_en = models.DateTimeField(null=True, blank=True)
@@ -1327,6 +1359,15 @@ class Prefactura(models.Model):
             pedido.estado_pago == Pedido.EstadoPago.PENDIENTE
             and pedido.metodo_pago == Pedido.MetodoPago.SUCURSAL
             and pedido.sucursal_pago_id
+        )
+
+    def vigente_para_pago(self, ahora=None):
+        ahora = ahora or timezone.now()
+        return (
+            self.pedido.estado_pago == Pedido.EstadoPago.PENDIENTE
+            and self.pedido.metodo_pago == Pedido.MetodoPago.SUCURSAL
+            and self.pedido.sucursal_pago_id
+            and self.fecha_vencimiento > ahora
         )
 
     @classmethod

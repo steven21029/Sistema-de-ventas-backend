@@ -40,12 +40,18 @@ from .serializers import (
 from .prefacturas import (
     ErrorEnvioCorreoPrefactura,
     LimiteIntentosCorreoPrefactura,
+    PrefacturaVencida,
     correo_comprador_verificado,
     enmascarar_correo,
     enviar_prefactura_por_correo,
     generar_pdf_prefactura,
 )
 from .services import calcular_carrito
+from .vencimientos import (
+    MENSAJE_VIGENCIA_PREFACTURA,
+    vencer_prefactura_sucursal,
+    vencer_prefacturas_sucursal,
+)
 
 
 class CalcularCarritoPublicoView(APIView):
@@ -493,6 +499,7 @@ class PedidoViewSet(
         return super().get_permissions()
 
     def get_queryset(self):
+        self._actualizar_vencimientos_visibles()
         queryset = Pedido.objects.select_related(
             "empresa",
             "usuario",
@@ -500,6 +507,7 @@ class PedidoViewSet(
             "carrito_origen",
             "sucursal_pago",
             "cancelado_por",
+            "prefactura",
         ).prefetch_related(
             "detalles__producto",
             "detalles__paquete",
@@ -662,13 +670,15 @@ class PedidoViewSet(
     @decorators.action(detail=True, methods=["get"], url_path="prefactura")
     def prefactura(self, request, pk=None):
         pedido = self.get_object()
-
-        if not Prefactura.puede_generarse_para(pedido):
+        vencer_prefactura_sucursal(pedido.pk)
+        pedido.refresh_from_db()
+        prefactura = Prefactura.objects.filter(pedido=pedido).first()
+        if not prefactura and not Prefactura.puede_generarse_para(pedido):
             raise ValidationError(
                 {"pedido": "La prefactura no esta disponible para este pedido."}
             )
-
-        prefactura = Prefactura.obtener_o_crear_para_pedido(pedido)
+        if not prefactura:
+            prefactura = Prefactura.obtener_o_crear_para_pedido(pedido)
         serializer = PrefacturaSerializer(prefactura)
         return response.Response(serializer.data)
 
@@ -734,6 +744,8 @@ class PedidoViewSet(
         if not prefactura.intentos_correo:
             try:
                 enviar_prefactura_por_correo(prefactura)
+            except PrefacturaVencida as exc:
+                raise ValidationError({"prefactura": str(exc)}) from exc
             except ErrorEnvioCorreoPrefactura as exc:
                 error = APIException(str(exc))
                 error.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
@@ -767,6 +779,10 @@ class PedidoViewSet(
                     ),
                     "correo_enviado": bool(prefactura.correo_enviado_en),
                     "correo_destino": enmascarar_correo(correo),
+                    "fecha_vencimiento": prefactura.fecha_vencimiento,
+                    "vigencia_horas": settings.PREFACTURA_VIGENCIA_HORAS,
+                    "vigente": prefactura.vigente_para_pago(),
+                    "mensaje_vigencia": MENSAJE_VIGENCIA_PREFACTURA,
                 },
             },
             status=codigo_estado,
@@ -779,6 +795,8 @@ class PedidoViewSet(
     )
     def prefactura_pdf(self, request, pk=None):
         pedido = self.get_object()
+        vencer_prefactura_sucursal(pedido.pk)
+        pedido.refresh_from_db()
         try:
             prefactura = Prefactura.objects.select_related(
                 "pedido__empresa",
@@ -804,6 +822,12 @@ class PedidoViewSet(
         pedido = self.get_object()
         self._validar_comprador_propietario(pedido)
         try:
+            vencimiento = vencer_prefactura_sucursal(pedido.pk)
+            if vencimiento.vencida:
+                raise PrefacturaVencida(
+                    "La prefactura vencio y el pedido fue rechazado. "
+                    "Debe realizar una nueva compra."
+                )
             prefactura = Prefactura.objects.select_related(
                 "pedido__usuario__perfil",
                 "pedido__empresa",
@@ -817,6 +841,8 @@ class PedidoViewSet(
             error = APIException(str(exc))
             error.status_code = status.HTTP_429_TOO_MANY_REQUESTS
             raise error from exc
+        except PrefacturaVencida as exc:
+            raise ValidationError({"prefactura": str(exc)}) from exc
         except ErrorEnvioCorreoPrefactura as exc:
             error = APIException(str(exc))
             error.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
@@ -848,6 +874,33 @@ class PedidoViewSet(
             raise PermissionDenied(
                 "Solo el comprador propietario puede gestionar este pago."
             )
+
+    def _actualizar_vencimientos_visibles(self):
+        user = self.request.user
+        if not user or not user.is_authenticated:
+            return
+        if user.is_superuser:
+            vencer_prefacturas_sucursal()
+            return
+
+        perfil = getattr(user, "perfil", None)
+        if not perfil or not perfil.activo:
+            return
+        if perfil.es_administrador_maestro:
+            empresa_ids = empresas_administrables(user).values_list("id", flat=True)
+            vencer_prefacturas_sucursal(empresa_ids=empresa_ids)
+            return
+        if (
+            perfil.rol
+            in [
+                PerfilUsuario.Rol.ADMINISTRADOR_EMPRESA,
+                PerfilUsuario.Rol.GERENTE,
+            ]
+            and perfil.empresa_id
+        ):
+            vencer_prefacturas_sucursal(empresa_ids=[perfil.empresa_id])
+            return
+        vencer_prefacturas_sucursal(usuario_id=user.pk)
 
     def _normalizar_error(self, error):
         if hasattr(error, "message_dict"):

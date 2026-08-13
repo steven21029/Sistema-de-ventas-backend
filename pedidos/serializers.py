@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db.models import Prefetch, Q
 from django.db.models.functions import Lower
 
@@ -15,6 +16,7 @@ from .models import (
     Prefactura,
     TarifaEntrega,
 )
+from .vencimientos import MENSAJE_VIGENCIA_PREFACTURA
 
 
 TIPOS_ARTICULO_CARRITO = [
@@ -320,6 +322,9 @@ class PedidoSerializer(serializers.ModelSerializer):
         read_only=True,
         allow_null=True,
     )
+    prefactura_fecha_vencimiento = serializers.SerializerMethodField()
+    prefactura_vigente = serializers.SerializerMethodField()
+    mensaje_vigencia_prefactura = serializers.SerializerMethodField()
 
     class Meta:
         model = Pedido
@@ -357,6 +362,9 @@ class PedidoSerializer(serializers.ModelSerializer):
             "cancelado_por",
             "cancelado_por_email",
             "fecha_cancelacion",
+            "prefactura_fecha_vencimiento",
+            "prefactura_vigente",
+            "mensaje_vigencia_prefactura",
             "detalles",
             "fecha_creacion",
             "fecha_actualizacion",
@@ -367,6 +375,27 @@ class PedidoSerializer(serializers.ModelSerializer):
         if not obj.municipio_entrega_catalogo_id:
             return None
         return obj.municipio_entrega_catalogo.departamento_id
+
+    def get_prefactura_fecha_vencimiento(self, obj):
+        prefactura = self._obtener_prefactura(obj)
+        return prefactura.fecha_vencimiento if prefactura else None
+
+    def get_prefactura_vigente(self, obj):
+        prefactura = self._obtener_prefactura(obj)
+        return prefactura.vigente_para_pago() if prefactura else False
+
+    def get_mensaje_vigencia_prefactura(self, obj):
+        return (
+            MENSAJE_VIGENCIA_PREFACTURA
+            if self._obtener_prefactura(obj)
+            else None
+        )
+
+    def _obtener_prefactura(self, obj):
+        try:
+            return obj.prefactura
+        except Prefactura.DoesNotExist:
+            return None
 
 
 class GenerarPedidoDesdeCarritoSerializer(serializers.Serializer):
@@ -865,6 +894,9 @@ class PrefacturaSerializer(serializers.ModelSerializer):
         many=True,
         read_only=True,
     )
+    vigente = serializers.SerializerMethodField()
+    vigencia_horas = serializers.SerializerMethodField()
+    mensaje_vigencia = serializers.SerializerMethodField()
 
     class Meta:
         model = Prefactura
@@ -892,6 +924,9 @@ class PrefacturaSerializer(serializers.ModelSerializer):
             "estado_pago",
             "estado_pago_nombre",
             "fecha_vencimiento",
+            "vigente",
+            "vigencia_horas",
+            "mensaje_vigencia",
             "leyenda",
         ]
         read_only_fields = fields
@@ -943,3 +978,12 @@ class PrefacturaSerializer(serializers.ModelSerializer):
             "direccion": sucursal.direccion,
             "telefono": sucursal.telefono,
         }
+
+    def get_vigente(self, obj):
+        return obj.vigente_para_pago()
+
+    def get_vigencia_horas(self, obj):
+        return settings.PREFACTURA_VIGENCIA_HORAS
+
+    def get_mensaje_vigencia(self, obj):
+        return MENSAJE_VIGENCIA_PREFACTURA

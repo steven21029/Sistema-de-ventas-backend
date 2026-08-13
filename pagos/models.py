@@ -195,6 +195,34 @@ class Pago(models.Model):
             del self._transicion_controlada
         return True
 
+    def rechazar_por_vencimiento_prefactura(self, fecha_vencimiento=None):
+        if (
+            self.estado == self.Estado.RECHAZADO
+            and self.codigo_respuesta == "PREFACTURA_VENCIDA"
+        ):
+            return False
+        if self.estado != self.Estado.PENDIENTE:
+            raise ValidationError(
+                {"estado": "Solo se puede vencer un intento de pago pendiente."}
+            )
+
+        self.estado = self.Estado.RECHAZADO
+        self.codigo_respuesta = "PREFACTURA_VENCIDA"
+        self.fecha_confirmacion = fecha_vencimiento or timezone.now()
+        self._transicion_controlada = True
+        try:
+            self.save(
+                update_fields=[
+                    "estado",
+                    "codigo_respuesta",
+                    "fecha_confirmacion",
+                    "fecha_actualizacion",
+                ]
+            )
+        finally:
+            del self._transicion_controlada
+        return True
+
     @classmethod
     def obtener_o_crear_pendiente(
         cls,
