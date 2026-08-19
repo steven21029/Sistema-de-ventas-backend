@@ -1,0 +1,33 @@
+name: sistema-ventas-backend
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: sistema-ventas-backend:local
+    env_file:
+      - .env
+    environment:
+      PORT: "8000"
+      DJANGO_COLLECTSTATIC: "${DJANGO_COLLECTSTATIC:-true}"
+      DJANGO_RUN_MIGRATIONS: "${DJANGO_RUN_MIGRATIONS:-true}"
+      DJANGO_ENSURE_SUPERUSER: "${DJANGO_ENSURE_SUPERUSER:-false}"
+      LOCAL_DEFAULT_EMPRESA_SLUG: "${LOCAL_DEFAULT_EMPRESA_SLUG:-Analiza}"
+      GUNICORN_WORKERS: "${GUNICORN_WORKERS:-2}"
+      GUNICORN_THREADS: "${GUNICORN_THREADS:-2}"
+      GUNICORN_TIMEOUT: "${GUNICORN_TIMEOUT:-120}"
+      DOCKER_HEALTHCHECK_HOST: "${DOCKER_HEALTHCHECK_HOST:-localhost}"
+    ports:
+      - "${DOCKER_PORT:-8000}:8000"
+    volumes:
+      - media_data:/app/media
+    init: true
+    restart: unless-stopped
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  media_data:

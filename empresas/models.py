@@ -367,6 +367,21 @@ class Empresa(models.Model):
         if not host_normalizado:
             return None
 
+        if settings.DEBUG and host_normalizado in {
+            "localhost",
+            "127.0.0.1",
+            "::1",
+            "host.docker.internal",
+        }:
+            slug_local = settings.LOCAL_DEFAULT_EMPRESA_SLUG
+            if slug_local:
+                empresa_local = cls.objects.filter(
+                    slug__iexact=slug_local,
+                    activa=True,
+                ).first()
+                if empresa_local:
+                    return empresa_local
+
         empresa = cls.objects.filter(
             dominio_personalizado__iexact=host_normalizado,
             activa=True,

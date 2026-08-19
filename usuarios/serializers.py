@@ -96,6 +96,14 @@ class PerfilUsuarioSerializer(serializers.ModelSerializer):
             "telefono",
             "numero_identidad",
             "correo_verificado",
+            "acepta_terminos",
+            "acepta_privacidad",
+            "fecha_aceptacion_terminos_privacidad",
+            "version_terminos_aceptada",
+            "version_privacidad_aceptada",
+            "acepta_promociones",
+            "fecha_aceptacion_promociones",
+            "fecha_retiro_promociones",
             "puede_crear_usuarios",
             "activo",
             "fecha_creacion",
@@ -110,6 +118,14 @@ class PerfilUsuarioSerializer(serializers.ModelSerializer):
             "departamento_id",
             "departamento",
             "rol_nombre",
+            "acepta_terminos",
+            "acepta_privacidad",
+            "fecha_aceptacion_terminos_privacidad",
+            "version_terminos_aceptada",
+            "version_privacidad_aceptada",
+            "acepta_promociones",
+            "fecha_aceptacion_promociones",
+            "fecha_retiro_promociones",
             "fecha_creacion",
             "fecha_actualizacion",
         ]
@@ -188,6 +204,14 @@ class UsuarioAdministrativoSerializer(serializers.ModelSerializer):
             "telefono",
             "numero_identidad",
             "correo_verificado",
+            "acepta_terminos",
+            "acepta_privacidad",
+            "fecha_aceptacion_terminos_privacidad",
+            "version_terminos_aceptada",
+            "version_privacidad_aceptada",
+            "acepta_promociones",
+            "fecha_aceptacion_promociones",
+            "fecha_retiro_promociones",
             "puede_crear_usuarios",
             "activo",
             "fecha_creacion",
@@ -202,6 +226,14 @@ class UsuarioAdministrativoSerializer(serializers.ModelSerializer):
             "departamento_id",
             "departamento",
             "rol_nombre",
+            "acepta_terminos",
+            "acepta_privacidad",
+            "fecha_aceptacion_terminos_privacidad",
+            "version_terminos_aceptada",
+            "version_privacidad_aceptada",
+            "acepta_promociones",
+            "fecha_aceptacion_promociones",
+            "fecha_retiro_promociones",
             "fecha_creacion",
             "fecha_actualizacion",
         ]
@@ -506,8 +538,17 @@ class RegistroCompradorSerializer(serializers.Serializer):
     )
     password = serializers.CharField(write_only=True, trim_whitespace=False)
     password_confirmacion = serializers.CharField(write_only=True, trim_whitespace=False)
-    acepta_terminos = serializers.BooleanField(write_only=True)
-    acepta_privacidad = serializers.BooleanField(write_only=True)
+    acepta_terminos = serializers.BooleanField(required=False, write_only=True)
+    acepta_privacidad = serializers.BooleanField(required=False, write_only=True)
+    acepta_terminos_privacidad = serializers.BooleanField(
+        required=False,
+        write_only=True,
+    )
+    acepta_promociones = serializers.BooleanField(
+        required=False,
+        default=False,
+        write_only=True,
+    )
 
     def validate_nombre(self, value):
         if not value.strip():
@@ -597,15 +638,43 @@ class RegistroCompradorSerializer(serializers.Serializer):
                 {"password_confirmacion": "Las contrasenas no coinciden."}
             )
 
-        if not attrs["acepta_terminos"]:
+        aceptacion_combinada = attrs.pop("acepta_terminos_privacidad", None)
+        acepta_terminos = attrs.get("acepta_terminos")
+        acepta_privacidad = attrs.get("acepta_privacidad")
+        if aceptacion_combinada is not None:
+            if acepta_terminos is not None and acepta_terminos != aceptacion_combinada:
+                raise serializers.ValidationError(
+                    {
+                        "acepta_terminos": (
+                            "La aceptacion enviada no coincide con la casilla legal."
+                        )
+                    }
+                )
+            if (
+                acepta_privacidad is not None
+                and acepta_privacidad != aceptacion_combinada
+            ):
+                raise serializers.ValidationError(
+                    {
+                        "acepta_privacidad": (
+                            "La aceptacion enviada no coincide con la casilla legal."
+                        )
+                    }
+                )
+            acepta_terminos = aceptacion_combinada
+            acepta_privacidad = aceptacion_combinada
+
+        if not acepta_terminos:
             raise serializers.ValidationError(
                 {"acepta_terminos": "Debes aceptar los terminos y condiciones."}
             )
 
-        if not attrs["acepta_privacidad"]:
+        if not acepta_privacidad:
             raise serializers.ValidationError(
                 {"acepta_privacidad": "Debes aceptar la politica de privacidad."}
             )
+        attrs["acepta_terminos"] = True
+        attrs["acepta_privacidad"] = True
 
         usuario_temporal = User(
             username=attrs["email"],
@@ -643,6 +712,14 @@ class RegistroCompradorSerializer(serializers.Serializer):
         perfil.correo_verificado = False
         perfil.puede_crear_usuarios = False
         perfil.activo = False
+        perfil.registrar_aceptacion_legal(
+            settings.TERMINOS_VERSION_ACTUAL,
+            settings.PRIVACIDAD_VERSION_ACTUAL,
+        )
+        perfil.actualizar_preferencia_promociones(
+            validated_data.get("acepta_promociones", False),
+            guardar=False,
+        )
         perfil.full_clean()
         perfil.save()
 
@@ -656,6 +733,51 @@ class RegistroCompradorSerializer(serializers.Serializer):
             "usuario": UsuarioBasicoSerializer(instance["usuario"]).data,
             "perfil": PerfilUsuarioSerializer(instance["perfil"]).data,
         }
+
+
+class PreferenciaComunicacionesSerializer(serializers.ModelSerializer):
+    acepta_promociones = serializers.BooleanField(required=True)
+    empresa = serializers.SerializerMethodField()
+    promociones_por_correo = serializers.SerializerMethodField()
+    promociones_por_telefono = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PerfilUsuario
+        fields = [
+            "empresa",
+            "acepta_promociones",
+            "promociones_por_correo",
+            "promociones_por_telefono",
+            "fecha_aceptacion_promociones",
+            "fecha_retiro_promociones",
+        ]
+        read_only_fields = [
+            "empresa",
+            "promociones_por_correo",
+            "promociones_por_telefono",
+            "fecha_aceptacion_promociones",
+            "fecha_retiro_promociones",
+        ]
+
+    def get_empresa(self, obj):
+        if not obj.empresa_id:
+            return None
+        return {
+            "nombre": obj.empresa.nombre,
+            "slug": obj.empresa.slug,
+        }
+
+    def get_promociones_por_correo(self, obj):
+        return obj.acepta_promociones
+
+    def get_promociones_por_telefono(self, obj):
+        return obj.acepta_promociones
+
+    def update(self, instance, validated_data):
+        instance.actualizar_preferencia_promociones(
+            validated_data["acepta_promociones"]
+        )
+        return instance
 
 
 class VerificarCorreoSerializer(serializers.Serializer):

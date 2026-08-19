@@ -6,6 +6,10 @@ class EmpresaContextMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
+        if request.path_info == "/health/":
+            request.empresa_actual = None
+            return self.get_response(request)
+
         request.empresa_actual = self._resolver_empresa(request)
         return self.get_response(request)
 

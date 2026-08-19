@@ -81,6 +81,36 @@ class PerfilUsuario(models.Model):
         help_text="Numero de identidad hondureno de 13 digitos.",
     )
     correo_verificado = models.BooleanField(default=False)
+    acepta_terminos = models.BooleanField(default=False)
+    acepta_privacidad = models.BooleanField(default=False)
+    fecha_aceptacion_terminos_privacidad = models.DateTimeField(
+        null=True,
+        blank=True,
+        editable=False,
+    )
+    version_terminos_aceptada = models.CharField(
+        max_length=40,
+        blank=True,
+        default="",
+        editable=False,
+    )
+    version_privacidad_aceptada = models.CharField(
+        max_length=40,
+        blank=True,
+        default="",
+        editable=False,
+    )
+    acepta_promociones = models.BooleanField(default=False)
+    fecha_aceptacion_promociones = models.DateTimeField(
+        null=True,
+        blank=True,
+        editable=False,
+    )
+    fecha_retiro_promociones = models.DateTimeField(
+        null=True,
+        blank=True,
+        editable=False,
+    )
     puede_crear_usuarios = models.BooleanField(default=False)
     activo = models.BooleanField(default=True)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
@@ -98,6 +128,38 @@ class PerfilUsuario(models.Model):
                     & ~models.Q(numero_identidad="")
                 ),
                 name="perfil_identidad_unica_por_empresa",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        acepta_terminos=False,
+                        acepta_privacidad=False,
+                        fecha_aceptacion_terminos_privacidad__isnull=True,
+                        version_terminos_aceptada="",
+                        version_privacidad_aceptada="",
+                    )
+                    | (
+                        models.Q(
+                            acepta_terminos=True,
+                            acepta_privacidad=True,
+                            fecha_aceptacion_terminos_privacidad__isnull=False,
+                        )
+                        & ~models.Q(version_terminos_aceptada="")
+                        & ~models.Q(version_privacidad_aceptada="")
+                    )
+                ),
+                name="perfil_aceptacion_legal_consistente",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(acepta_promociones=False)
+                    | models.Q(
+                        acepta_promociones=True,
+                        fecha_aceptacion_promociones__isnull=False,
+                        fecha_retiro_promociones__isnull=True,
+                    )
+                ),
+                name="perfil_promociones_aceptadas_consistente",
             ),
         ]
 
@@ -120,6 +182,86 @@ class PerfilUsuario(models.Model):
                     )
                 }
             )
+
+        aceptacion_legal_completa = (
+            self.acepta_terminos
+            and self.acepta_privacidad
+            and self.fecha_aceptacion_terminos_privacidad
+            and self.version_terminos_aceptada
+            and self.version_privacidad_aceptada
+        )
+        aceptacion_legal_vacia = (
+            not self.acepta_terminos
+            and not self.acepta_privacidad
+            and self.fecha_aceptacion_terminos_privacidad is None
+            and not self.version_terminos_aceptada
+            and not self.version_privacidad_aceptada
+        )
+        if not aceptacion_legal_completa and not aceptacion_legal_vacia:
+            raise ValidationError(
+                {
+                    "consentimiento_legal": (
+                        "La aceptacion de terminos y privacidad debe registrarse "
+                        "de forma completa."
+                    )
+                }
+            )
+
+        if self.acepta_promociones and (
+            not self.fecha_aceptacion_promociones
+            or self.fecha_retiro_promociones
+        ):
+            raise ValidationError(
+                {
+                    "acepta_promociones": (
+                        "El consentimiento promocional activo requiere una fecha "
+                        "de aceptacion y no puede tener fecha de retiro."
+                    )
+                }
+            )
+
+    def registrar_aceptacion_legal(self, version_terminos, version_privacidad):
+        version_terminos = str(version_terminos).strip()
+        version_privacidad = str(version_privacidad).strip()
+        if not version_terminos or not version_privacidad:
+            raise ValidationError(
+                {"consentimiento_legal": "Las versiones legales son obligatorias."}
+            )
+
+        self.acepta_terminos = True
+        self.acepta_privacidad = True
+        self.fecha_aceptacion_terminos_privacidad = timezone.now()
+        self.version_terminos_aceptada = version_terminos
+        self.version_privacidad_aceptada = version_privacidad
+
+    def actualizar_preferencia_promociones(self, acepta, guardar=True):
+        acepta = bool(acepta)
+        ahora = timezone.now()
+        campos = ["acepta_promociones", "fecha_actualizacion"]
+
+        if acepta:
+            if self.acepta_promociones:
+                return False
+            self.acepta_promociones = True
+            self.fecha_aceptacion_promociones = ahora
+            self.fecha_retiro_promociones = None
+            campos.extend(
+                [
+                    "fecha_aceptacion_promociones",
+                    "fecha_retiro_promociones",
+                ]
+            )
+        else:
+            if not self.acepta_promociones:
+                return False
+            self.acepta_promociones = False
+            self.fecha_retiro_promociones = ahora
+            campos.append("fecha_retiro_promociones")
+
+        if guardar:
+            self.full_clean()
+            self.save(update_fields=campos)
+        return True
 
     @property
     def es_administrador_maestro(self):

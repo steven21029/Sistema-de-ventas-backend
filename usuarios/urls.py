@@ -3,12 +3,14 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenVerifyView
 
 from .views import (
+    AvisoLegalView,
     ConfirmarRecuperacionContrasenaView,
     LoginJWTView,
     LogoutJWTView,
     PerfilUsuarioViewSet,
     UsuarioAdministrativoViewSet,
     RefreshJWTView,
+    PreferenciaComunicacionesView,
     ReenviarVerificacionCorreoView,
     RegistroCompradorView,
     SolicitarRecuperacionContrasenaView,
@@ -25,6 +27,11 @@ router.register("usuarios/perfiles", PerfilUsuarioViewSet, basename="usuarios-pe
 
 urlpatterns = [
     path(
+        "usuarios/aviso-legal/",
+        AvisoLegalView.as_view(),
+        name="usuarios-aviso-legal",
+    ),
+    path(
         "usuarios/registro-comprador/",
         RegistroCompradorView.as_view(),
         name="usuarios-registro-comprador",
@@ -38,6 +45,11 @@ urlpatterns = [
         "usuarios/reenviar-verificacion/",
         ReenviarVerificacionCorreoView.as_view(),
         name="usuarios-reenviar-verificacion",
+    ),
+    path(
+        "usuarios/preferencias-comunicacion/",
+        PreferenciaComunicacionesView.as_view(),
+        name="usuarios-preferencias-comunicacion",
     ),
     path(
         "usuarios/solicitar-recuperacion-contrasena/",

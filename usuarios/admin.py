@@ -13,6 +13,7 @@ class PerfilUsuarioAdmin(admin.ModelAdmin):
         "telefono",
         "numero_identidad",
         "correo_verificado",
+        "acepta_promociones",
         "activo",
     )
     list_filter = (
@@ -21,6 +22,7 @@ class PerfilUsuarioAdmin(admin.ModelAdmin):
         "municipio",
         "municipio__departamento",
         "correo_verificado",
+        "acepta_promociones",
         "puede_crear_usuarios",
         "activo",
     )
@@ -35,7 +37,18 @@ class PerfilUsuarioAdmin(admin.ModelAdmin):
         "numero_identidad",
     )
     autocomplete_fields = ("empresa", "municipio")
-    readonly_fields = ("fecha_creacion", "fecha_actualizacion")
+    readonly_fields = (
+        "acepta_terminos",
+        "acepta_privacidad",
+        "fecha_aceptacion_terminos_privacidad",
+        "version_terminos_aceptada",
+        "version_privacidad_aceptada",
+        "acepta_promociones",
+        "fecha_aceptacion_promociones",
+        "fecha_retiro_promociones",
+        "fecha_creacion",
+        "fecha_actualizacion",
+    )
 
     fieldsets = (
         (
@@ -56,6 +69,21 @@ class PerfilUsuarioAdmin(admin.ModelAdmin):
                     "telefono",
                     "numero_identidad",
                     "correo_verificado",
+                )
+            },
+        ),
+        (
+            "Consentimientos",
+            {
+                "fields": (
+                    "acepta_terminos",
+                    "acepta_privacidad",
+                    "fecha_aceptacion_terminos_privacidad",
+                    "version_terminos_aceptada",
+                    "version_privacidad_aceptada",
+                    "acepta_promociones",
+                    "fecha_aceptacion_promociones",
+                    "fecha_retiro_promociones",
                 )
             },
         ),

@@ -2,19 +2,22 @@ from django.conf import settings
 from django.db.models import Q
 from rest_framework import decorators, response, status, views, viewsets
 from rest_framework import mixins
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from config.pagination import PaginacionAdministrativa
 from empresas.contexto import empresas_administrables, obtener_empresa_administrable
+from empresas.models import Empresa
+from .consentimientos import construir_aviso_legal
 from .models import PerfilUsuario
 from .permissions import IsAdministrativeUser, IsSuperUserOrReadOwnProfile
 from .services import revocar_sesiones_usuario
 from .serializers import (
     ConfirmarRecuperacionContrasenaSerializer,
     LoginJWTSerializer,
+    PreferenciaComunicacionesSerializer,
     PerfilUsuarioSerializer,
     ReenviarVerificacionCorreoSerializer,
     RegistroCompradorSerializer,
@@ -127,6 +130,50 @@ class RegistroCompradorView(views.APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return response.Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class AvisoLegalView(views.APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        empresa_slug = (
+            request.query_params.get("empresa_slug", "").strip()
+            or request.query_params.get("slug", "").strip()
+        )
+        if not empresa_slug:
+            raise ValidationError(
+                {"empresa_slug": "Debes indicar la empresa del aviso legal."}
+            )
+        empresa = Empresa.objects.filter(
+            slug__iexact=empresa_slug,
+            activa=True,
+        ).first()
+        if not empresa:
+            raise NotFound("La empresa no existe o no esta activa.")
+        return response.Response(construir_aviso_legal(empresa))
+
+
+class PreferenciaComunicacionesView(views.APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        perfil = PerfilUsuario.objects.select_related("empresa").get(
+            usuario=request.user
+        )
+        return response.Response(PreferenciaComunicacionesSerializer(perfil).data)
+
+    def patch(self, request):
+        perfil = PerfilUsuario.objects.select_related("empresa").get(
+            usuario=request.user
+        )
+        serializer = PreferenciaComunicacionesSerializer(
+            perfil,
+            data=request.data,
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return response.Response(serializer.data)
 
 
 class VerificarCorreoView(views.APIView):

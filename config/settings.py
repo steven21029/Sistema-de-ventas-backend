@@ -44,6 +44,10 @@ CORS_ALLOWED_ORIGIN_REGEXES = config_list(
     default="",
 )
 CORS_ALLOW_CREDENTIALS = config("CORS_ALLOW_CREDENTIALS", cast=bool)
+LOCAL_DEFAULT_EMPRESA_SLUG = config(
+    "LOCAL_DEFAULT_EMPRESA_SLUG",
+    default="",
+).strip()
 
 
 # Application definition
@@ -287,6 +291,14 @@ PREFACTURA_MAX_INTENTOS_CORREO = config(
     'PREFACTURA_MAX_INTENTOS_CORREO',
     default=4,
     cast=int,
+)
+TERMINOS_VERSION_ACTUAL = config(
+    'TERMINOS_VERSION_ACTUAL',
+    default='2026-08-13',
+)
+PRIVACIDAD_VERSION_ACTUAL = config(
+    'PRIVACIDAD_VERSION_ACTUAL',
+    default='2026-08-13',
 )
 
 # Default primary key field type

@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.test import override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -37,6 +38,16 @@ class EmpresaActualAPITests(APITestCase):
         self.assertEqual(response.data["subdominio"], "analiza")
         self.assertEqual(len(response.data["menu"]), 8)
         self.assertFalse(response.data["pago_en_linea_disponible"])
+
+    @override_settings(DEBUG=True, LOCAL_DEFAULT_EMPRESA_SLUG="Analiza")
+    def test_resuelve_empresa_local_predeterminada(self):
+        response = self.client.get(
+            reverse("empresas-actual"),
+            {"host": "localhost:5173"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["slug"], self.empresa.slug)
 
     def test_resuelve_empresa_por_dominio_personalizado(self):
         response = self.client.get(
